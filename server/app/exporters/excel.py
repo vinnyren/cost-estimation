@@ -15,7 +15,9 @@ REQUIRED_NAMES = ["scale_adjusted", "effort_dev_p10", "effort_dev_p50", "effort_
 
 # OWASP CSV / Excel injection 防护：用户输入字符串若以这些字符开头，Excel
 # 会把它当公式执行（=HYPERLINK / =cmd|... 等是已知 RCE 路径）。在写入前
-# 加单引号让 Excel 显式当文本处理。覆盖 ASCII 与全角变体（=≡＝）。
+# 加单引号让 Excel 显式当文本处理。
+# 覆盖范围：ASCII = + - @ + Tab + CR。Excel 不把全角 ＝＋－＠ 视为公式触发，
+# 所以不需要列入。NUL/换行不会被 Excel 解析为公式。
 _FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
 
 

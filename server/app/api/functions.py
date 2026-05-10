@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..db.session import get_db
@@ -62,7 +62,11 @@ def list_snapshots(project_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/restore")
-def restore(project_id: str, version: int, db: Session = Depends(get_db)):
+def restore(
+    project_id: str,
+    version: int = Query(..., ge=1),
+    db: Session = Depends(get_db),
+):
     try:
         n = svc.restore(db, project_id, version)
     except ValueError as e:

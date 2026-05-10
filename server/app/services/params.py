@@ -57,6 +57,15 @@ def get_global(db: Session) -> dict:
 
 
 def patch_global(db: Session, key: str, value) -> None:
+    """Write a single global param override. Key must resolve to an existing
+    leaf in the canonical tree (see _path_resolves_to_leaf); rejects pollution
+    like {"key": "anything", "value": 1} that would otherwise add a stray
+    row visible to every project."""
+    raw_eff = _raw_to_flat(get_global(db))
+    if not _path_resolves_to_leaf(raw_eff, key):
+        raise ValueError(
+            f"INVALID_PARAM_KEY: {key!r} does not resolve to a known leaf"
+        )
     p = db.query(ParamGlobal).filter_by(key=key).first()
     if p is None:
         p = ParamGlobal(
@@ -73,14 +82,29 @@ def patch_global(db: Session, key: str, value) -> None:
 
 
 def reset_global(db: Session) -> None:
-    """Drop ParamGlobal rows then re-seed from CSBMK file.
+    """Drop ParamGlobal rows then re-seed from CSBMK file in a single
+    transaction.
 
     Wipes anything user-modified — backs /api/params/global/reset. Per-project
     ParamOverride rows are intentionally left intact.
+
+    /review round 5: 之前 delete+commit 然后 seed_from_csbmk 用独立 session
+    打开了一个空 params 窗口，并发 calc 会拿空树。改为 inline 重新 seed 在
+    同一 session 同一 transaction 中提交，避免 reader 看到过渡空状态。
     """
+    raw = json.loads(settings.csbmk_seed_path.read_text(encoding="utf-8"))
+    version = raw.get("version", "CSBMK®-unknown")
+    flat: dict = {}
+    _flatten("", raw, flat)
     db.query(ParamGlobal).delete()
+    for k, v in flat.items():
+        db.add(ParamGlobal(
+            key=k,
+            value=json.dumps(v, ensure_ascii=False),
+            basis_version=version,
+            modified=False,
+        ))
     db.commit()
-    seed_from_csbmk()
 
 
 _FLAT_TOP_KEYS = (
@@ -138,6 +162,38 @@ def get_effective(db: Session, project_id: str) -> dict:
     return eff
 
 
+_KEY_MAX_LEN = 256
+
+
+def _path_resolves_to_leaf(tree: dict, key: str) -> bool:
+    """A param-override key is well-formed only when it refers to a non-dict
+    leaf in the canonical params tree. Otherwise the user can clobber an
+    entire subtree (e.g. POST {"cf": 42} overwrites the whole cf dict and
+    crashes the next forward calc). /review round 5 adversarial discovery."""
+    if not isinstance(key, str) or not (1 <= len(key) <= _KEY_MAX_LEN):
+        return False
+    parts = key.split(".")
+    if any(not p for p in parts):
+        return False
+    cur: Any = tree
+    for p in parts:
+        if not isinstance(cur, dict) or p not in cur:
+            return False
+        cur = cur[p]
+    return not isinstance(cur, dict)
+
+
+def validate_override_key(db: Session, key: str) -> None:
+    """Raise ValueError if key is unsafe to write into ParamOverride / ParamGlobal."""
+    raw = get_global(db)
+    eff = _raw_to_flat(raw)
+    if not _path_resolves_to_leaf(eff, key):
+        raise ValueError(
+            f"INVALID_PARAM_KEY: {key!r} does not resolve to a known leaf "
+            f"(must be a dotted path ending at a scalar in the params tree)"
+        )
+
+
 def apply_overrides(
     db: Session, project_id: str, items: dict[str, Any]
 ) -> dict:
@@ -145,6 +201,10 @@ def apply_overrides(
 
     `items` is a flat dotted-key map. Passing `None` for a key clears that
     override row, restoring the global value.
+
+    Each key is validated against the canonical params tree so users can't
+    overwrite a top-level subtree (e.g. {"cf": 42} would otherwise flatten
+    the whole cf dict to a scalar — see /review round 5).
 
     Marks any cached Result rows stale — calc engine reads effective(=global
     ⊕ overrides), so changing an override invalidates the previously computed
@@ -155,6 +215,12 @@ def apply_overrides(
     from ..db.models import Result
     if not db.query(Project).filter_by(id=project_id).first():
         raise ValueError("PROJECT_NOT_FOUND")
+    raw_eff = _raw_to_flat(get_global(db))
+    for key in items:
+        if not _path_resolves_to_leaf(raw_eff, key):
+            raise ValueError(
+                f"INVALID_PARAM_KEY: {key!r} does not resolve to a known leaf"
+            )
     for key, val in items.items():
         existing = (
             db.query(ParamOverride)

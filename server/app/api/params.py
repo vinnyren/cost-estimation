@@ -17,7 +17,13 @@ def get_global(db: Session = Depends(get_db)):
 
 @router.patch("/api/params/global")
 def patch_global(payload: ParamPatch, db: Session = Depends(get_db)):
-    svc.patch_global(db, payload.key, payload.value)
+    try:
+        svc.patch_global(db, payload.key, payload.value)
+    except ValueError as e:
+        if "INVALID_PARAM_KEY" in str(e):
+            raise HTTPException(422, detail={"error": {"code": "INVALID_PARAM_KEY",
+                                                          "problem": str(e)}})
+        raise
     return {"ok": True, "data": {"updated": payload.key}}
 
 
@@ -44,7 +50,13 @@ def patch_override(
     try:
         eff = svc.apply_overrides(db, project_id, payload)
     except ValueError as e:
-        if "PROJECT_NOT_FOUND" in str(e):
+        msg = str(e)
+        if "PROJECT_NOT_FOUND" in msg:
             raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND")
+        if "INVALID_PARAM_KEY" in msg:
+            raise HTTPException(
+                status_code=422,
+                detail={"error": {"code": "INVALID_PARAM_KEY", "problem": msg}},
+            )
         raise
     return {"ok": True, "data": eff}

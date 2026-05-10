@@ -58,10 +58,13 @@ async def test_same_filename_uploaded_twice_does_not_overwrite(client_with_proje
     r1 = await _upload(c, pid, "sample.pdf", "needs.pdf")
     r2 = await _upload(c, pid, "sample.pdf", "needs.pdf")
     assert r1.status_code == 201 and r2.status_code == 201
-    p1 = Path(r1.json()["data"]["parsed_text_path"])
-    p2 = Path(r2.json()["data"]["parsed_text_path"])
+    p1 = r1.json()["data"]["parsed_text_path"]
+    p2 = r2.json()["data"]["parsed_text_path"]
     assert p1 != p2, "two uploads with same filename must produce different parsed paths"
-    assert p1.exists() and p2.exists(), "both parsed-text files must persist"
+    # parsed paths are stored relative to settings.parsed_dir = tmp/parsed
+    abs1 = tmp / "parsed" / p1
+    abs2 = tmp / "parsed" / p2
+    assert abs1.exists() and abs2.exists(), "both parsed-text files must persist"
 
 
 async def test_same_basename_diff_extension_does_not_collide(client_with_project):
@@ -69,11 +72,12 @@ async def test_same_basename_diff_extension_does_not_collide(client_with_project
     r1 = await _upload(c, pid, "sample.pdf", "needs.pdf")
     r2 = await _upload(c, pid, "sample.docx", "needs.docx")
     assert r1.status_code == 201 and r2.status_code == 201
-    p1 = Path(r1.json()["data"]["parsed_text_path"])
-    p2 = Path(r2.json()["data"]["parsed_text_path"])
+    p1 = r1.json()["data"]["parsed_text_path"]
+    p2 = r2.json()["data"]["parsed_text_path"]
     assert p1 != p2
-    # 两份 parsed 结果都还在
-    assert p1.exists() and p2.exists()
+    abs1 = tmp / "parsed" / p1
+    abs2 = tmp / "parsed" / p2
+    assert abs1.exists() and abs2.exists()
 
 
 async def test_uploaded_files_listed_separately(client_with_project):

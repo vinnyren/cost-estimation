@@ -1,4 +1,5 @@
 import uuid, json
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..db.models import FunctionPoint, FPSnapshot, Project, Result
 from ..schemas.functions import FunctionPointCreate, FunctionPointPatch
@@ -90,6 +91,30 @@ def bulk_write(db: Session, project_id: str, items: list[FunctionPointCreate],
                 replace: bool, reason: str = "bulk_write") -> int:
     if not db.query(Project).filter_by(id=project_id).first():
         raise ValueError("PROJECT_NOT_FOUND")
+
+    # 当 replace=True 且 DB 已有功能点（可能是通过 POST /functions 单体
+    # create 或 PATCH 添加的），先做一道 pre-replace 快照。否则那些通过
+    # create/patch 路径写入但从未触发过 bulk_write 的行，会被 replace
+    # 永久销毁、且不在任何快照里、无法 restore。
+    # /review round 5 adversarial discovery (ISSUE-024)。
+    # 用 current_max 作为快照版本（这些行的真实 version）；若该 version
+    # 上已经有快照（比如来自上一次 bulk_write 的 post-write 快照）则不再
+    # 重复写，避免与新的 UNIQUE(project_id, version) 约束冲突。
+    if replace:
+        current_max = (
+            db.query(func.max(FunctionPoint.version))
+            .filter_by(project_id=project_id)
+            .scalar()
+        )
+        if current_max is not None:
+            existing_snap = (
+                db.query(FPSnapshot)
+                .filter_by(project_id=project_id, version=current_max)
+                .first()
+            )
+            if not existing_snap:
+                _snapshot(db, project_id, current_max, reason="pre_bulk_replace")
+
     next_v = _next_version(db, project_id)
 
     if replace:
@@ -121,9 +146,13 @@ def restore(db: Session, project_id: str, version: int) -> int:
     """
     if not db.query(Project).filter_by(id=project_id).first():
         raise ValueError("PROJECT_NOT_FOUND")
+    # 同 (project_id, version) 可能有多条快照（无 UNIQUE 约束 + 重放路径）。
+    # 选最新写入的一条（id 最大）作为权威版本，避免 .first() 在重复键上的
+    # 不确定行为。/review round 5 adversarial 发现。
     snap = (
         db.query(FPSnapshot)
         .filter_by(project_id=project_id, version=version)
+        .order_by(FPSnapshot.id.desc())
         .first()
     )
     if not snap:

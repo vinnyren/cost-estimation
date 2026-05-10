@@ -126,6 +126,15 @@ class FPSnapshot(Base):
 
 
 Index("idx_fp_snapshots_project", FPSnapshot.project_id, FPSnapshot.id)
+# UNIQUE 防止并发 bulk_write 在同一 (project, version) 上插入重复快照导致
+# restore 非确定。/review round 5 加，并由 alembic migration 8a2e6b41c3d7
+# 落到已有 DB。
+Index(
+    "uq_fp_snapshots_project_version",
+    FPSnapshot.project_id,
+    FPSnapshot.version,
+    unique=True,
+)
 
 
 class ParamGlobal(Base):

@@ -74,16 +74,34 @@ async def save_and_parse(db: Session, project_id: str, file: UploadFile) -> Uplo
     parsed_path = _parsed_dir(project_id) / f"{upload_uid}__{Path(original_name).stem}.txt"
     parsed_path.write_text(text, encoding="utf-8")
 
+    # 存相对路径（相对 settings.parsed_dir），让 COST_DATA_DIR 迁移不会让
+    # 历史 upload 记录变成 dangling 绝对路径。读取时用 resolve_parsed_path
+    # 还原为当前 data_dir 下的绝对路径。/review round 5 (ISSUE-026).
+    assert settings.parsed_dir is not None
+    rel_parsed = str(parsed_path.relative_to(settings.parsed_dir))
+
     rec = Upload(
         project_id=project_id,
         filename=original_name,
         size=info["size"],
         filetype=info["ext"].lstrip("."),
-        parsed_text_path=str(parsed_path))
+        parsed_text_path=rel_parsed)
     db.add(rec)
     db.commit()
     db.refresh(rec)
     return rec
+
+
+def resolve_parsed_path(rec: Upload) -> Path:
+    """Read-side helper: turn the stored relative parsed_text_path back into
+    an absolute Path under the current settings.parsed_dir. Tolerant of legacy
+    rows that may still hold an absolute path."""
+    assert settings.parsed_dir is not None
+    stored = rec.parsed_text_path or ""
+    p = Path(stored)
+    if p.is_absolute():
+        return p
+    return settings.parsed_dir / stored
 
 
 def list_for_project(db: Session, project_id: str) -> list[Upload]:
