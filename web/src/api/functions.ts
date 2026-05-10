@@ -1,7 +1,12 @@
 import { api } from "./client";
 
 export type FpCategory = "EI" | "EO" | "EQ" | "ILF" | "EIF";
-export type FpSource = "manual" | "ai_extracted" | "allocator";
+export type FpSource =
+  | "manual"
+  | "imported"
+  | "ai_extracted"
+  | "claude_draft"
+  | "allocator";
 
 export interface FunctionPoint {
   id: number;

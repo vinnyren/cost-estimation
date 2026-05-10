@@ -60,7 +60,7 @@ class FunctionPoint(Base):
     reuse_level = Column(String)
     modify_type = Column(String)
     us = Column(Float, nullable=False)
-    source = Column(String)  # claude_draft|manual|imported|allocator
+    source = Column(String)  # manual | imported | ai_extracted | claude_draft | allocator
     locked = Column(Boolean, default=False)
     notes = Column(Text)
     ord = Column(Integer)

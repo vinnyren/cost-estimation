@@ -61,6 +61,26 @@ async def test_bulk_replace(client_with_project):
     assert len(r2.json()["data"]) == 5
 
 
+async def test_bulk_accepts_ai_extracted_source(client_with_project):
+    """Cross-plan alignment: SKILL/AI agents write source='ai_extracted'.
+
+    Backend Pydantic schema must accept this value (regression for the
+    422 bug where the old Literal only allowed claude_draft|manual|imported|allocator).
+    """
+    c, pid = client_with_project
+    items = [{**SAMPLE_FP, "name": "AI-Extracted-FP", "source": "ai_extracted"}]
+    r = await c.post(f"/api/projects/{pid}/functions/bulk",
+                      headers={**H, "Content-Type": "application/json"},
+                      json={"items": items, "replace": True})
+    assert r.status_code in (200, 201), r.text
+    assert r.json()["data"]["written"] == 1
+
+    r2 = await c.get(f"/api/projects/{pid}/functions", headers=H)
+    rows = r2.json()["data"]
+    assert len(rows) == 1
+    assert rows[0]["source"] == "ai_extracted"
+
+
 async def test_patch_fp_marks_results_stale(client_with_project):
     c, pid = client_with_project
     r = await c.post(f"/api/projects/{pid}/functions",

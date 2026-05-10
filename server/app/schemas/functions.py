@@ -15,7 +15,9 @@ class FunctionPointBase(BaseModel):
     reuse_level: Optional[Literal["low", "high"]] = "low"
     modify_type: Optional[Literal["new", "modify", "delete"]] = "new"
     us: float
-    source: Optional[Literal["claude_draft", "manual", "imported", "allocator"]] = "manual"
+    source: Optional[
+        Literal["manual", "imported", "ai_extracted", "claude_draft", "allocator"]
+    ] = "manual"
     locked: bool = False
     notes: Optional[str] = None
     ord: Optional[int] = None
