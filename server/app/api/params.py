@@ -33,6 +33,16 @@ def reset_global(db: Session = Depends(get_db)):
     return {"ok": True, "data": svc.get_global(db)}
 
 
+@router.get("/api/params/effective")
+def get_global_effective(db: Session = Depends(get_db)):
+    """Read the *flat-named* effective view of the global params (no
+    project layer). Mirrors GET /api/projects/{id}/params/effective minus the
+    per-project overrides, used by ParamManager's snapshot tab + UI to
+    display restored values consistently with the override view."""
+    # type: ignore[arg-type] — project_id=None yields an empty override layer
+    return {"ok": True, "data": svc.get_effective(db, project_id=None)}  # type: ignore[arg-type]
+
+
 @router.get("/api/projects/{project_id}/params/effective")
 def get_effective(project_id: str, db: Session = Depends(get_db)):
     from ..db.models import Project

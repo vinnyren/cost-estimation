@@ -14,6 +14,7 @@ from .api.calc import router as calc_router
 from .api.uploads import router as uploads_router
 from .api.functions import router as functions_router
 from .api.reports import router as reports_router
+from .api.snapshots import router as snapshots_router
 from .config import Settings, settings
 from .deps import auth_middleware, origin_middleware
 
@@ -104,6 +105,7 @@ def create_app() -> FastAPI:
     app.include_router(uploads_router)
     app.include_router(functions_router)
     app.include_router(reports_router)
+    app.include_router(snapshots_router)
 
     # 生产期：若配置了 web_dist_dir 则挂载静态资源 + SPA fallback。
     # 必须在所有 API 路由之后挂载，避免通配符路径吞掉真实路由。
