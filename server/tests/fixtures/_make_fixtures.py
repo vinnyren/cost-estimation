@@ -45,7 +45,21 @@ def make_docx():
     d.save(str(OUT / "sample.docx"))
 
 
+def make_xlsx():
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "功能清单"
+    ws.append(["子系统", "一级模块", "二级模块", "功能项描述"])
+    ws.append(["政务服务平台", "业务功能", "门户首页", "新闻列表"])
+    ws.append(["政务服务平台", "业务功能", "新闻管理", "新增"])
+    ws.append(["政务服务平台", "业务功能", "新闻管理", "修改"])
+    ws.append(["政务服务平台", "业务功能", "用户管理", "登录"])
+    wb.save(str(OUT / "sample.xlsx"))
+
+
 if __name__ == "__main__":
     make_pdf()
     make_docx()
+    make_xlsx()
     print("✓ fixtures created")
