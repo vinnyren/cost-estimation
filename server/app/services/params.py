@@ -145,7 +145,14 @@ def apply_overrides(
 
     `items` is a flat dotted-key map. Passing `None` for a key clears that
     override row, restoring the global value.
+
+    Marks any cached Result rows stale — calc engine reads effective(=global
+    ⊕ overrides), so changing an override invalidates the previously computed
+    cost (ISSUE-011). Today the calc path doesn't actually persist Result
+    rows, so this is a no-op in practice; wiring it now keeps the path
+    correct when result caching is added.
     """
+    from ..db.models import Result
     if not db.query(Project).filter_by(id=project_id).first():
         raise ValueError("PROJECT_NOT_FOUND")
     for key, val in items.items():
@@ -169,6 +176,9 @@ def apply_overrides(
                     value=encoded,
                 )
             )
+    db.query(Result).filter_by(project_id=project_id).update(
+        {Result.is_stale: True}
+    )
     db.commit()
     return get_effective(db, project_id)
 

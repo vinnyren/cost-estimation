@@ -72,7 +72,19 @@ def create_app() -> FastAPI:
     # 生产期静态托管目录从环境同步（reload 友好）
     settings.web_dist_dir = fresh.web_dist_dir
 
-    app = FastAPI(title="软件造价制作系统", version="1.0.0", lifespan=_lifespan)
+    # 生产期（挂载 web/dist）关闭 FastAPI 内置 /docs /redoc /openapi.json —
+    # 这些路由在 deps.auth_middleware 里命中「GET 且 非 /api/」分支被放行，
+    # 任何能访问 loopback 的进程都能拉到完整 API 表面，作为 defense-in-depth
+    # 在产品形态下关掉。开发模式（无 web_dist_dir）保留以便联调（ISSUE-008）。
+    docs_kwargs: dict[str, str | None] = (
+        {"docs_url": None, "redoc_url": None, "openapi_url": None}
+        if fresh.web_dist_dir
+        else {}
+    )
+    app = FastAPI(
+        title="软件造价制作系统", version="1.0.0", lifespan=_lifespan,
+        **docs_kwargs,  # type: ignore[arg-type]
+    )
 
     app.add_middleware(
         CORSMiddleware,

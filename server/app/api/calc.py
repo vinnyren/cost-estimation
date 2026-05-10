@@ -42,10 +42,15 @@ def reverse(payload: CalcReverseRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/allocate")
-def allocate_route(payload: AllocateRequest):
+def allocate_route(payload: AllocateRequest, db: Session = Depends(get_db)):
     try:
-        return {"ok": True, "data": svc.run_allocate(payload.model_dump())}
+        return {
+            "ok": True,
+            "data": svc.run_allocate(db, payload.project_id, payload.model_dump()),
+        }
     except ValueError as e:
         code = str(e).split(":")[0]
+        if code == "PROJECT_NOT_FOUND":
+            raise HTTPException(404, detail={"error": {"code": code}})
         raise HTTPException(400, detail={"error": {"code": code, "problem": str(e),
                                                      "fix": "解锁部分锁定项或提高 target_us"}})

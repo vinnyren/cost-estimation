@@ -75,7 +75,13 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
     return r.__dict__
 
 
-def run_allocate(payload: dict) -> list[dict]:
+def run_allocate(db: Session, project_id: str, payload: dict) -> list[dict]:
+    """Allocator 算法本身不需要 project_id（纯数学切分），但 schema 要求是
+    为了：1) 显式绑定到一个项目作为审计 / 权限作用域，2) 保证调用者拿到的
+    drafts 之后能 bulk_write 回同一个项目。这里加一道存在性校验，避免对
+    不存在的项目调用 allocate 也返回 200（ISSUE-012 round 2 QA）。"""
+    if not db.query(Project).filter_by(id=project_id).first():
+        raise ValueError("PROJECT_NOT_FOUND")
     drafts = [FpDraft(name=d["name"], weight=d["weight"],
                       locked=d.get("locked", False), locked_us=d.get("locked_us", 0.0))
               for d in payload["drafts"]]
