@@ -400,7 +400,17 @@ describe("Wizard step 2 — project_type / alpha / include_ops (T14)", () => {
     for (let i = 0; i < 5; i++) {
       await w.find("[data-test='wizard-next']").trigger("click");
     }
-    expect(w.text()).toContain("\"alpha\": 1");
+    // dev_only 模式下 step 7 不展示 α 行（只在 dev_and_ops 显示）。
+    // 通过 submit payload 验证 alpha_dev 回到 1.0。
+    const submitBtn = w.findAll("button").find((b) =>
+      b.text().includes("创建项目"),
+    );
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0];
+    expect(payload.alpha_dev).toBeCloseTo(1.0, 5);
   });
 
   it("选择 ops_only：include_ops checkbox 隐藏（强制为 true 但不展示），AlphaSlider 不显示", async () => {
@@ -511,11 +521,13 @@ describe("Wizard step 3 — phase + CF preview (T15)", () => {
     expect(w.find('[data-testid="phase-card-budget"]').attributes("data-active")).toBe("true");
     expect(w.find('[data-testid="phase-card-bidding"]').attributes("data-active")).toBe("false");
 
-    // 跳到 step 7 检查 form.phase 写入
+    // 跳到 step 7 检查 form.phase 写入（确认页"阶段"行显示 budget）。
     for (let i = 0; i < 4; i++) {
       await w.find("[data-test='wizard-next']").trigger("click");
     }
-    expect(w.text()).toContain('"phase": "budget"');
+    const summary = w.find('[data-testid="confirm-summary"]');
+    expect(summary.exists()).toBe(true);
+    expect(summary.text()).toContain("budget");
   });
 
   it("CF 默认 1.00 when key missing from effective", async () => {
@@ -665,5 +677,249 @@ describe("Wizard step 5/6 — factor dropdowns (T17)", () => {
     const html = appTypeSelect.html();
     expect(html).toContain("×1.00");
     expect(html).toContain("×1.10");
+  });
+});
+
+/**
+ * NOTE (T18 — Wizard step 7 确认 + 提交):
+ *   Step 7 展示全部参数（dl 列表），submit() 把 v2.0 新字段
+ *   （client / evaluator / include_ops / factors_dev / factors_ops）
+ *   都写进 create payload。空因子组 → factors_* = undefined（不发送）。
+ *   factors_ops 仅在 include_ops=true 时携带。
+ */
+describe("Wizard step 7 — 确认 + 提交 (T18)", () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const { paramsApi } = await import("@/api/params");
+    (paramsApi.global as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      cf: { budget: 1.5, bidding: 1.21, planning: 1.1, change: 1.05, settled: 1.0 },
+      factors_dev: {
+        app_type: { OLTP: 1.0, OLAP: 1.1 },
+        platform: { web: 1.0, mobile: 1.2 },
+      },
+      factors_ops: {
+        update_freq: { low: 0.8, high: 1.3 },
+      },
+    });
+    (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p-99",
+      name: "new",
+      project_type: "dev_only",
+      mode: "forward",
+      city: "北京",
+      industry: "电子政务",
+      phase: "bidding",
+      basis_data_ver: "CSBMK®-202510",
+      created_at: "",
+      updated_at: "",
+    });
+  });
+
+  async function advanceToStep7(w: ReturnType<typeof mountWizard>) {
+    for (let i = 0; i < 6; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+      await flushPromises();
+    }
+  }
+
+  it("step 7 渲染 confirm-summary dl 包含项目名、城市、客户/评估方", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("项目甲");
+    await w.find('input[name="client"]').setValue("甲方公司");
+    await w.find('input[name="evaluator"]').setValue("第三方评估");
+    await flushPromises();
+    await advanceToStep7(w);
+
+    const summary = w.find('[data-testid="confirm-summary"]');
+    expect(summary.exists()).toBe(true);
+    const text = summary.text();
+    expect(text).toContain("项目甲");
+    expect(text).toContain("北京");
+    expect(text).toContain("电子政务");
+    expect(text).toContain("甲方公司");
+    expect(text).toContain("第三方评估");
+    expect(text).toContain("仅开发");
+    expect(text).toContain("bidding");
+    expect(text).toContain("正向");
+  });
+
+  it("空 client / evaluator 显示占位符 —", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("无客户项目");
+    await flushPromises();
+    await advanceToStep7(w);
+
+    const summary = w.find('[data-testid="confirm-summary"]');
+    expect(summary.text()).toContain("— / —");
+  });
+
+  it("submit payload 携带 client + evaluator", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("项目甲");
+    await w.find('input[name="client"]').setValue("甲方");
+    await w.find('input[name="evaluator"]').setValue("评估方");
+    await flushPromises();
+    await advanceToStep7(w);
+
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0];
+    expect(payload.client).toBe("甲方");
+    expect(payload.evaluator).toBe("评估方");
+  });
+
+  it("submit payload 携带 factors_dev 当至少一个因子被选中", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("带因子项目");
+    await flushPromises();
+    // 进到 step 5（开发因子）
+    for (let i = 0; i < 4; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+      await flushPromises();
+    }
+    await w.find('[data-factor="app_type"] select').setValue("OLAP");
+    await flushPromises();
+    // step 5 → 6 → 7
+    for (let i = 0; i < 2; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+      await flushPromises();
+    }
+
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0];
+    expect(payload.factors_dev).toBeDefined();
+    expect(payload.factors_dev.app_type).toBe("OLAP");
+  });
+
+  it("submit payload factors_dev=undefined 当没有任何选择", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("空因子项目");
+    await flushPromises();
+    await advanceToStep7(w);
+
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0];
+    expect(payload.factors_dev).toBeUndefined();
+  });
+
+  it("dev_only 项目：submit payload.factors_ops = undefined（即使 ops 因子有值也被丢弃）", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("仅开发");
+    await flushPromises();
+    // dev_only 默认 → include_ops=false → step 6 是 skip
+    await advanceToStep7(w);
+
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0];
+    expect(payload.include_ops).toBe(false);
+    expect(payload.factors_ops).toBeUndefined();
+  });
+
+  it("dev_and_ops + ops 因子选中：payload.factors_ops 携带选择", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("混合项目");
+    await w.find("[data-test='wizard-next']").trigger("click"); // → step 2
+    const radios = w.findAll('input[type="radio"][name="project_type"]');
+    const devOps = radios.find(
+      (r) => (r.element as HTMLInputElement).value === "dev_and_ops",
+    )!;
+    await devOps.setValue();
+    await flushPromises();
+    // step 2 → 3 → 4 → 5 → 6
+    for (let i = 0; i < 4; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+      await flushPromises();
+    }
+    // step 6: 选 update_freq=low
+    await w.find('[data-factor="update_freq"] select').setValue("low");
+    await flushPromises();
+    // step 6 → 7
+    await w.find("[data-test='wizard-next']").trigger("click");
+    await flushPromises();
+
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0];
+    expect(payload.include_ops).toBe(true);
+    expect(payload.factors_ops).toBeDefined();
+    expect(payload.factors_ops.update_freq).toBe("low");
+  });
+
+  it("step 7 显示 α 行仅当 dev_and_ops", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("混合项目");
+    await w.find("[data-test='wizard-next']").trigger("click"); // → step 2
+    const radios = w.findAll('input[type="radio"][name="project_type"]');
+    const devOps = radios.find(
+      (r) => (r.element as HTMLInputElement).value === "dev_and_ops",
+    )!;
+    await devOps.setValue();
+    await flushPromises();
+    // step 2 → 3 → 4 → 5 → 6 → 7
+    for (let i = 0; i < 5; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+      await flushPromises();
+    }
+    const summary = w.find('[data-testid="confirm-summary"]');
+    expect(summary.text()).toContain("α");
+    expect(summary.text()).toContain("开发 + 运维");
+  });
+
+  it("payload 始终携带 basis_data_ver = CSBMK®-202510", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("基础数据版本测试");
+    await flushPromises();
+    await advanceToStep7(w);
+
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>)
+      .mock.calls[0][0];
+    expect(payload.basis_data_ver).toBe("CSBMK®-202510");
   });
 });

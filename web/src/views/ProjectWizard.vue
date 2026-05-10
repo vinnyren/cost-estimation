@@ -212,21 +212,43 @@ const opsFactorPreview = computed<number>(() =>
   ),
 );
 
+function hasAnyFactor(obj: Record<string, string>): boolean {
+  return Object.values(obj).some((v) => v && v.length > 0);
+}
+
 async function submit(): Promise<void> {
   submitting.value = true;
   errorMsg.value = null;
   try {
-    const payload: Partial<Project> & { mode: ProjectMode } = {
+    // v2.0 payload: project core + 调整因子。Partial<Project> 覆盖核心字段；
+    // factors_dev/factors_ops 在 TS Project 接口上未声明（后端 schema
+    // 在 server/app/schemas/project.py 已有），这里用 intersection 显式扩展。
+    const payload: Partial<Project> &
+      { mode: ProjectMode } &
+      {
+        factors_dev?: Record<string, string>;
+        factors_ops?: Record<string, string>;
+      } = {
       name: form.name,
-      mode: form.mode,
+      project_type: form.project_type,
+      phase: form.phase,
       city: form.city,
       industry: form.industry,
-      phase: form.phase,
-      project_type: form.project_type,
-      basis_data_ver: BASIS_DATA_VER,
-      alpha_dev: form.alpha,
+      client: form.client || undefined,
+      evaluator: form.evaluator || undefined,
+      mode: form.mode,
       target_cost:
         form.mode === "reverse" ? form.target_total : undefined,
+      include_ops: form.include_ops,
+      alpha_dev: form.alpha,
+      basis_data_ver: BASIS_DATA_VER,
+      factors_dev: hasAnyFactor(form.factors_dev)
+        ? { ...form.factors_dev }
+        : undefined,
+      factors_ops:
+        form.include_ops && hasAnyFactor(form.factors_ops)
+          ? { ...form.factors_ops }
+          : undefined,
     };
     const created = await store.create(payload);
     router.push({ name: "fp-editor", params: { id: created.id } });
@@ -470,10 +492,80 @@ async function submit(): Promise<void> {
 
       <fieldset v-else-if="currentStep === 7">
         <legend>确认</legend>
-        <p class="placeholder">
-          将在 T18 填充：摘要 + 创建
-        </p>
-        <pre class="confirm-summary">{{ JSON.stringify(form, null, 2) }}</pre>
+        <dl
+          class="confirm-list"
+          data-testid="confirm-summary"
+        >
+          <dt>项目名</dt>
+          <dd data-field="name">
+            {{ form.name }}
+          </dd>
+
+          <dt>城市 / 行业</dt>
+          <dd>{{ form.city }} / {{ form.industry }}</dd>
+
+          <dt>客户 / 评估方</dt>
+          <dd>
+            {{ form.client || "—" }} / {{ form.evaluator || "—" }}
+          </dd>
+
+          <dt>类型</dt>
+          <dd>{{ PROJECT_TYPE_LABELS[form.project_type] }}</dd>
+
+          <template v-if="form.project_type === 'dev_and_ops'">
+            <dt>α</dt>
+            <dd>{{ form.alpha.toFixed(2) }}</dd>
+          </template>
+
+          <dt>阶段</dt>
+          <dd>
+            {{ form.phase }} (CF =
+            {{ (effectiveParams?.cf?.[form.phase] ?? 1).toFixed(2) }})
+          </dd>
+
+          <dt>模式</dt>
+          <dd>
+            {{ form.mode === "forward"
+              ? "正向"
+              : `反向（目标 ${form.target_total} 元）` }}
+          </dd>
+
+          <dt>开发因子</dt>
+          <dd>
+            <ul class="factor-list">
+              <template
+                v-for="(v, k) in form.factors_dev"
+                :key="String(k)"
+              >
+                <li v-if="v">
+                  {{ FACTOR_LABELS[String(k)] ?? String(k) }}: {{ v }}
+                </li>
+              </template>
+              <li v-if="!hasAnyFactor(form.factors_dev)">
+                未配置（按 1.0 计算）
+              </li>
+            </ul>
+          </dd>
+
+          <template v-if="form.include_ops">
+            <dt>运维因子</dt>
+            <dd>
+              <ul class="factor-list">
+                <template
+                  v-for="(v, k) in form.factors_ops"
+                  :key="String(k)"
+                >
+                  <li v-if="v">
+                    {{ FACTOR_LABELS[String(k)] ?? String(k) }}: {{ v }}
+                  </li>
+                </template>
+                <li v-if="!hasAnyFactor(form.factors_ops)">
+                  未配置（按 1.0 计算）
+                </li>
+              </ul>
+            </dd>
+          </template>
+        </dl>
         <p
           v-if="errorMsg"
           role="alert"
@@ -655,15 +747,27 @@ legend {
 .checkbox input[type="checkbox"]:disabled + span {
   color: var(--color-text-muted);
 }
-.confirm-summary {
-  background: var(--color-bg);
+.confirm-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
   padding: var(--space-3);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-body);
   margin: 0;
-  overflow: auto;
-  max-height: 240px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-body);
+}
+.confirm-list dt {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+.confirm-list dd {
+  margin: 0;
+}
+.factor-list {
+  margin: 0;
+  padding-left: var(--space-4);
 }
 .nav {
   display: flex;
