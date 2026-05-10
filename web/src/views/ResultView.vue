@@ -37,7 +37,9 @@ async function loadAndCompute(): Promise<void> {
       forwardResult.value = r;
       results.setForwardResult(r);
     } else {
-      // reverse 模式：等用户输入 target_total 后再算
+      // reverse 模式：从向导/编辑保存的 target_cost 预填，省一次手输
+      targetTotal.value = project.value.target_cost ?? 0;
+      otherCost.value = project.value.other_cost ?? 0;
     }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : "计算失败";
@@ -211,7 +213,10 @@ const hasReverse = computed(() => reverseResult.value !== null);
       </div>
     </div>
 
-    <footer class="dl-bar">
+    <footer
+      v-if="hasForward || hasReverse"
+      class="dl-bar"
+    >
       <button
         type="button"
         class="btn btn-primary"

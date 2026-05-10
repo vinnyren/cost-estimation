@@ -55,6 +55,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/ResultView.vue"),
     props: (route) => ({ projectId: String(route.params.id) }),
   },
+  {
+    // SPA fallback: any unmatched URL resolves here so users see a real
+    // "page not found" instead of a blank body under the layout shell.
+    path: "/:pathMatch(.*)*",
+    name: "not-found",
+    component: () => import("@/views/NotFound.vue"),
+  },
 ];
 
 export function createRouterFor(history: RouterHistory) {

@@ -1,4 +1,9 @@
 <script setup lang="ts">
+declare const __APP_VERSION__: string;
+const version =
+  typeof __APP_VERSION__ === "string" && __APP_VERSION__.length > 0
+    ? __APP_VERSION__
+    : "1.0";
 </script>
 
 <template>
@@ -10,7 +15,7 @@
       <h1 class="app-logo">
         软件造价制作系统
       </h1>
-      <span class="app-meta text-muted">v1.0 · CSBMK®-202510</span>
+      <span class="app-meta text-muted">v{{ version }} · CSBMK®-202510</span>
     </header>
     <main
       class="app-main"

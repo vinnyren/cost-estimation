@@ -16,7 +16,7 @@ describe("router", () => {
     expect(sessionStorage.getItem("auth_token")).toBe("existing");
   });
 
-  it("路由表包含 5 屏 + 每条 props 函数能从 route 提取 projectId", () => {
+  it("路由表包含 5 屏 + not-found + 每条 props 函数能从 route 提取 projectId", () => {
     const router = createRouterFor(createMemoryHistory());
     const records = router.getRoutes();
     const names = records.map((r) => r.name);
@@ -27,6 +27,7 @@ describe("router", () => {
         "fp-editor",
         "param-manager",
         "result-view",
+        "not-found",
       ]),
     );
     // 显式调用 props 函数（带 id 的 3 个屏），确保函数执行
@@ -64,5 +65,13 @@ describe("router", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     await router.push("/projects/new").catch(() => {});
     expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it("未知路由 fallback 到 not-found（避免空白 layout）", async () => {
+    const router = createRouterFor(createMemoryHistory());
+    await router.push("/projects"); // 注意：列表是 /，没有 /projects 路由
+    expect(router.currentRoute.value.name).toBe("not-found");
+    await router.push("/something-totally-bogus");
+    expect(router.currentRoute.value.name).toBe("not-found");
   });
 });

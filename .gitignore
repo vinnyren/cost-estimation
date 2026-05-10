@@ -35,3 +35,4 @@ test-results/
 # mutation testing
 .mutmut-cache/
 mutants/
+.gstack/

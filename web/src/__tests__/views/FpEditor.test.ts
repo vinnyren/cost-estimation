@@ -37,10 +37,15 @@ const router = createRouter({
 });
 
 describe("FpEditor", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     (functionsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    // Seed the in-memory router at a real route — otherwise the initial empty
+    // path triggers a Vue Router "no match found" warning that shows up in
+    // CI logs and makes real failures harder to spot.
+    await router.push("/projects/p-1/functions");
+    await router.isReady();
   });
 
   it("空表态显示 hero CTA：上传文档让 AI 写第一稿", async () => {
