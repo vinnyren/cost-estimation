@@ -6,3 +6,4 @@ dist-ssr
 !.vscode/settings.json
 .idea
 coverage
+*.tsbuildinfo
