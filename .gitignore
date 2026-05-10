@@ -11,6 +11,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mutmut-cache/
+*.egg-info/
 
 # 项目数据
 *.sqlite
