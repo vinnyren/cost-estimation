@@ -16,12 +16,16 @@ allowed-tools: Bash, Read
    echo "DATA_DIR=$DATA_DIR"
    ```
 
-2. 检测 Python 3.11+ 与 libmagic（preflight）：
+2. 在 `$PLUGIN_DIR/server` 下创建 venv 并跑 preflight（Python 版本 + libmagic + pip 镜像）：
    ```bash
-   python3 --version | grep -E "Python 3\.(11|12|13)" \
-     || { echo "✗ 需要 Python 3.11 及以上"; exit 1; }
-   python3 -c "import ctypes.util; assert ctypes.util.find_library('magic'), '请先安装 libmagic：macOS 用 brew install libmagic / Ubuntu 用 apt install libmagic1'" \
-     || exit 1
+   cd "$PLUGIN_DIR/server"
+   if [ ! -d ".venv" ]; then
+     python3 -m venv .venv
+   fi
+   source .venv/bin/activate
+   pip install --upgrade pip click --quiet
+   python -m app.preflight \
+     || { echo "✗ Preflight 失败，请按上方提示安装缺失依赖后重试"; exit 1; }
    ```
 
 3. 创建数据目录：
@@ -29,12 +33,8 @@ allowed-tools: Bash, Read
    mkdir -p "$DATA_DIR"/{db,uploads,exports}
    ```
 
-4. 在 `$PLUGIN_DIR/server` 下创建 venv 并安装依赖：
+4. 安装后端依赖（preflight 通过后执行）：
    ```bash
-   cd "$PLUGIN_DIR/server"
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install --upgrade pip --quiet
    pip install -r requirements.txt --quiet \
      -i https://pypi.tuna.tsinghua.edu.cn/simple
    ```
