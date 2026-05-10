@@ -26,23 +26,29 @@ defineProps<{ rows?: number }>();
   gap: var(--space-2);
 }
 .skeleton-row {
+  position: relative;
+  overflow: hidden;
   height: 32px;
   border-radius: var(--radius-sm);
+  background: oklch(94% 0 0);
+}
+.skeleton-row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
     90deg,
-    oklch(94% 0 0),
-    oklch(97% 0 0),
-    oklch(94% 0 0)
+    transparent,
+    oklch(97% 0 0 / 0.7),
+    transparent
   );
-  background-size: 200% 100%;
+  transform: translateX(-100%);
   animation: shimmer 1.5s ease-in-out infinite;
+  will-change: transform;
 }
 @keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
   100% {
-    background-position: -200% 0;
+    transform: translateX(100%);
   }
 }
 .visually-hidden {

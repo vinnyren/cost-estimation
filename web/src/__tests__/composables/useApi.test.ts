@@ -38,10 +38,11 @@ describe("useApi", () => {
   });
 
   it("reset 回到 idle", async () => {
-    const { state, data, run, reset } = useApi(() => Promise.resolve(1));
+    const { state, data, error, run, reset } = useApi(() => Promise.resolve(1));
     await run();
     reset();
     expect(state.value).toBe("idle");
     expect(data.value).toBeNull();
+    expect(error.value).toBeNull();
   });
 });
