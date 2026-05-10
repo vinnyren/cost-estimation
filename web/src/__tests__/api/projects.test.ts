@@ -19,10 +19,10 @@ describe("projectsApi", () => {
   });
 
   it("list 调 GET /api/projects", async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ items: [] });
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     const result = await projectsApi.list();
     expect(api.get).toHaveBeenCalledWith("/api/projects");
-    expect(result).toEqual({ items: [] });
+    expect(result).toEqual([]);
   });
 
   it("get 调 GET /api/projects/:id", async () => {

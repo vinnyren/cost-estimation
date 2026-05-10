@@ -32,7 +32,7 @@ export interface Project {
 }
 
 export const projectsApi = {
-  list: () => api.get<{ items: Project[] }>("/api/projects"),
+  list: () => api.get<Project[]>("/api/projects"),
   get: (id: string) => api.get<Project>(`/api/projects/${id}`),
   create: (body: Partial<Project>) => api.post<Project>("/api/projects", body),
   patch: (id: string, body: Partial<Project>) =>

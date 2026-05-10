@@ -34,11 +34,11 @@ export interface FunctionPoint {
 
 export const functionsApi = {
   list: (projectId: string) =>
-    api.get<{ items: FunctionPoint[] }>(`/api/projects/${projectId}/functions`),
+    api.get<FunctionPoint[]>(`/api/projects/${projectId}/functions`),
   patch: (projectId: string, fpId: string, body: Partial<FunctionPoint>) =>
     api.patch<FunctionPoint>(`/api/projects/${projectId}/functions/${fpId}`, body),
   bulk: (projectId: string, items: Partial<FunctionPoint>[]) =>
-    api.post<{ items: FunctionPoint[] }>(`/api/projects/${projectId}/functions/bulk`, { items }),
+    api.post<{ written: number }>(`/api/projects/${projectId}/functions/bulk`, { items }),
   restore: (projectId: string, version: number) =>
     api.post<void>(`/api/projects/${projectId}/functions/restore?version=${version}`),
 };

@@ -19,10 +19,10 @@ describe("functionsApi", () => {
   });
 
   it("list 调 GET /api/projects/:id/functions", async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ items: [] });
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     const result = await functionsApi.list("p-11");
     expect(api.get).toHaveBeenCalledWith("/api/projects/p-11/functions");
-    expect(result).toEqual({ items: [] });
+    expect(result).toEqual([]);
   });
 
   it("patch 调 PATCH /api/projects/:pid/functions/:fpid", async () => {
@@ -35,10 +35,10 @@ describe("functionsApi", () => {
 
   it("bulk 调 POST /api/projects/:id/functions/bulk 并包装 items", async () => {
     const items = [{ ufp: 1 }, { ufp: 2 }];
-    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ items });
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ written: 2 });
     const result = await functionsApi.bulk("p-11", items);
     expect(api.post).toHaveBeenCalledWith("/api/projects/p-11/functions/bulk", { items });
-    expect(result).toEqual({ items });
+    expect(result).toEqual({ written: 2 });
   });
 
   it("restore 调 POST /api/projects/:id/functions/restore?version=N", async () => {

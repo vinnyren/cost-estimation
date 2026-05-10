@@ -13,7 +13,7 @@ export const useProjectsStore = defineStore("projects", () => {
     error.value = null;
     try {
       const resp = await projectsApi.list();
-      items.value = resp.items;
+      items.value = resp;
       state.value = "success";
     } catch (e) {
       error.value = e instanceof ApiError ? e : new ApiError("UNKNOWN", String(e));

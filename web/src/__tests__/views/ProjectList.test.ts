@@ -51,31 +51,29 @@ describe("ProjectList", () => {
   });
 
   it("Empty 态显示 CTA", async () => {
-    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ items: [] });
+    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     const w = mountList();
     await flushPromises();
     expect(w.text()).toContain("新建第一个项目");
   });
 
   it("Success 态显示项目卡片 + total_cost 经 formatCost 格式化为 万元", async () => {
-    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      items: [
-        {
-          id: "p-1",
-          name: "test-p1",
-          mode: "forward",
-          city: "北京",
-          industry: "电子政务",
-          phase: "bidding",
-          project_type: "dev_only",
-          basis_data_ver: "CSBMK®-202510",
-          total_cost: 250_000,
-          total_fp: 100,
-          created_at: "",
-          updated_at: "",
-        },
-      ],
-    });
+    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: "p-1",
+        name: "test-p1",
+        mode: "forward",
+        city: "北京",
+        industry: "电子政务",
+        phase: "bidding",
+        project_type: "dev_only",
+        basis_data_ver: "CSBMK®-202510",
+        total_cost: 250_000,
+        total_fp: 100,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
     const w = mountList();
     await flushPromises();
     expect(w.text()).toContain("test-p1");
@@ -96,7 +94,7 @@ describe("ProjectList", () => {
   });
 
   it("点击新建按钮 → 路由跳到 project-wizard", async () => {
-    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ items: [] });
+    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     await router.push("/");
     await router.isReady();
     const w = mountList();
@@ -109,22 +107,20 @@ describe("ProjectList", () => {
   });
 
   it("点击「打开」→ 路由跳到 fp-editor 并带 id", async () => {
-    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      items: [
-        {
-          id: "p-42",
-          name: "p",
-          mode: "forward",
-          city: "北京",
-          industry: "电子政务",
-          phase: "bidding",
-          project_type: "dev_only",
-          basis_data_ver: "CSBMK®-202510",
-          created_at: "",
-          updated_at: "",
-        },
-      ],
-    });
+    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: "p-42",
+        name: "p",
+        mode: "forward",
+        city: "北京",
+        industry: "电子政务",
+        phase: "bidding",
+        project_type: "dev_only",
+        basis_data_ver: "CSBMK®-202510",
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
     await router.push("/");
     await router.isReady();
     const w = mountList();
@@ -138,22 +134,20 @@ describe("ProjectList", () => {
   });
 
   it("点击「删除」→ confirm=false 时不调 remove API", async () => {
-    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      items: [
-        {
-          id: "p-7",
-          name: "p",
-          mode: "forward",
-          city: "北京",
-          industry: "电子政务",
-          phase: "bidding",
-          project_type: "dev_only",
-          basis_data_ver: "CSBMK®-202510",
-          created_at: "",
-          updated_at: "",
-        },
-      ],
-    });
+    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: "p-7",
+        name: "p",
+        mode: "forward",
+        city: "北京",
+        industry: "电子政务",
+        phase: "bidding",
+        project_type: "dev_only",
+        basis_data_ver: "CSBMK®-202510",
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     const w = mountList();
     await flushPromises();
@@ -164,22 +158,20 @@ describe("ProjectList", () => {
   });
 
   it("点击「删除」→ confirm=true 时调 remove API", async () => {
-    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      items: [
-        {
-          id: "p-7",
-          name: "p",
-          mode: "forward",
-          city: "北京",
-          industry: "电子政务",
-          phase: "bidding",
-          project_type: "dev_only",
-          basis_data_ver: "CSBMK®-202510",
-          created_at: "",
-          updated_at: "",
-        },
-      ],
-    });
+    (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: "p-7",
+        name: "p",
+        mode: "forward",
+        city: "北京",
+        industry: "电子政务",
+        phase: "bidding",
+        project_type: "dev_only",
+        basis_data_ver: "CSBMK®-202510",
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
     (projectsApi.remove as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const w = mountList();

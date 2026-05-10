@@ -40,7 +40,7 @@ describe("FpEditor", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
-    (functionsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ items: [] });
+    (functionsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   });
 
   it("空表态显示 hero CTA：上传文档让 AI 写第一稿", async () => {
@@ -66,55 +66,53 @@ describe("FpEditor", () => {
   });
 
   it("有数据时显示功能点表（含 sourceLabel 渲染）", async () => {
-    (functionsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      items: [
-        {
-          id: "f-1",
-          project_id: "p-1",
-          subsystem: "S1",
-          l1_module: "M1",
-          description: "d",
-          category: "EI",
-          complexity: "low",
-          ufp: 4,
-          reuse_level: "low",
-          modify_type: "new",
-          us: 4,
-          source: "manual",
-          version: 1,
-        },
-        {
-          id: "f-2",
-          project_id: "p-1",
-          subsystem: "S2",
-          l1_module: "M2",
-          description: "d",
-          category: "EO",
-          complexity: "low",
-          ufp: 5,
-          reuse_level: "low",
-          modify_type: "new",
-          us: 5,
-          source: "ai_extracted",
-          version: 1,
-        },
-        {
-          id: "f-3",
-          project_id: "p-1",
-          subsystem: "S3",
-          l1_module: "M3",
-          description: "d",
-          category: "EQ",
-          complexity: "low",
-          ufp: 3,
-          reuse_level: "low",
-          modify_type: "new",
-          us: 3,
-          source: "allocator",
-          version: 1,
-        },
-      ],
-    });
+    (functionsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: "f-1",
+        project_id: "p-1",
+        subsystem: "S1",
+        l1_module: "M1",
+        description: "d",
+        category: "EI",
+        complexity: "low",
+        ufp: 4,
+        reuse_level: "low",
+        modify_type: "new",
+        us: 4,
+        source: "manual",
+        version: 1,
+      },
+      {
+        id: "f-2",
+        project_id: "p-1",
+        subsystem: "S2",
+        l1_module: "M2",
+        description: "d",
+        category: "EO",
+        complexity: "low",
+        ufp: 5,
+        reuse_level: "low",
+        modify_type: "new",
+        us: 5,
+        source: "ai_extracted",
+        version: 1,
+      },
+      {
+        id: "f-3",
+        project_id: "p-1",
+        subsystem: "S3",
+        l1_module: "M3",
+        description: "d",
+        category: "EQ",
+        complexity: "low",
+        ufp: 3,
+        reuse_level: "low",
+        modify_type: "new",
+        us: 3,
+        source: "allocator",
+        version: 1,
+      },
+    ]);
     const w = mount(FpEditor, {
       props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },

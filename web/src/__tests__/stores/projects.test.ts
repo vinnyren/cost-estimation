@@ -4,22 +4,20 @@ import { useProjectsStore } from "@/stores/projects";
 
 vi.mock("@/api/projects", () => ({
   projectsApi: {
-    list: vi.fn().mockResolvedValue({
-      items: [
-        {
-          id: "p-1",
-          name: "p1",
-          project_type: "dev_only",
-          mode: "forward",
-          city: "北京",
-          industry: "电子政务",
-          phase: "bidding",
-          basis_data_ver: "CSBMK®-202510",
-          created_at: "",
-          updated_at: "",
-        },
-      ],
-    }),
+    list: vi.fn().mockResolvedValue([
+      {
+        id: "p-1",
+        name: "p1",
+        project_type: "dev_only",
+        mode: "forward",
+        city: "北京",
+        industry: "电子政务",
+        phase: "bidding",
+        basis_data_ver: "CSBMK®-202510",
+        created_at: "",
+        updated_at: "",
+      },
+    ]),
     create: vi.fn().mockResolvedValue({
       id: "p-2",
       name: "p2",

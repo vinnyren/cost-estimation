@@ -31,7 +31,7 @@ async function load(): Promise<void> {
   error.value = null;
   try {
     const resp = await functionsApi.list(props.projectId);
-    functions.value = resp.items;
+    functions.value = resp;
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : "加载失败";
   } finally {
