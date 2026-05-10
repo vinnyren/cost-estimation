@@ -13,6 +13,16 @@ vi.mock("@/api/params", () => ({
   },
 }));
 
+// GAP-H — snapshots tab 切换会触发 snapshotsApi.list；stub 出来避免真实 HTTP。
+vi.mock("@/api/snapshots", () => ({
+  snapshotsApi: {
+    list: vi.fn().mockResolvedValue([]),
+    create: vi.fn().mockResolvedValue({ id: 1, scope: "global", label: null, created_at: "" }),
+    restore: vi.fn().mockResolvedValue({}),
+    remove: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 const baseEffective = {
   cf: { budget: 1.39, bidding: 1.21, planning: 1.10, change: 1.10, settled: 1.00 },
   productivity_dev: { 电子政务: { P10: 2.04, P50: 6.41, P90: 15.36 } },
@@ -80,7 +90,7 @@ describe("ParamManager", () => {
     expect(w.text()).toContain("参数 500");
   });
 
-  it("未实装 Tab（快照）显示「v2 完成」骨架", async () => {
+  it("快照 Tab → 渲染快照面板（GAP-H 已实装，不再是 v2 骨架）", async () => {
     router.push("/projects/1/parameters");
     await router.isReady();
     const w = mount(ParamManager, {
@@ -89,9 +99,11 @@ describe("ParamManager", () => {
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
-    // tabs[5] = snapshots（GAP-B 已实装 factors_dev/_ops 和 scale_change，仅快照仍是骨架）
+    // tabs[5] = snapshots — 已通过 GAP-H 实装；具体行为详见 ParamManager-snapshots.test.ts
     await tabs[5].trigger("click");
-    expect(w.text()).toContain("v2 完成");
+    await flushPromises();
+    expect(w.text()).toContain("参数快照");
+    expect(w.text()).toContain("立即快照");
   });
 
   it("规模变更 Tab → 渲染各变更类型行 + 改值用 scale_change.{key} 路径 (GAP-B)", async () => {

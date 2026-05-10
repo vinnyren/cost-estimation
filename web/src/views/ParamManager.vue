@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from "vue";
+import { onMounted, ref, computed, watch } from "vue";
 import { useParamsStore } from "@/stores/params";
 import { useResultsStore } from "@/stores/results";
 import OverrideField from "@/components/OverrideField.vue";
 import FactorTable from "@/components/FactorTable.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
+import { snapshotsApi, type ParamSnapshot } from "@/api/snapshots";
 
 const props = defineProps<{ projectId: string }>();
 
@@ -15,6 +16,76 @@ const results = useResultsStore();
 const activeTab = ref<string>("rate");
 const loading = ref(true);
 const error = ref<string | null>(null);
+
+// GAP-H — 快照 tab 状态
+const snapshots = ref<ParamSnapshot[]>([]);
+const newSnapLabel = ref<string>("");
+const snapshotsLoading = ref<boolean>(false);
+const snapshotsError = ref<string | null>(null);
+
+async function reloadSnapshots(): Promise<void> {
+  snapshotsLoading.value = true;
+  snapshotsError.value = null;
+  try {
+    snapshots.value = await snapshotsApi.list("global");
+  } catch (e: unknown) {
+    snapshotsError.value = e instanceof Error ? e.message : "快照加载失败";
+  } finally {
+    snapshotsLoading.value = false;
+  }
+}
+
+async function onCreateSnapshot(): Promise<void> {
+  const label = newSnapLabel.value.trim();
+  try {
+    await snapshotsApi.create({
+      scope: "global",
+      label: label || undefined,
+    });
+    newSnapLabel.value = "";
+    await reloadSnapshots();
+  } catch (e: unknown) {
+    snapshotsError.value = e instanceof Error ? e.message : "创建快照失败";
+  }
+}
+
+async function onRestoreSnapshot(id: number): Promise<void> {
+  if (!window.confirm("确定恢复到这一时刻的参数？当前未保存的修改会被覆盖。")) return;
+  try {
+    await snapshotsApi.restore(id);
+    // 恢复后重新拉 effective，让其他 tab 同步刷新
+    await store.loadFor(props.projectId);
+    results.markParamsChanged();
+    await reloadSnapshots();
+  } catch (e: unknown) {
+    snapshotsError.value = e instanceof Error ? e.message : "恢复快照失败";
+  }
+}
+
+async function onDeleteSnapshot(id: number): Promise<void> {
+  if (!window.confirm("删除这个快照？此操作不可撤销。")) return;
+  try {
+    await snapshotsApi.remove(id);
+    await reloadSnapshots();
+  } catch (e: unknown) {
+    snapshotsError.value = e instanceof Error ? e.message : "删除快照失败";
+  }
+}
+
+function formatSnapshotTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+// 切到 snapshots tab 时拉列表（懒加载，避免初始加载多发请求）
+watch(activeTab, (v) => {
+  if (v === "snapshots") {
+    void reloadSnapshots();
+  }
+});
 
 const PRODUCTIVITY_BANDS = ["P10", "P50", "P90"] as const;
 type Band = (typeof PRODUCTIVITY_BANDS)[number];
@@ -359,6 +430,95 @@ async function onFactorEdit(
       </section>
 
       <section
+        v-else-if="activeTab === 'snapshots'"
+        role="tabpanel"
+        class="panel"
+      >
+        <h2>参数快照</h2>
+        <p class="hint">
+          参数快照可在重要节点固化当前全局参数；后续可恢复到任一快照点。
+        </p>
+        <div class="snap-toolbar">
+          <input
+            v-model="newSnapLabel"
+            class="snap-label-input"
+            type="text"
+            placeholder="备注（可选，如 实验前 / before-edit）"
+            maxlength="120"
+          >
+          <button
+            type="button"
+            class="btn-primary"
+            @click="onCreateSnapshot"
+          >
+            立即快照
+          </button>
+        </div>
+        <div
+          v-if="snapshotsError"
+          role="alert"
+          class="snap-error"
+        >
+          {{ snapshotsError }}
+        </div>
+        <table class="rate-table snap-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>备注</th>
+              <th>创建时间</th>
+              <th>作用域</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="s in snapshots"
+              :key="s.id"
+              data-testid="snapshot-row"
+            >
+              <td>#{{ s.id }}</td>
+              <td>{{ s.label || "—" }}</td>
+              <td>{{ formatSnapshotTime(s.created_at) }}</td>
+              <td>{{ s.scope }}</td>
+              <td class="snap-actions">
+                <button
+                  type="button"
+                  class="btn-secondary"
+                  @click="onRestoreSnapshot(s.id)"
+                >
+                  恢复
+                </button>
+                <button
+                  type="button"
+                  class="btn-link"
+                  @click="onDeleteSnapshot(s.id)"
+                >
+                  删除
+                </button>
+              </td>
+            </tr>
+            <tr v-if="snapshots.length === 0 && !snapshotsLoading">
+              <td
+                colspan="5"
+                class="empty"
+              >
+                暂无快照
+              </td>
+            </tr>
+            <tr v-else-if="snapshotsLoading && snapshots.length === 0">
+              <td
+                colspan="5"
+                class="empty"
+              >
+                加载中…
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section
         v-else
         role="tabpanel"
         class="panel"
@@ -490,5 +650,63 @@ async function onFactorEdit(
   font-weight: 500;
   color: var(--color-text-body);
   white-space: nowrap;
+}
+
+/* GAP-H — 快照 tab 样式 */
+.snap-toolbar {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) 0;
+}
+.snap-label-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--touch-target-comfortable);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-body);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+.snap-label-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+.snap-error {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-danger-bg, #fef2f2);
+  color: var(--color-danger, #b91c1c);
+  border: 1px solid var(--color-danger-border, #fecaca);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+.snap-table tbody td.empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--space-4) var(--space-3);
+  font-style: italic;
+}
+.snap-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.snap-actions .btn-link {
+  background: transparent;
+  border: none;
+  color: var(--color-danger, #b91c1c);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.snap-actions .btn-link:hover {
+  opacity: 0.75;
 }
 </style>
