@@ -36,10 +36,10 @@ describe("router", () => {
     for (const r of idRoutes) {
       const propsFn = r.props.default as unknown as (route: {
         params: { id: string };
-      }) => { projectId: number };
+      }) => { projectId: string };
       expect(typeof propsFn).toBe("function");
       const out = propsFn({ params: { id: "42" } });
-      expect(out.projectId).toBe(42);
+      expect(out.projectId).toBe("42");
     }
   });
 

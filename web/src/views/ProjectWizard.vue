@@ -2,7 +2,14 @@
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useProjectsStore } from "@/stores/projects";
-import type { Project, ProjectMode } from "@/api/projects";
+import type {
+  Project,
+  ProjectMode,
+  ProjectPhase,
+  ProjectType,
+} from "@/api/projects";
+
+const BASIS_DATA_VER = "CSBMK®-202510";
 
 const router = useRouter();
 const store = useProjectsStore();
@@ -15,7 +22,8 @@ const form = ref<{
   name: string;
   city: string;
   industry: string;
-  stage: string;
+  phase: ProjectPhase;
+  project_type: ProjectType;
   target_total: number;
   alpha: number;
 }>({
@@ -23,7 +31,8 @@ const form = ref<{
   name: "",
   city: "北京",
   industry: "电子政务",
-  stage: "bidding",
+  phase: "bidding",
+  project_type: "dev_only",
   target_total: 0,
   alpha: 1.0,
 });
@@ -39,7 +48,7 @@ const CITIES = [
 ];
 
 const INDUSTRIES = ["全行业", "电子政务", "金融", "电信", "制造", "能源", "交通"];
-const STAGES: Array<{ value: string; label: string }> = [
+const STAGES: Array<{ value: ProjectPhase; label: string }> = [
   { value: "budget", label: "预算" },
   { value: "bidding", label: "招投标" },
   { value: "planning", label: "立项" },
@@ -51,7 +60,7 @@ const canNext = computed(() => {
   if (step.value === 1) return !!form.value.mode;
   if (step.value === 2) return form.value.name.trim().length > 0;
   if (step.value === 3) return CITIES.includes(form.value.city) && INDUSTRIES.includes(form.value.industry);
-  if (step.value === 4) return STAGES.some((s) => s.value === form.value.stage);
+  if (step.value === 4) return STAGES.some((s) => s.value === form.value.phase);
   if (step.value === 5) {
     if (form.value.mode === "reverse") return form.value.target_total > 0;
     return true;
@@ -76,8 +85,16 @@ async function submit(): Promise<void> {
   errorMsg.value = null;
   try {
     const payload: Partial<Project> & { mode: ProjectMode } = {
-      ...form.value,
+      name: form.value.name,
       mode: form.value.mode,
+      city: form.value.city,
+      industry: form.value.industry,
+      phase: form.value.phase,
+      project_type: form.value.project_type,
+      basis_data_ver: BASIS_DATA_VER,
+      alpha_dev: form.value.alpha,
+      target_cost:
+        form.value.mode === "reverse" ? form.value.target_total : undefined,
     };
     const created = await store.create(payload);
     router.push({ name: "fp-editor", params: { id: created.id } });
@@ -153,7 +170,7 @@ async function submit(): Promise<void> {
           :key="s.value"
         >
           <input
-            v-model="form.stage"
+            v-model="form.phase"
             type="radio"
             :value="s.value"
           > {{ s.label }}

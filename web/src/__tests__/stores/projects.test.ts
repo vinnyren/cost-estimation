@@ -4,37 +4,41 @@ import { useProjectsStore } from "@/stores/projects";
 
 vi.mock("@/api/projects", () => ({
   projectsApi: {
-    list: vi.fn().mockResolvedValue({
-      items: [
-        {
-          id: 1,
-          name: "p1",
-          mode: "forward",
-          city: "北京",
-          industry: "电子政务",
-          stage: "bidding",
-          created_at: "",
-          updated_at: "",
-        },
-      ],
-    }),
+    list: vi.fn().mockResolvedValue([
+      {
+        id: "p-1",
+        name: "p1",
+        project_type: "dev_only",
+        mode: "forward",
+        city: "北京",
+        industry: "电子政务",
+        phase: "bidding",
+        basis_data_ver: "CSBMK®-202510",
+        created_at: "",
+        updated_at: "",
+      },
+    ]),
     create: vi.fn().mockResolvedValue({
-      id: 2,
+      id: "p-2",
       name: "p2",
+      project_type: "dev_only",
       mode: "reverse",
       city: "上海",
       industry: "金融",
-      stage: "budget",
+      phase: "budget",
+      basis_data_ver: "CSBMK®-202510",
       created_at: "",
       updated_at: "",
     }),
     patch: vi.fn().mockResolvedValue({
-      id: 1,
+      id: "p-1",
       name: "p1-renamed",
+      project_type: "dev_only",
       mode: "forward",
       city: "北京",
       industry: "电子政务",
-      stage: "bidding",
+      phase: "bidding",
+      basis_data_ver: "CSBMK®-202510",
       created_at: "",
       updated_at: "",
     }),
@@ -59,10 +63,12 @@ describe("projectsStore", () => {
     await store.fetchAll();
     await store.create({
       name: "p2",
+      project_type: "dev_only",
       mode: "reverse",
       city: "上海",
       industry: "金融",
-      stage: "budget",
+      phase: "budget",
+      basis_data_ver: "CSBMK®-202510",
     });
     expect(store.items).toHaveLength(2);
   });
@@ -70,14 +76,14 @@ describe("projectsStore", () => {
   it("remove 移除 item", async () => {
     const store = useProjectsStore();
     await store.fetchAll();
-    await store.remove(1);
+    await store.remove("p-1");
     expect(store.items).toHaveLength(0);
   });
 
   it("patch 更新对应 item", async () => {
     const store = useProjectsStore();
     await store.fetchAll();
-    await store.patch(1, { name: "p1-renamed" });
+    await store.patch("p-1", { name: "p1-renamed" });
     expect(store.items[0].name).toBe("p1-renamed");
   });
 

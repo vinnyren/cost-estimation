@@ -20,8 +20,8 @@ describe("paramsApi", () => {
 
   it("effective 调 GET /api/projects/:id/params/effective", async () => {
     (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ cf: {} });
-    const result = await paramsApi.effective(42);
-    expect(api.get).toHaveBeenCalledWith("/api/projects/42/params/effective");
+    const result = await paramsApi.effective("p-42");
+    expect(api.get).toHaveBeenCalledWith("/api/projects/p-42/params/effective");
     expect(result).toEqual({ cf: {} });
   });
 
@@ -50,8 +50,8 @@ describe("paramsApi", () => {
   it("override 调 PATCH /api/projects/:id/params/override 并透传 body", async () => {
     const body = { "cf.scale": 1.2 };
     (api.patch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ overrides: body });
-    const result = await paramsApi.override(7, body);
-    expect(api.patch).toHaveBeenCalledWith("/api/projects/7/params/override", body);
+    const result = await paramsApi.override("p-7", body);
+    expect(api.patch).toHaveBeenCalledWith("/api/projects/p-7/params/override", body);
     expect(result).toMatchObject({ overrides: body });
   });
 });

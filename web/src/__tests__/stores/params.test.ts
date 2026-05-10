@@ -23,10 +23,10 @@ describe("paramsStore", () => {
       overrides: { "cf.x": 2 },
     });
     const store = useParamsStore();
-    await store.loadFor(7);
+    await store.loadFor("p-7");
     expect(store.effective).toEqual({ cf: { x: 1 }, overrides: { "cf.x": 2 } });
     expect(store.overrides).toEqual({ "cf.x": 2 });
-    expect(store.loadedFor).toBe(7);
+    expect(store.loadedFor).toBe("p-7");
   });
 
   it("loadFor 处理无 overrides 字段", async () => {
@@ -34,7 +34,7 @@ describe("paramsStore", () => {
       cf: { x: 1 },
     });
     const store = useParamsStore();
-    await store.loadFor(7);
+    await store.loadFor("p-7");
     expect(store.overrides).toEqual({});
   });
 
@@ -44,8 +44,8 @@ describe("paramsStore", () => {
       overrides: { "cf.x": 5 },
     });
     const store = useParamsStore();
-    await store.applyOverride(3, { "cf.x": 5 });
-    expect(paramsApi.override).toHaveBeenCalledWith(3, { "cf.x": 5 });
+    await store.applyOverride("p-3", { "cf.x": 5 });
+    expect(paramsApi.override).toHaveBeenCalledWith("p-3", { "cf.x": 5 });
     expect(store.overrides).toEqual({ "cf.x": 5 });
   });
 
@@ -54,7 +54,7 @@ describe("paramsStore", () => {
       overrides: { "cf.scale": 1.2 },
     });
     const store = useParamsStore();
-    await store.loadFor(1);
+    await store.loadFor("p-1");
     expect(store.isOverridden("cf.scale")).toBe(true);
     expect(store.isOverridden("cf.unknown")).toBe(false);
   });
@@ -64,7 +64,7 @@ describe("paramsStore", () => {
       overrides: { city_rate: { 北京: { dev: 200 } } },
     });
     const store = useParamsStore();
-    await store.loadFor(1);
+    await store.loadFor("p-1");
     expect(store.isOverridden("city_rate.北京.dev")).toBe(true);
     expect(store.isOverridden("city_rate.上海.dev")).toBe(false);
   });

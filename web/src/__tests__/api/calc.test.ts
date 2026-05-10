@@ -19,11 +19,17 @@ describe("calcApi", () => {
   });
 
   it("forward 调 POST /api/calc/forward 并透传 body", async () => {
-    const body = { project_id: 1 };
+    const body = { project_id: "p-1" };
     const reply = {
+      scale_us: 80,
       scale_adjusted: 100,
-      effort_pm: { P10: 1, P50: 2, P90: 3 },
-      cost_yuan: { P10: 10, P50: 20, P90: 30 },
+      cf_used: 1.25,
+      effort_dev_hours: { P10: 800, P50: 1600, P90: 2400 },
+      effort_ops_hours: { P10: 0, P50: 0, P90: 0 },
+      cost_dev_yuan: { P10: 10, P50: 20, P90: 30 },
+      cost_ops_yuan: { P10: 0, P50: 0, P90: 0 },
+      cost_other_yuan: 0,
+      cost_total_yuan: { P10: 10, P50: 20, P90: 30 },
     };
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(reply);
     const result = await calcApi.forward(body);
@@ -32,9 +38,15 @@ describe("calcApi", () => {
   });
 
   it("reverse 调 POST /api/calc/reverse 并透传 body", async () => {
-    const body = { project_id: 1, target_total: 1_000_000, other_cost: 50_000 };
+    const body = { project_id: "p-1", target_total: 1_000_000, other_cost: 50_000 };
     const reply = {
-      fp_total: { P10: 100, P50: 200, P90: 300 },
+      budget_for_dev: 950_000,
+      budget_for_ops: 0,
+      scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
+      scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
+      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      cf_used: 1.25,
       recommended_band: "P50" as const,
     };
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(reply);
@@ -44,8 +56,15 @@ describe("calcApi", () => {
   });
 
   it("allocate 调 POST /api/calc/allocate 并透传 body", async () => {
-    const body = { project_id: 1, target_us: 200, cf: 1.0 };
-    const reply = { items: [{ id: 1, us: 50 }] };
+    const body = {
+      project_id: "p-1",
+      target_us: 200,
+      cf: 1.0,
+      drafts: [{ name: "A", weight: 1 }],
+    };
+    const reply = [
+      { name: "A", us: 200, locked: false, audit_tag: "budget_derived" },
+    ];
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(reply);
     const result = await calcApi.allocate(body);
     expect(api.post).toHaveBeenCalledWith("/api/calc/allocate", body);

@@ -80,3 +80,40 @@ pnpm lint          # eslint，max-warnings=0
 | 生产构建后访问 `/projects/1` 直接 404 | 后端没挂载 SPA fallback；确认 `COST_WEB_DIST_DIR` 已设置且路径存在 |
 | `/assets/app.js` 401 | 升级旧版后端；token 中间件需放行非 `/api/` GET（已在最新 `app/deps.py` 内置） |
 | 浏览器控制台 CORS 报错 | 同源部署不应触发；确认你访问的是 8788 而非 5173 |
+
+## E2E 测试
+
+E2E 测试基于 Playwright，需要后端启动 + `web/dist` 构建产物（FastAPI 同源托管）。两个 spec：
+
+- `tests/e2e/forward.spec.ts` — 项目列表 → FP 编辑 → 三档结果 → 下载 Excel
+- `tests/e2e/reverse.spec.ts` — 反向项目 → 输入目标金额 → 反算 → 三档 FP
+
+```bash
+# 终端 1：先 build 前端
+cd web
+pnpm install                       # 仅首次或依赖变更
+pnpm exec playwright install chromium  # 仅首次（约 120MB）
+pnpm build                         # 产物落到 web/dist/
+
+# 终端 2：启动后端（用固定 token "e2e-token"，便于浏览器拼到 URL）
+cd ../server
+COST_AUTH_TOKEN=e2e-token \
+COST_WEB_DIST_DIR=$(realpath ../web/dist) \
+COST_DATABASE_URL=sqlite:////tmp/cost-e2e.sqlite \
+.venv/bin/python -m app.bootstrap \
+  --db /tmp/cost-e2e.sqlite \
+  --seed app/data/csbmk_202510.json
+COST_AUTH_TOKEN=e2e-token \
+COST_DATABASE_URL=sqlite:////tmp/cost-e2e.sqlite \
+COST_WEB_DIST_DIR=$(realpath ../web/dist) \
+.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8788
+
+# 终端 3：跑 e2e（E2E_AUTH_TOKEN 必须与 COST_AUTH_TOKEN 一致）
+cd ../web
+E2E_AUTH_TOKEN=e2e-token pnpm test:e2e
+
+# 调试 / UI 模式
+E2E_AUTH_TOKEN=e2e-token pnpm test:e2e:ui
+```
+
+> 如果 e2e 因 web/dist 未 build 报 404，先 `pnpm build`；如果因 token 不匹配 401，确认 `COST_AUTH_TOKEN` 与 `E2E_AUTH_TOKEN` 完全一致。

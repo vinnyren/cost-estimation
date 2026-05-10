@@ -1,0 +1,2 @@
+import{d as i,a as e,c as a,b as l,t as c,f as o,_ as r}from"./index-B9G6kgAQ.js";const m={class:"empty"},d={key:0},p=i({__name:"EmptyState",props:{title:{},description:{},ctaLabel:{}},emits:["cta-click"],setup(t){return(s,n)=>(e(),a("section",m,[l("h2",null,c(t.title),1),t.description?(e(),a("p",d,c(t.description),1)):o("",!0),t.ctaLabel?(e(),a("button",{key:1,type:"button",onClick:n[0]||(n[0]=u=>s.$emit("cta-click"))},c(t.ctaLabel),1)):o("",!0)]))}}),y=r(p,[["__scopeId","data-v-9c111429"]]);export{y as E};
+//# sourceMappingURL=EmptyState-C9RkOYJU.js.map

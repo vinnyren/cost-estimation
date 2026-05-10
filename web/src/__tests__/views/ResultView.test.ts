@@ -17,9 +17,15 @@ vi.mock("@/api/projects", () => ({
 vi.mock("@/api/calc", () => ({
   calcApi: {
     forward: vi.fn().mockResolvedValue({
+      scale_us: 275,
       scale_adjusted: 332.75,
-      effort_pm: { P10: 50, P50: 80, P90: 110 },
-      cost_yuan: { P10: 300000, P50: 489180, P90: 700000 },
+      cf_used: 1.21,
+      effort_dev_hours: { P10: 800, P50: 1600, P90: 2400 },
+      effort_ops_hours: { P10: 0, P50: 0, P90: 0 },
+      cost_dev_yuan: { P10: 300000, P50: 489180, P90: 700000 },
+      cost_ops_yuan: { P10: 0, P50: 0, P90: 0 },
+      cost_other_yuan: 0,
+      cost_total_yuan: { P10: 300000, P50: 489180, P90: 700000 },
     }),
     reverse: vi.fn(),
   },
@@ -27,7 +33,7 @@ vi.mock("@/api/calc", () => ({
 
 vi.mock("@/api/reports", () => ({
   reportsApi: {
-    excelUrl: (id: number) => `/api/reports/excel/${id}`,
+    excelUrl: (id: string) => `/api/reports/excel/${id}`,
     download: vi.fn(),
   },
 }));
@@ -45,19 +51,21 @@ const router = createRouter({
 });
 
 const forwardProject = {
-  id: 1,
+  id: "p-1",
   name: "p",
+  project_type: "dev_only" as const,
   mode: "forward" as const,
   city: "北京",
   industry: "电子政务",
-  stage: "bidding" as const,
+  phase: "bidding" as const,
+  basis_data_ver: "CSBMK®-202510",
   created_at: "",
   updated_at: "",
 };
 
 const reverseProject = {
   ...forwardProject,
-  id: 2,
+  id: "p-2",
   mode: "reverse" as const,
 };
 
@@ -72,7 +80,7 @@ describe("ResultView", () => {
     router.push("/projects/1/result");
     await router.isReady();
     const w = mount(ResultView, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -88,7 +96,7 @@ describe("ResultView", () => {
     router.push("/projects/2/result");
     await router.isReady();
     const w = mount(ResultView, {
-      props: { projectId: 2 },
+      props: { projectId: "p-2" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -107,7 +115,7 @@ describe("ResultView", () => {
     router.push("/projects/1/result");
     await router.isReady();
     const w = mount(ResultView, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -128,7 +136,7 @@ describe("ResultView", () => {
     router.push("/projects/1/result");
     await router.isReady();
     const w = mount(ResultView, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -136,7 +144,7 @@ describe("ResultView", () => {
     const dlBtn = w.findAll("button").find((b) => b.text().includes("下载 Excel"));
     await dlBtn!.trigger("click");
     await flushPromises();
-    expect(reportsApi.download).toHaveBeenCalledWith(1, "p.xlsx");
+    expect(reportsApi.download).toHaveBeenCalledWith("p-1", "p.xlsx");
   });
 
   it("点击「返回 FP 编辑」→ 路由跳 fp-editor 并带 id", async () => {
@@ -144,7 +152,7 @@ describe("ResultView", () => {
     router.push("/projects/1/result");
     await router.isReady();
     const w = mount(ResultView, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -154,7 +162,7 @@ describe("ResultView", () => {
     await backBtn!.trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("fp-editor");
-    expect(router.currentRoute.value.params.id).toBe("1");
+    expect(router.currentRoute.value.params.id).toBe("p-1");
   });
 
   it("reverse 模式：targetTotal=0 时点反算 → 显示「请输入目标金额」错误", async () => {
@@ -162,7 +170,7 @@ describe("ResultView", () => {
     router.push("/projects/2/result");
     await router.isReady();
     const w = mount(ResultView, {
-      props: { projectId: 2 },
+      props: { projectId: "p-2" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -177,13 +185,19 @@ describe("ResultView", () => {
   it("reverse 模式：targetTotal>0 → 调 reverse API 并显示三档 FP", async () => {
     vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
     vi.mocked(calcApi.reverse).mockResolvedValueOnce({
-      fp_total: { P10: 100, P50: 200, P90: 300 },
+      budget_for_dev: 950_000,
+      budget_for_ops: 0,
+      scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
+      scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
+      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      cf_used: 1.25,
       recommended_band: "P50" as const,
     });
     router.push("/projects/2/result");
     await router.isReady();
     const w = mount(ResultView, {
-      props: { projectId: 2 },
+      props: { projectId: "p-2" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -196,7 +210,7 @@ describe("ResultView", () => {
     await flushPromises();
     await flushPromises();
     expect(calcApi.reverse).toHaveBeenCalledWith({
-      project_id: 2,
+      project_id: "p-2",
       target_total: 1_000_000,
       other_cost: 50_000,
     });

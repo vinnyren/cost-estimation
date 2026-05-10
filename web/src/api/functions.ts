@@ -1,32 +1,44 @@
 import { api } from "./client";
 
 export type FpCategory = "EI" | "EO" | "EQ" | "ILF" | "EIF";
-export type FpSource = "manual" | "ai_extracted" | "allocator";
+export type FpComplexity = "low" | "average" | "high";
+export type FpReuseLevel = "low" | "high";
+export type FpModifyType = "new" | "modify" | "delete";
+export type FpSource =
+  | "manual"
+  | "imported"
+  | "ai_extracted"
+  | "claude_draft"
+  | "allocator";
 
 export interface FunctionPoint {
-  id: number;
-  project_id: number;
-  subsystem: string;
-  module_l1: string;
-  module_l2?: string;
-  description: string;
+  id: string;
+  project_id: string;
+  subsystem?: string;
+  l1_module?: string;
+  l2_module?: string;
+  description?: string;
+  name?: string;
   category: FpCategory;
+  complexity: FpComplexity;
   ufp: number;
-  reuse_ratio: number;
-  modify_ratio: number;
+  reuse_level?: FpReuseLevel;
+  modify_type?: FpModifyType;
   us: number;
-  source: FpSource;
-  audit_tag?: string;
+  source?: FpSource;
+  locked?: boolean;
+  notes?: string;
+  ord?: number;
   version: number;
 }
 
 export const functionsApi = {
-  list: (projectId: number) =>
-    api.get<{ items: FunctionPoint[] }>(`/api/projects/${projectId}/functions`),
-  patch: (projectId: number, fpId: number, body: Partial<FunctionPoint>) =>
+  list: (projectId: string) =>
+    api.get<FunctionPoint[]>(`/api/projects/${projectId}/functions`),
+  patch: (projectId: string, fpId: string, body: Partial<FunctionPoint>) =>
     api.patch<FunctionPoint>(`/api/projects/${projectId}/functions/${fpId}`, body),
-  bulk: (projectId: number, items: Partial<FunctionPoint>[]) =>
-    api.post<{ items: FunctionPoint[] }>(`/api/projects/${projectId}/functions/bulk`, { items }),
-  restore: (projectId: number, version: number) =>
+  bulk: (projectId: string, items: Partial<FunctionPoint>[]) =>
+    api.post<{ written: number }>(`/api/projects/${projectId}/functions/bulk`, { items }),
+  restore: (projectId: string, version: number) =>
     api.post<void>(`/api/projects/${projectId}/functions/restore?version=${version}`),
 };

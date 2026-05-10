@@ -5,6 +5,22 @@ from ..core.reverse import calculate_reverse, ReverseInput
 from ..core.allocator import allocate, AllocatorInput, FpDraft
 from ..db.models import Project
 from . import params as ps
+from . import functions as fs
+
+
+def _resolve_items(db: Session, project_id: str, payload: dict) -> list[FpItem]:
+    """Get FpItem list from payload, or fall back to DB functions for the project.
+
+    Server keeps items optional in schema; if caller does not supply, we read
+    every FunctionPoint of the project. This keeps existing API tests (which
+    pass items explicitly) working while letting the frontend send only
+    project_id.
+    """
+    raw_items = payload.get("items")
+    if raw_items:
+        return [FpItem(us=i["us"]) for i in raw_items]
+    db_items = fs.list_for_project(db, project_id)
+    return [FpItem(us=fp.us) for fp in db_items]
 
 
 def run_forward(db: Session, project_id: str, payload: dict) -> dict:
@@ -17,7 +33,7 @@ def run_forward(db: Session, project_id: str, payload: dict) -> dict:
         ProjectInputs(industry=proj.industry, city=proj.city, phase=proj.phase),
     )
     inp = ForwardInput(
-        items=[FpItem(us=i["us"]) for i in payload.get("items", [])],
+        items=_resolve_items(db, project_id, payload),
         dev_factor=payload.get("dev_factor", 1.0),
         ops_factor=payload.get("ops_factor", 1.0),
         include_dev=payload.get("include_dev", True),

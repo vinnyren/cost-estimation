@@ -13,12 +13,12 @@ export interface EffectiveParams {
 }
 
 export const paramsApi = {
-  effective: (projectId: number) =>
+  effective: (projectId: string) =>
     api.get<EffectiveParams>(`/api/projects/${projectId}/params/effective`),
   global: () => api.get<EffectiveParams>("/api/params/global"),
   patchGlobal: (body: Partial<EffectiveParams>) =>
     api.patch<EffectiveParams>("/api/params/global", body),
   resetGlobal: () => api.post<EffectiveParams>("/api/params/global/reset"),
-  override: (projectId: number, body: Record<string, unknown>) =>
+  override: (projectId: string, body: Record<string, unknown>) =>
     api.patch<EffectiveParams>(`/api/projects/${projectId}/params/override`, body),
 };

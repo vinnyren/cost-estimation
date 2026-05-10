@@ -9,6 +9,8 @@ export default defineConfig({
     environment: "happy-dom",
     globals: true,
     setupFiles: ["src/__tests__/setup.ts"],
+    // Exclude Playwright e2e specs — they run via `pnpm test:e2e`, not vitest
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

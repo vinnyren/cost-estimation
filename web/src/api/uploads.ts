@@ -8,7 +8,7 @@ export interface UploadResult {
 }
 
 export const uploadsApi = {
-  upload: async (projectId: number, file: File): Promise<UploadResult> => {
+  upload: async (projectId: string, file: File): Promise<UploadResult> => {
     const form = new FormData();
     form.append("file", file);
     // Do NOT set Content-Type manually — axios detects FormData and generates

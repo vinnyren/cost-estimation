@@ -1,24 +1,63 @@
 import { api } from "./client";
 
+export type Band = "P10" | "P50" | "P90";
+export type BandValues = { P10: number; P50: number; P90: number };
+
+/**
+ * Forward 正向计算返回值（与 server `app/core/forward.py:ForwardResult` 一一对应）。
+ *
+ * - effort_*_hours / cost_*_yuan 是三档 dict（P10/P50/P90）。
+ * - cost_total_yuan 是 P10/P50/P90 三档总价。
+ */
 export interface ForwardResult {
+  scale_us: number;
   scale_adjusted: number;
-  effort_pm: { P10: number; P50: number; P90: number };
-  cost_yuan: { P10: number; P50: number; P90: number };
-  steps?: Array<{ name: string; value: number; note?: string }>;
+  cf_used: number;
+  effort_dev_hours: BandValues;
+  effort_ops_hours: BandValues;
+  cost_dev_yuan: BandValues;
+  cost_ops_yuan: BandValues;
+  cost_other_yuan: number;
+  cost_total_yuan: BandValues;
 }
 
+/**
+ * Reverse 反算返回值（与 server `app/core/reverse.py:ReverseResult` 对齐）。
+ *
+ * 三档语义见 server 类注释：
+ * - P10 乐观 / P50 中位 / P90 保守。
+ * - scale_adjusted_bands 为开发口径调整后规模（FP）。
+ */
 export interface ReverseResult {
-  fp_total: { P10: number; P50: number; P90: number };
-  recommended_band: "P10" | "P50" | "P90";
+  budget_for_dev: number;
+  budget_for_ops: number;
+  scale_adjusted_bands: BandValues;
+  scale_unadjusted_bands: BandValues;
+  scale_adjusted_ops_bands: BandValues;
+  scale_unadjusted_ops_bands: BandValues;
+  cf_used: number;
+  recommended_band: Band;
+}
+
+/**
+ * Allocate 分摊返回值（与 server `app/core/allocator.py:AllocatorOutput` 对齐）。
+ */
+export interface AllocateOutput {
+  name: string;
+  us: number;
+  locked: boolean;
+  audit_tag: string | null;
 }
 
 export const calcApi = {
-  forward: (body: { project_id: number }) => api.post<ForwardResult>("/api/calc/forward", body),
-  reverse: (body: { project_id: number; target_total: number; other_cost: number }) =>
+  forward: (body: { project_id: string }) =>
+    api.post<ForwardResult>("/api/calc/forward", body),
+  reverse: (body: { project_id: string; target_total: number; other_cost: number }) =>
     api.post<ReverseResult>("/api/calc/reverse", body),
-  allocate: (body: { project_id: number; target_us: number; cf: number }) =>
-    api.post<{ items: Array<{ id: number; us: number; audit_tag?: string }> }>(
-      "/api/calc/allocate",
-      body,
-    ),
+  allocate: (body: {
+    project_id: string;
+    target_us: number;
+    cf: number;
+    drafts: Array<{ name: string; weight: number; locked?: boolean; locked_us?: number }>;
+  }) => api.post<AllocateOutput[]>("/api/calc/allocate", body),
 };

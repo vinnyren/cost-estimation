@@ -1,5 +1,5 @@
 node_modules
-dist
+# dist/ is intentionally tracked: plugin distribution via git clone needs prebuilt assets
 dist-ssr
 *.local
 .vscode/*
