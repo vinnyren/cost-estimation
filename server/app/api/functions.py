@@ -51,3 +51,17 @@ def bulk(project_id: str, payload: BulkRequest, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(404, detail={"error": {"code": str(e)}})
     return {"ok": True, "data": {"written": n}}
+
+
+@router.post("/restore")
+def restore(project_id: str, version: int, db: Session = Depends(get_db)):
+    try:
+        n = svc.restore(db, project_id, version)
+    except ValueError as e:
+        msg = str(e)
+        if "PROJECT_NOT_FOUND" in msg:
+            raise HTTPException(404, detail={"error": {"code": "PROJECT_NOT_FOUND"}})
+        if "SNAPSHOT_NOT_FOUND" in msg:
+            raise HTTPException(404, detail={"error": {"code": "SNAPSHOT_NOT_FOUND"}})
+        raise
+    return {"ok": True, "data": {"restored_version": version, "fp_count": n}}
