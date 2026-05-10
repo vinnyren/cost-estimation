@@ -41,6 +41,11 @@ class Project(Base):
     fp_method = Column(String, default="nesma_estimated")
     basis_data_ver = Column(String, nullable=False)
 
+    # v2.0 — per-project 调整因子选择，calc.py 用它代替 default=1.0
+    # JSON: dev = {"app_type": "OLTP", "integrity_level": "B", ...}
+    factors_dev_json = Column(Text)
+    factors_ops_json = Column(Text)
+
     # Cascade-delete child rows when the project is removed. Both ORM-level
     # `cascade="all, delete-orphan"` (so SQLAlchemy emits child DELETEs in the
     # right order) and FK-level `ondelete="CASCADE"` (defense in depth at the
