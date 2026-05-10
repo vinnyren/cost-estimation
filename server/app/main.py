@@ -8,6 +8,7 @@ from .api.params import router as params_router
 from .api.calc import router as calc_router
 from .api.uploads import router as uploads_router
 from .api.functions import router as functions_router
+from .api.reports import router as reports_router
 from .config import Settings, settings
 from .deps import auth_middleware, origin_middleware
 
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(calc_router)
     app.include_router(uploads_router)
     app.include_router(functions_router)
+    app.include_router(reports_router)
 
     @app.on_event("startup")
     async def _bootstrap() -> None:
