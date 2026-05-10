@@ -24,6 +24,28 @@ def make_pdf():
     c.save()
 
 
+def make_docx():
+    from docx import Document
+    d = Document()
+    d.add_heading("XX 政务服务平台业务需求", level=1)
+    d.add_heading("3.2 业务功能概括", level=2)
+    d.add_paragraph("3.2.1 门户首页：新闻列表 + 政务服务图标")
+    d.add_paragraph("3.2.2 新闻管理：新增/修改/删除/查看/撤回")
+    # 加一个表格（FP 清单常见形式）
+    t = d.add_table(rows=3, cols=3)
+    t.rows[0].cells[0].text = "模块"
+    t.rows[0].cells[1].text = "功能项"
+    t.rows[0].cells[2].text = "说明"
+    t.rows[1].cells[0].text = "门户"
+    t.rows[1].cells[1].text = "首页"
+    t.rows[1].cells[2].text = "展示新闻"
+    t.rows[2].cells[0].text = "新闻管理"
+    t.rows[2].cells[1].text = "新闻新增"
+    t.rows[2].cells[2].text = "录入新闻"
+    d.save(str(OUT / "sample.docx"))
+
+
 if __name__ == "__main__":
     make_pdf()
-    print("✓ sample.pdf created")
+    make_docx()
+    print("✓ fixtures created")
