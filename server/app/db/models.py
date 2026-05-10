@@ -9,6 +9,7 @@ from sqlalchemy import (
     String,
     Text,
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from .session import Base
@@ -40,13 +41,52 @@ class Project(Base):
     fp_method = Column(String, default="nesma_estimated")
     basis_data_ver = Column(String, nullable=False)
 
+    # Cascade-delete child rows when the project is removed. Both ORM-level
+    # `cascade="all, delete-orphan"` (so SQLAlchemy emits child DELETEs in the
+    # right order) and FK-level `ondelete="CASCADE"` (defense in depth at the
+    # SQLite layer; PRAGMA foreign_keys=ON is set in session.py) are required
+    # to keep this safe across direct deletes and ORM deletes.
+    function_points = relationship(
+        "FunctionPoint",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    fp_snapshots = relationship(
+        "FPSnapshot",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    results = relationship(
+        "Result",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    param_overrides = relationship(
+        "ParamOverride",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    uploads = relationship(
+        "Upload",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
 
 class FunctionPoint(Base):
     __tablename__ = "function_points"
 
     id = Column(String, primary_key=True)
     project_id = Column(
-        String, ForeignKey("projects.id"), nullable=False, index=True
+        String,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     version = Column(Integer, nullable=False, default=1)
     subsystem = Column(String)
@@ -65,16 +105,24 @@ class FunctionPoint(Base):
     notes = Column(Text)
     ord = Column(Integer)
 
+    project = relationship("Project", back_populates="function_points")
+
 
 class FPSnapshot(Base):
     __tablename__ = "fp_snapshots"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    project_id = Column(String, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(
+        String,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     version = Column(Integer, nullable=False)
     snapshot_at = Column(DateTime, server_default=func.now(), nullable=False)
     snapshot_json = Column(Text, nullable=False)
     reason = Column(String)
+
+    project = relationship("Project", back_populates="fp_snapshots")
 
 
 Index("idx_fp_snapshots_project", FPSnapshot.project_id, FPSnapshot.id)
@@ -93,11 +141,17 @@ class ParamGlobal(Base):
 class ParamOverride(Base):
     __tablename__ = "params_override"
 
-    project_id = Column(String, ForeignKey("projects.id"), primary_key=True)
+    project_id = Column(
+        String,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
     key = Column(String, primary_key=True)
     value = Column(Text, nullable=False)
     reason = Column(String)
     updated_at = Column(DateTime, server_default=func.now())
+
+    project = relationship("Project", back_populates="param_overrides")
 
 
 class Result(Base):
@@ -105,7 +159,10 @@ class Result(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(
-        String, ForeignKey("projects.id"), nullable=False, index=True
+        String,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     computed_at = Column(DateTime, server_default=func.now())
     mode = Column(String, nullable=False)
@@ -114,14 +171,22 @@ class Result(Base):
     payload_json = Column(Text, nullable=False)
     is_stale = Column(Boolean, default=False)
 
+    project = relationship("Project", back_populates="results")
+
 
 class Upload(Base):
     __tablename__ = "uploads"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    project_id = Column(String, ForeignKey("projects.id"), nullable=False)
+    project_id = Column(
+        String,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     filename = Column(String, nullable=False)
     size = Column(Integer)
     uploaded_at = Column(DateTime, server_default=func.now())
     filetype = Column(String)
     parsed_text_path = Column(String)  # 大文本不进 DB
+
+    project = relationship("Project", back_populates="uploads")
