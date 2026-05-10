@@ -204,3 +204,19 @@ class Upload(Base):
     parsed_text_path = Column(String)  # 大文本不进 DB
 
     project = relationship("Project", back_populates="uploads")
+
+
+class ParamSnapshot(Base):
+    """v2.0 — ParamManager 快照 tab 的存储。
+
+    与 FPSnapshot 不同：FPSnapshot 是 FP 列表快照（per-project 的 FP 状态），
+    ParamSnapshot 是 effective_params 的快照（可以是全局 baseline，也可以是
+    某个项目的 override 状态）。
+    """
+    __tablename__ = "param_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    scope = Column(String, nullable=False, index=True)  # "global" | project_id
+    label = Column(String)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    payload_json = Column(Text, nullable=False)
