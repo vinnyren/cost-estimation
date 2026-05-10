@@ -1,8 +1,8 @@
 # 软件造价制作系统 · 设计规范
 
-**版本**：v1.0
+**版本**：v1.1（基于 /autoplan 评审反馈修订）
 **日期**：2026-05-10
-**状态**：草案
+**状态**：已评审，待实施
 **依据标准**：GB/T 36964 / T/CCUA 005-2024 / GB/T 28827.7-2022 / GB/T 42452-2023
 **基准数据**：CSBMK®-202510（2025 年中国软件行业基准数据）
 
@@ -288,8 +288,25 @@ params_global (含 CSBMK®-202510 默认值 + 用户全局修改)
 ### 4.3 一致性约束
 
 - `results.params_hash` = SHA256(effective_params + functions_version)；参数或 FP 变更后自动设置 `is_stale=1`
-- FP 编辑：每次保存后写入新版本号，并将快照写入 `fp_snapshots`；超过 5 版触发器删除最旧
-- 项目目录用文件锁（操作 SQLite 时 SQLite 自身 WAL 模式即可）
+- FP 编辑：每次保存后写入新版本号，并将快照写入 `fp_snapshots`
+- **fp_snapshots 触发器（按 project_id 分组保留前 5 版）**：
+
+  ```sql
+  CREATE TRIGGER trim_fp_snapshots AFTER INSERT ON fp_snapshots
+  BEGIN
+    DELETE FROM fp_snapshots
+    WHERE project_id = NEW.project_id
+      AND id NOT IN (
+        SELECT id FROM fp_snapshots
+        WHERE project_id = NEW.project_id
+        ORDER BY id DESC LIMIT 5
+      );
+  END;
+  CREATE INDEX idx_fp_snapshots_project ON fp_snapshots(project_id, id);
+  ```
+
+- **并发**：SQLite WAL 模式 + `busy_timeout=5000`；不再用文件锁。前端走乐观锁（携带 `fp_version`，409 冲突时刷新）
+- **共享计算上下文**：`server/core/context.py::EvaluationContext` 集中管理 effective params，forward/reverse/allocator 全部从 context 派生（纯函数，便于黄金测试与 hypothesis 性质测试）
 
 ---
 
@@ -322,12 +339,22 @@ params_global (含 CSBMK®-202510 默认值 + 用户全局修改)
 ### 5.2 反向反推（Reverse）
 
 输入：目标金额 T、其他费用 O、α（开发占比）、城市、行业、阶段、调整因子取值
-输出：US、S 三档（对应 PDR 三档）
+输出：US、S 三档（对应 PDR 三档"乐观/中位/保守预算口径"）
+
+**业务语义说明（CRITICAL，避免误读）**：
+
+PDR 是"行业生产率分布"，不是"团队生产率"。三档对应**预算口径**而非团队效率：
+
+- **乐观（PDR P10 — 行业最高效率）**：在乐观假设下（团队配合最佳/技术最熟悉/无返工），相同预算能买到的最大功能规模。**Boundary case**，作敏感度上界。
+- **中位（PDR P50 — 行业中位）**：基于行业基准多数项目能达到的水平。**推荐值**，报告默认呈现此档。
+- **保守（PDR P90 — 行业较低效率）**：考虑各种不确定性（需求蔓延/技术债/沟通损耗），相同预算能保证完成的最小功能规模。**Boundary case**，作敏感度下界。
+
+**关键提示**：直接拿"乐观档 FP 数"承诺给客户存在合规与商业风险（团队不一定达到 P10）。报告必须呈现三档 + 强调 P50 推荐 + 标注"基于 CSBMK®-202510 行业分布"。
 
 ```
 步骤：
   1. 可用预算 = T - O
-  2. 若 include_ops:
+  2. 若 include_ops（默认 false，α 默认 1.0）:
        Budget_dev = (T - O) × α
        Budget_ops = (T - O) × (1 - α)
      否则:
@@ -336,18 +363,24 @@ params_global (含 CSBMK®-202510 默认值 + 用户全局修改)
        PM   = Budget / F_city
        AE   = PM × 174
        UE   = AE / Π(调整因子)
-  4. 反求规模（对应 PDR 三档）：
-       S_紧 = UE / PDR_P10                   # 高生产率 = 小规模
-       S_中 = UE / PDR_P50
-       S_松 = UE / PDR_P90
+  4. 反求规模（按 PDR 三档,对应预算口径）：
+       S_乐观 = UE / PDR_P10        # 乐观口径：可买功能规模上界
+       S_中位 = UE / PDR_P50        # 推荐：报告呈现此档
+       S_保守 = UE / PDR_P90        # 保守口径：可买功能规模下界
   5. US = S / CF
-  6. 检查：若已有 FP 草稿合计在 [S_紧, S_松] 内，预算合理；否则提示
+  6. 检查：若已有 FP 草稿合计在 [S_保守, S_乐观] 内，预算合理；否则提示
+  7. UI 与 Excel 报告必须：
+     a) 默认推荐 S_中位
+     b) 标注"乐观/保守为敏感度边界，非承诺值"
+     c) 反向模式输出加水印"基于目标金额倒推"
 ```
 
 ### 5.3 模块分摊（Allocator）
 
-输入：目标 S（中值，建议）+ 文档解析得到的模块树 + 可选 Claude 初稿权重
+输入：目标 S（默认 S_中位）+ 文档解析得到的模块树 + 可选 Claude 初稿权重
 输出：完整 FP 清单（每条带类别、复杂度、UFP）
+
+**两段计算（避免锁定项与 1% 容差冲突）**：
 
 ```
 步骤：
@@ -356,20 +389,26 @@ params_global (含 CSBMK®-202510 默认值 + 用户全局修改)
      B. 用户在 Web UI 的自定义权重
      C. 等权 + 类别默认 UFP
 
-  2. 归一与分配：
-       UFP_i = round(S_target × w_i / Σw_j, 2)
+  2. 锁定项隔离（先计算）：
+     S_locked  = Σ(locked FP[i].us)         # 已锁定项规模合计
+     S_free    = S_target - S_locked × CF    # 留给未锁定项的规模
+     若 S_free ≤ 0，拒绝并提示"锁定项已超目标，请解锁后重试"
 
-  3. 类别分布约束：
+  3. 未锁定项归一与分配（仅在 S_free 上分摊）：
+       UFP_i = round(S_free × w_i / Σ(unlocked w_j), 2)
+
+  4. 类别分布约束（仅作用于未锁定项）：
      ILF≈14% / EI≈50% / EO≈7% / EQ≈29% / EIF≈0%（参考实施规程示例）
-     允许 ±5% 漂移；超出则在保持总和不变的前提下重平衡
+     允许 ±5% 漂移；超出则在保持未锁定总和不变的前提下重平衡
 
-  4. 取整：UFP 落到 NESMA 估算合法值（详细法可走完整 IFPUG 表）
+  5. 取整：UFP 落到 NESMA 估算合法值（详细法可走完整 IFPUG 表）
 
-  5. 双向一致性校验：
-     重新走一遍 forward(分摊后 FP) → 计算 cost
-     若 |cost - target| / target > 1%，提示用户
+  6. 双向一致性校验：
+     重新走一遍 forward(分摊后 FP, 含锁定项) → 计算 S_actual
+     若 |S_actual - S_target| / S_target > 1%（仅检查未锁定误差），提示用户
 
-  6. 锁定的 FP（locked=1）不参与重平衡
+  7. 反向模式专属：所有 source=allocator 的 FP 项必须打上 audit_tag=budget_derived
+     在 Excel 报告与 UI 中显示"预算倒推"水印；与人工/AI 项做视觉区分
 ```
 
 ### 5.4 黄金测试
@@ -432,7 +471,47 @@ CSBMK 数据每年更新，因此测试也需配备 202210 历史数据用于精
 | 参数管理 | `/projects/{id}/parameters` | 6 Tab（费率/生产率/开发因子/运维因子/规模变更/快照）；覆盖项黄底高亮 |
 | 结果页 | `/projects/{id}/result` | Forward：三档金额卡片；Reverse：三档 FP 卡片 + 反算输入区；底部下载按钮 |
 
-### 6.4 关键 UI 决策
+### 6.4 状态矩阵（每屏 5 态）
+
+每个主屏必须实现以下 5 种状态。`-` 代表不适用。
+
+| 屏 | Loading | Empty | Error | Partial | Stale |
+|---|---|---|---|---|---|
+| 项目列表 | skeleton 卡片 ×3 | 中央插画 + "新建第一个项目" CTA | 顶部红色 banner + 重试按钮 | 部分加载完显示 + "..."占位 | - |
+| 项目向导 | 步条置灰 | 表单空表态默认填示例 | 字段红色边框 + 错误文案 | - | - |
+| FP 编辑 | skeleton 行 ×8 | 中央 hero CTA "上传文档让 AI 写第一稿" | banner + 错误详情可展开 | AI 提取部分行已写入则显示进度（12/87）+ 取消 | 顶部黄条 "参数已变，重新计算" + 按钮 |
+| 参数管理 | skeleton tab 内容 | "参数库为空，导入 CSBMK®-202510" | 字段级错误提示 + 字段恢复默认 | - | - |
+| 结果页 | spinner + "计算中…" | "请先完成 FP 编辑" + 跳回链接 | 红色 banner + "查看错误详情" | 部分计算完显示已知值 + "..."占位 | 顶部黄条 + "重新计算"按钮 |
+
+**通用规则：**
+- Loading 超过 3 秒显示进度条；超过 10 秒显示"耐心等待"插画
+- Error banner 带 problem + cause + 建议 fix（详见 §10）
+- 长任务（AI 提取、Excel 导出）必须有取消按钮
+- 网络断开时全局显示 offline 提示条
+
+### 6.5 可访问性基线（WCAG 2.1 AA）
+
+- **键盘导航**：所有交互元素支持 Tab/Enter/Esc；FP 表格支持方向键移动焦点
+- **ARIA 标签**：所有 icon button 必带 `aria-label`；动态内容用 `aria-live="polite"`
+- **颜色对比**：文本/背景对比度 ≥ 4.5:1；非文本（图标/边框）≥ 3:1
+- **覆盖项视觉**（取代"黄底高亮"）：浅琥珀底 `oklch(96% 0.08 95)` + 左侧 3px 实线 `oklch(70% 0.15 70)` + 行尾"自定义"徽章
+- **触摸目标**：最小 44×44 px（移动端考虑）
+- **Excel 输出**：Sheet 命名规范、表头 row 标记 `<table:header>`、关键单元格 alt text
+
+### 6.6 组件契约（避免 4 程序员 4 版）
+
+| 组件 | 位置 | 默认状态 | 关键交互 |
+|---|---|---|---|
+| AI 辅助提取按钮 | FP 编辑屏工具栏第一项 | 空表时为屏中央 hero CTA；有数据时降级为 primary 工具栏按钮 | Loading 期间替换为进度条 + 取消按钮 |
+| 三档结果卡片 | 结果页顶部 | **横排 3 张，P50 中间居中、加 "推荐" 徽章** | hover 显示详细计算过程；点击查看分项明细 |
+| 模块树 | FP 编辑屏左侧 240px | 默认仅展开一级 | 支持折叠/展开；不支持拖拽排序（v2） |
+| vxe-table 列宽 | FP 表格 | 写入 localStorage `cost_fp_cols` | 列隐藏不持久化 |
+| stale 标识 | 结果页顶部 | 黄色横条 banner（不阻止下载） | 点击 "重新计算" 触发计算 |
+| Reverse FP 表 | FP 编辑屏 | 反向模式下"采纳档位"前为只读，采纳后可编辑 | 采纳按钮在结果页 |
+| Excel 下载 | 结果页底部 | 异步生成（Job + SSE 进度） | 完成后浏览器原生下载 |
+| 反向水印 | Excel 与 UI | 全部 source=allocator 的 FP 显示 "预算倒推" 徽章 | Excel 封面页加注 "反向模式" |
+
+### 6.7 关键 UI 决策
 
 - **vxe-table** 处理大型 FP 表（百行以上）的批量编辑、虚拟滚动、列排序
 - **Element Plus** 提供 Form/Tab/Drawer/Notification 等基础组件
@@ -674,6 +753,84 @@ description: Use when the user wants to do software cost estimation per Chinese 
 
 ---
 
+### 9.5 安全设计（CRITICAL — 防 localhost CSRF）
+
+绑定 127.0.0.1 不等于安全。浏览器同时打开 `evil.com` 时，恶意 JS 可发请求到本机服务。**强制三层防护**：
+
+### 9.5.1 启动随机 token
+
+`/cost` 命令启动时生成一次性 token：
+
+```python
+# server/app/main.py
+import secrets
+TOKEN = secrets.token_urlsafe(32)
+TOKEN_FILE = Path("~/.claude/projects/cost-estimation/.token").expanduser()
+TOKEN_FILE.write_text(TOKEN)
+```
+
+打开浏览器时把 token 拼到 URL：`http://127.0.0.1:8788/?t=<token>`。前端从 URL 读后存入 sessionStorage。
+
+### 9.5.2 中间件强制鉴权
+
+```python
+@app.middleware("http")
+async def verify_token(request, call_next):
+    if request.url.path == "/health":
+        return await call_next(request)
+    sent = request.headers.get("X-Auth-Token") or request.query_params.get("t")
+    if sent != TOKEN:
+        return JSONResponse(401, {"error": {"code": "UNAUTHORIZED", "message": "Invalid token"}})
+    return await call_next(request)
+```
+
+### 9.5.3 Origin + CORS 白名单
+
+```python
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["X-Auth-Token", "Content-Type", "X-Requested-With"]
+)
+
+@app.middleware("http")
+async def verify_origin(request, call_next):
+    if request.method != "GET":
+        origin = request.headers.get("Origin", "")
+        if origin and not origin.startswith(f"http://127.0.0.1") and not origin.startswith(f"http://localhost"):
+            return JSONResponse(403, {"error": {"code": "FORBIDDEN_ORIGIN"}})
+    return await call_next(request)
+```
+
+### 9.5.4 文件上传白名单 + zip slip 防护
+
+```python
+ALLOWED_MIME = {"application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
+
+import magic
+def validate_upload(file: UploadFile) -> None:
+    # 1. 扩展名白名单
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {".pdf", ".docx", ".xlsx", ".md"}:
+        raise HTTPException(400, "INVALID_FILE_TYPE")
+    # 2. MIME 内容嗅探
+    head = file.file.read(2048); file.file.seek(0)
+    if magic.from_buffer(head, mime=True) not in ALLOWED_MIME:
+        raise HTTPException(400, "MIME_MISMATCH")
+    # 3. 大小限制
+    if file.size > 50 * 1024 * 1024:
+        raise HTTPException(413, "FILE_TOO_LARGE")
+```
+
+### 9.5.5 危险操作二次确认
+
+`DELETE /api/projects/{id}` 与 `POST /api/params/global/reset` 要求请求体含 `{ "confirm": "<project_name>" }` 或 `{ "confirm": "RESET_GLOBAL" }`。
+
+---
+
 ## 10. 错误处理与边界条件
 
 | 场景 | 处理 |
@@ -750,13 +907,15 @@ description: Use when the user wants to do software cost estimation per Chinese 
 
 ## 14. 验收标准
 
-- [ ] 一键安装：`/plugin install` → 自动 venv + 依赖 + SQLite seed
-- [ ] `/cost` 唤起 → 浏览器自动打开 → 可以走完 5 步向导导出 Excel
-- [ ] 黄金测试（附录 D 算例）：输出 = 48.92 万元 ±0.01（中值）
-- [ ] 反向模式：目标 50 万 → 三档 FP，反算回去 ≤1% 误差
+- [ ] 二步安装：`/plugin install cost-estimation` → 用户运行 `/cost-estimation:setup` → setup 输出 "✓ 安装完成"
+- [ ] `/cost` 唤起 → 后端启动 → 浏览器自动打开（携带 token）→ 可以走完 5 步向导导出 Excel
+- [ ] 黄金测试（附录 D 算例）：输出 = 48.92 万元 ±0.01（中值），数据走 fixture `tests/golden/csbmk_202210.json`
+- [ ] 反向模式：目标 50 万 → 三档 FP（乐观/中位/保守），forward(allocator(中位)) 误差 ≤1%
 - [ ] 参数全量可改 + 重置 + 快照回滚
-- [ ] 测试覆盖 ≥ 80%
+- [ ] 测试覆盖 ≥ 80%；mutation testing `core/*` 杀死率 ≥ 70%
 - [ ] Excel 用 Office/WPS 正常打开，格式无错乱
+- [ ] 安全：未带 token 访问任意 /api/* 路径返回 401
+- [ ] 安全：跨域 fetch 到 8788 被 Origin 中间件拒绝
 
 ---
 
@@ -816,6 +975,46 @@ description: Use when the user wants to do software cost estimation per Chinese 
 - Design Voices：Codex（9 项）+ Claude subagent（8 项），Consensus 7/7 confirmed
 - Eng Voices：Codex（8 项）+ Claude subagent（10 项），Consensus 6/6 confirmed
 - DX Voices：Codex（8 项）+ Claude subagent（8 项），Consensus 6/6 confirmed
+
+### 16.4 用户拍板结果（D2 / D3）
+
+- **D2 — UC-1：先做对话主导 MVP？** → 用户选 **B：仍按完整 Web 方案推进**，承担方向风险
+- **D3 — UC-2：补访谈 + 竞品 + 合规链？** → 用户选 **C：两者都不做**，调研由产品负责人自行处理
+
+### 16.5 v1.1 修订摘要
+
+| # | 章节 | 修订内容 | 来源 |
+|---|---|---|---|
+| 1 | §5.2 | PDR 三档命名"乐观/中位/保守"+ 业务语义说明 + 推荐 P50 + 反向水印 | CRITICAL Eng+CEO |
+| 2 | §5.3 | Allocator 两段计算（锁定项隔离）+ audit_tag=budget_derived | HIGH Eng |
+| 3 | §6.4 | 新增"状态矩阵"——5 屏 × Loading/Empty/Error/Partial/Stale | CRITICAL Design |
+| 4 | §6.5 | 新增"可访问性基线"——WCAG 2.1 AA、键盘、对比度、ARIA | HIGH Design |
+| 5 | §6.6 | 新增"组件契约表"——8 个争议点视觉与交互定义 | CRITICAL Design |
+| 6 | §9.5 | 新增"安全设计"——token + Origin + CORS + zip slip + 二次确认 | CRITICAL Eng |
+| 7 | §4.3 | fp_snapshots 触发器按 project_id 分组；EvaluationContext 共享 | HIGH Eng |
+| 8 | §14 | 验收标准修正：删除"自动 venv"承诺，统一为"二步安装" | CRITICAL DX |
+
+### 16.6 待实施细节（v1.1 接受但未在 spec 内逐条展开）
+
+下列改进点由 /autoplan 评审接受，将在编码阶段逐项落地（写入 commit 信息与代码注释）：
+
+- **DX**：命令命名统一为 `/cost-estimation:setup` / `:start` / `:stop` / `:status`
+- **DX**：错误响应统一 4 字段 `{ code, problem, cause, fix }` + `docs_url`
+- **DX**：setup 加 preflight（python3 ≥ 3.10 + 磁盘 + 网络）+ 镜像 fallback `--index-url https://pypi.tuna.tsinghua.edu.cn/simple`
+- **DX**：API 风格统一为资源型 `/api/projects/{id}/calculations/{forward,reverse,allocate}` + `/exports/excel`
+- **DX**：Excel 批量导入作为一等公民——下载空白模板 + 上传写入
+- **Eng**：openpyxl 5000+ 行流式 + 模板坏 fallback
+- **Eng**：文档解析异步化（threadpool/进程池）+ SSE 进度
+- **Eng**：测试加 mutation testing（mutmut，core/* ≥70% 杀死率）+ hypothesis property 测试
+- **Eng**：黄金测试 fixture `tests/golden/csbmk_202210.json`（不进生产 seed）
+
+### 16.7 USER CHALLENGES 拒绝结果备忘
+
+用户明确拒绝以下两条改动：
+- UC-1（先做 MVP）：**用户选直上完整方案**。承担"方向错误返工"风险。
+- UC-2（补访谈/竞品/合规调研）：**用户选不做调研，按现方案推进**。所有差异化与合规可过审策略由产品负责人独立判断。
+
+记录此项以便未来回溯：若产品上线后遇到"用户与预设不符"或"报告不被审计接受"，本节为 /autoplan 阶段已识别但被 deprioritized 的风险。
 
 
 - COSMIC 方法（GB/T 42452）完整支持
