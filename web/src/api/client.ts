@@ -1,6 +1,8 @@
 import axios, { type AxiosInstance, type AxiosResponse } from "axios";
 import type { ApiEnvelope } from "./types";
 
+export const AUTH_TOKEN_KEY = "auth_token";
+
 export class ApiError extends Error {
   constructor(
     public code: string,
@@ -23,7 +25,7 @@ function unwrap<T>(resp: AxiosResponse<ApiEnvelope<T>>): T {
 }
 
 function getToken(): string {
-  return sessionStorage.getItem("auth_token") ?? "";
+  return sessionStorage.getItem(AUTH_TOKEN_KEY) ?? "";
 }
 
 export interface Client {

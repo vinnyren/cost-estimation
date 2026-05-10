@@ -2,15 +2,28 @@ import {
   createRouter,
   createWebHistory,
   type RouteRecordRaw,
+  type Router,
   type RouterHistory,
 } from "vue-router";
+import { AUTH_TOKEN_KEY } from "@/api/client";
 
 export function extractTokenFromUrl(url: string = window.location.href): void {
   const u = new URL(url);
   const token = u.searchParams.get("t");
   if (token) {
-    sessionStorage.setItem("auth_token", token);
+    sessionStorage.setItem(AUTH_TOKEN_KEY, token);
   }
+}
+
+/**
+ * 把 dirty-checker 注入路由内置 slot。
+ *
+ * 单实例契约：同一时刻只有一个 dirty checker — 见 useUnsavedGuard 顶部 JSDoc。
+ */
+export function setDirtyChecker(router: Router, fn: () => boolean): void {
+  (router as unknown as { __setDirtyChecker?: (fn: () => boolean) => void }).__setDirtyChecker?.(
+    fn,
+  );
 }
 
 const routes: RouteRecordRaw[] = [
@@ -66,4 +79,3 @@ export function createRouterFor(history: RouterHistory) {
 }
 
 export const router = createRouterFor(createWebHistory());
-extractTokenFromUrl();

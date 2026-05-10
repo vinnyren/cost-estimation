@@ -5,9 +5,11 @@ import "element-plus/dist/index.css";
 import VxeUI from "vxe-table";
 import "vxe-table/lib/style.css";
 import App from "./App.vue";
-import { router } from "./router";
+import { router, extractTokenFromUrl } from "./router";
 import "./styles/tokens.css";
 import "./styles/global.css";
+
+extractTokenFromUrl();
 
 createApp(App)
   .use(createPinia())
