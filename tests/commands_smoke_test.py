@@ -25,6 +25,15 @@ def test_cost_command_starts_uvicorn_with_token():
         "必须生成随机 token"
     assert "/health" in body, "必须健康检查后再开浏览器"
     assert "/?t=" in body or "?t=$TOKEN" in body, "必须把 token 拼到 URL"
+    assert "COST_AUTH_TOKEN" in body, \
+        "必须用 COST_AUTH_TOKEN 而非 AUTH_TOKEN（与 server config env_prefix 对齐）"
+    # 不应留有未加 COST_ 前缀的 AUTH_TOKEN=（行首或空白后开始的 AUTH_TOKEN=）
+    import re
+    bad_auth = re.search(r"(?:^|\s)AUTH_TOKEN=", body, re.MULTILINE)
+    assert bad_auth is None, \
+        f"不应留有未加 COST_ 前缀的 AUTH_TOKEN= ：{bad_auth.group(0)!r}"
+    assert "COST_DATABASE_URL" not in body, \
+        "不应使用 COST_DATABASE_URL（不存在的 setting）"
 
 
 def test_cost_command_handles_port_conflict():

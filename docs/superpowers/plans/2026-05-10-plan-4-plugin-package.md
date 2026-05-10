@@ -600,26 +600,36 @@ allowed-tools: Bash
 
 4. 启动 uvicorn（后台），把 PID 写入 .pid：
    ```bash
+   if [ ! -x "$PLUGIN_DIR/server/.venv/bin/uvicorn" ]; then
+     echo "✗ 未找到 venv：请先运行 /cost-estimation:setup"
+     exit 1
+   fi
    cd "$PLUGIN_DIR/server"
-   AUTH_TOKEN="$TOKEN" \
-   COST_DATABASE_URL="sqlite:///$DATA_DIR/db/cost.sqlite" \
+   COST_AUTH_TOKEN="$TOKEN" \
+   COST_DATA_DIR="$DATA_DIR" \
    COST_WEB_DIST_DIR="$PLUGIN_DIR/web/dist" \
-   COST_UPLOAD_DIR="$DATA_DIR/uploads" \
-   COST_EXPORT_DIR="$DATA_DIR/exports" \
    nohup ".venv/bin/uvicorn" \
      app.main:app --host 127.0.0.1 --port "$PORT" \
      > /tmp/cost-estimation.log 2>&1 &
    echo $! > "$DATA_DIR/.pid"
    ```
 
-5. 轮询 `http://127.0.0.1:$PORT/health` 直到就绪（最多 10 秒）：
+   注意：`server/app/config.py` 用 `env_prefix="COST_"`，所以所有 setting 都需 `COST_` 前缀；`uploads` / `exports` 由 `settings.data_dir` 派生，无独立 env-var。
+
+5. 轮询 `http://127.0.0.1:$PORT/health` 直到就绪（最多 10 秒），超时则 abort：
    ```bash
+   READY=false
    for i in $(seq 1 20); do
      if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+       READY=true
        break
      fi
      sleep 0.5
    done
+   if [ "$READY" != "true" ]; then
+     echo "✗ 后端启动超时（10s）。日志: /tmp/cost-estimation.log"
+     exit 1
+   fi
    ```
 
 6. 在默认浏览器打开（携带 token）：
