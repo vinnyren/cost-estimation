@@ -103,18 +103,33 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
       >
         <h2>城市费率（元/人月）</h2>
         <p class="hint">
-          基于 CSBMK®-202510，可单项覆盖。
+          基于 CSBMK®-202510，可单项覆盖。开发与运维各自独立费率。
         </p>
-        <div class="grid">
-          <OverrideField
+        <div class="city-rate-list">
+          <div
             v-for="(rate, city) in eff.city_rate"
-            :key="city"
-            :label="`${city}（开发）`"
-            :model-value="rate.dev"
-            :default-value="rate.dev"
-            :overridden="store.isOverridden(`city_rate.${String(city)}.dev`)"
-            @update:model-value="(nv) => patchOverride(`city_rate.${String(city)}.dev`, nv)"
-          />
+            :key="String(city)"
+            class="city-rate-row"
+            data-testid="city-rate-row"
+          >
+            <div class="city-rate-city">
+              {{ city }}
+            </div>
+            <OverrideField
+              :label="`${city}（开发）`"
+              :model-value="rate.dev"
+              :default-value="rate.dev"
+              :overridden="store.isOverridden(`city_rate.${String(city)}.dev`)"
+              @update:model-value="(nv) => patchOverride(`city_rate.${String(city)}.dev`, nv)"
+            />
+            <OverrideField
+              :label="`${city}（运维）`"
+              :model-value="rate.ops"
+              :default-value="rate.ops"
+              :overridden="store.isOverridden(`city_rate.${String(city)}.ops`)"
+              @update:model-value="(nv) => patchOverride(`city_rate.${String(city)}.ops`, nv)"
+            />
+          </div>
         </div>
       </section>
 
@@ -123,20 +138,47 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
         role="tabpanel"
         class="panel"
       >
-        <h2>开发生产率（FP/人月）</h2>
+        <h3 class="subtitle">
+          开发生产率（FP/人月）
+        </h3>
         <div class="grid">
           <template
             v-for="(bands, ind) in eff.productivity_dev"
-            :key="ind"
+            :key="`dev-${String(ind)}`"
           >
             <OverrideField
               v-for="band in PRODUCTIVITY_BANDS"
-              :key="`${String(ind)}-${band}`"
+              :key="`dev-${String(ind)}-${band}`"
               :label="`${String(ind)} ${band}`"
               :model-value="(bands as Record<Band, number>)[band]"
               :default-value="(bands as Record<Band, number>)[band]"
               :overridden="store.isOverridden(`productivity_dev.${String(ind)}.${band}`)"
               @update:model-value="(nv) => patchOverride(`productivity_dev.${String(ind)}.${band}`, nv)"
+            />
+          </template>
+        </div>
+        <h3
+          v-if="eff.productivity_ops && Object.keys(eff.productivity_ops).length > 0"
+          class="subtitle subtitle-spaced"
+        >
+          运维生产率（FP/人月）
+        </h3>
+        <div
+          v-if="eff.productivity_ops && Object.keys(eff.productivity_ops).length > 0"
+          class="grid"
+        >
+          <template
+            v-for="(bands, ind) in eff.productivity_ops"
+            :key="`ops-${String(ind)}`"
+          >
+            <OverrideField
+              v-for="band in PRODUCTIVITY_BANDS"
+              :key="`ops-${String(ind)}-${band}`"
+              :label="`${String(ind)} ${band}`"
+              :model-value="(bands as Record<Band, number>)[band]"
+              :default-value="(bands as Record<Band, number>)[band]"
+              :overridden="store.isOverridden(`productivity_ops.${String(ind)}.${band}`)"
+              @update:model-value="(nv) => patchOverride(`productivity_ops.${String(ind)}.${band}`, nv)"
             />
           </template>
         </div>
@@ -219,5 +261,35 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-2);
+}
+.subtitle {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-text-body);
+  font-weight: 600;
+}
+.subtitle-spaced {
+  margin-top: var(--space-5);
+}
+.city-rate-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.city-rate-row {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) 1fr 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.city-rate-row:last-child {
+  border-bottom: none;
+}
+.city-rate-city {
+  font-weight: 600;
+  color: var(--color-text-body);
+  padding-top: var(--space-2);
 }
 </style>
