@@ -1,6 +1,7 @@
+import math
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class FunctionPointBase(BaseModel):
@@ -11,16 +12,25 @@ class FunctionPointBase(BaseModel):
     name: Optional[str] = None
     category: Literal["EI", "EO", "EQ", "ILF", "EIF"]
     complexity: Literal["low", "average", "high"]
-    ufp: float
+    # ufp / us 必须 ≥ 0 — 负值会让 forward calc 产出负造价，业务无意义
+    # （ISSUE-021 round 3 QA：曾有 ufp=-5 通过 schema → cost_dev_yuan 也是负）
+    ufp: float = Field(ge=0)
     reuse_level: Optional[Literal["low", "high"]] = "low"
     modify_type: Optional[Literal["new", "modify", "delete"]] = "new"
-    us: float
+    us: float = Field(ge=0)
     source: Optional[
         Literal["manual", "imported", "ai_extracted", "claude_draft", "allocator"]
     ] = "manual"
     locked: bool = False
     notes: Optional[str] = None
     ord: Optional[int] = None
+
+    @field_validator("ufp", "us")
+    @classmethod
+    def _finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("must be a finite number (NaN/Inf rejected)")
+        return v
 
 
 class FunctionPointCreate(FunctionPointBase):
@@ -42,10 +52,17 @@ class FunctionPointPatch(BaseModel):
     name: Optional[str] = None
     category: Optional[Literal["EI", "EO", "EQ", "ILF", "EIF"]] = None
     complexity: Optional[Literal["low", "average", "high"]] = None
-    ufp: Optional[float] = None
-    us: Optional[float] = None
+    ufp: Optional[float] = Field(default=None, ge=0)
+    us: Optional[float] = Field(default=None, ge=0)
     locked: Optional[bool] = None
     notes: Optional[str] = None
+
+    @field_validator("ufp", "us")
+    @classmethod
+    def _finite_optional(cls, v: Optional[float]) -> Optional[float]:
+        if v is not None and not math.isfinite(v):
+            raise ValueError("must be a finite number (NaN/Inf rejected)")
+        return v
 
 
 class BulkRequest(BaseModel):
