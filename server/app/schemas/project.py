@@ -1,9 +1,11 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal, Optional
 from datetime import datetime
 
+NAME_MAX = 120
+
 class ProjectCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=NAME_MAX)
     project_type: Literal["dev_only", "ops_only", "dev_and_ops"]
     phase: Literal["budget", "bidding", "planning", "change", "settled"]
     city: str
@@ -25,7 +27,7 @@ class ProjectRead(ProjectCreate):
     model_config = ConfigDict(from_attributes=True)
 
 class ProjectPatch(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(default=None, min_length=1, max_length=NAME_MAX)
     phase: Optional[str] = None
     city: Optional[str] = None
     industry: Optional[str] = None
