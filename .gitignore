@@ -3,3 +3,21 @@
 .superpowers/
 *.pdf
 软件造价喵-用户操作手册/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mutmut-cache/
+
+# 项目数据
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# 临时
+.coverage
+htmlcov/
