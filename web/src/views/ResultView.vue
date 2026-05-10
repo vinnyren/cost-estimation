@@ -20,6 +20,9 @@ const forwardResult = ref<ForwardResult | null>(null);
 const reverseResult = ref<ReverseResult | null>(null);
 const loading = ref(true);
 const error = ref<string | null>(null);
+// download error is rendered separately so the banner doesn't claim
+// "计算失败" when the download path is the actual failure
+const downloadError = ref<string | null>(null);
 const downloading = ref(false);
 
 const targetTotal = ref(0);
@@ -72,10 +75,18 @@ async function reverseCalc(): Promise<void> {
 
 async function download(): Promise<void> {
   downloading.value = true;
+  downloadError.value = null;
   try {
     await reportsApi.download(props.projectId, `${project.value?.name ?? "report"}.xlsx`);
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : "下载失败";
+    const msg = e instanceof Error ? e.message : "下载失败";
+    // 反向项目无 FP 时后端会回 FP_EMPTY/400 — 给个能行动的提示
+    if (project.value?.mode === "reverse" && /FP_EMPTY|status code 400/i.test(msg)) {
+      downloadError.value =
+        "反向项目导出 Excel 需要先在 FP 编辑屏录入功能点（基于推荐档位的 FP 数量）";
+    } else {
+      downloadError.value = msg;
+    }
   } finally {
     downloading.value = false;
   }
@@ -225,6 +236,13 @@ const hasReverse = computed(() => reverseResult.value !== null);
       >
         {{ downloading ? "下载中…" : "下载 Excel 报告" }}
       </button>
+      <p
+        v-if="downloadError"
+        class="dl-error"
+        role="alert"
+      >
+        下载失败：{{ downloadError }}
+      </p>
     </footer>
   </section>
 </template>
@@ -294,8 +312,17 @@ const hasReverse = computed(() => reverseResult.value !== null);
 .dl-bar {
   margin-top: var(--space-4);
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
+}
+.dl-error {
+  margin: 0;
+  color: var(--color-danger, #d4380d);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  max-width: 60ch;
 }
 </style>

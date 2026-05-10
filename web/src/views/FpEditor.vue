@@ -189,6 +189,7 @@ function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
       ref="fileInput"
       type="file"
       accept=".pdf,.docx,.xlsx,.md,.txt"
+      aria-label="上传需求文档（PDF/Word/Excel/MD/TXT）"
       hidden
       @change="onFileChange"
     >
@@ -235,8 +236,23 @@ function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
 }
 .grid-body {
   flex: 1;
+  min-width: 0;
   overflow: auto;
   padding: var(--space-3);
+}
+/* 窄屏：240px sidebar 把表格挤到只剩一两列。改为竖排 + 表格水平滚动。
+   断点选 768px 与全局 .cards 一致。 */
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    max-height: 30vh;
+    overflow: auto;
+  }
 }
 .grid-body table.data-table {
   border: none;

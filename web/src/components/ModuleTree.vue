@@ -68,6 +68,13 @@ const tree = computed(() => {
   background: var(--color-bg-hover);
   font-size: var(--font-size-sm);
 }
+/* 窄屏跟随父布局自适应宽度，避免 240px 把表格挤掉 */
+@media (max-width: 768px) {
+  .tree {
+    width: 100%;
+    height: auto;
+  }
+}
 .tree-root,
 .tree-leaves {
   list-style: none;

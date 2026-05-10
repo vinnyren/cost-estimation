@@ -12,9 +12,13 @@ const version =
       class="app-header"
       role="banner"
     >
-      <h1 class="app-logo">
+      <!-- 品牌不用 h1，让每个页面只保留一个 h1（页面标题） -->
+      <div
+        class="app-logo"
+        aria-label="软件造价制作系统"
+      >
         软件造价制作系统
-      </h1>
+      </div>
       <span class="app-meta text-muted">v{{ version }} · CSBMK®-202510</span>
     </header>
     <main
