@@ -1,7 +1,10 @@
 """模板损坏时的内置生成器：用代码直接构建一个最小可用的 7-Sheet 报告。"""
 from pathlib import Path
+from typing import Any
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
+
+from .excel import _safe_text  # 复用同一份 CSV/Excel 注入防护
 
 
 def _bold() -> Font:
@@ -24,7 +27,7 @@ def render_fallback(output_path: Path, *,
     cover = wb.create_sheet("封面声明")
     cover["A1"] = "第三方软件造价评估报告（fallback 版）"
     cover["A1"].font = Font(bold=True, size=18)
-    cover["A3"] = f"项目名称：{project_name}"
+    cover["A3"] = _safe_text(f"项目名称：{project_name}")
 
     summary = wb.create_sheet("评估结果摘要")
     summary.append(["项目", "数值", "单位"])
@@ -39,27 +42,35 @@ def render_fallback(output_path: Path, *,
     report = wb.create_sheet("评估报告书")
     report["A1"] = "项目概述"
     report["A1"].font = _bold()
-    report["A2"] = project_overview
+    report["A2"] = _safe_text(project_overview)
 
     factors_ws = wb.create_sheet("调整因子表")
     factors_ws.append(["类别", "名称", "取值"])
     for f in factors:
-        factors_ws.append([f.get("category", ""), f.get("name", ""), f.get("value", 0)])
+        factors_ws.append([_safe_text(f.get("category", "")),
+                            _safe_text(f.get("name", "")),
+                            f.get("value", 0)])
 
     fp_ws = wb.create_sheet("功能点计数表")
     fp_ws.append(["编号", "名称", "类别", "UFP", "US"])
     for i, fp in enumerate(functions, start=1):
-        fp_ws.append([i, fp.get("name", ""), fp.get("category", ""), fp.get("ufp", 0), fp.get("us", 0)])
+        fp_ws.append([i, _safe_text(fp.get("name", "")),
+                       _safe_text(fp.get("category", "")),
+                       fp.get("ufp", 0), fp.get("us", 0)])
 
     steps_ws = wb.create_sheet("详细计算过程")
     steps_ws.append(["步骤", "说明", "公式", "结果"])
     for s in steps:
-        steps_ws.append([s.get("step", ""), s.get("desc", ""), s.get("formula", ""), s.get("result", "")])
+        steps_ws.append([_safe_text(s.get("step", "")),
+                          _safe_text(s.get("desc", "")),
+                          _safe_text(s.get("formula", "")),
+                          s.get("result", "")])
 
     params_ws = wb.create_sheet("参数附录")
     params_ws.append(["键", "值"])
     for p in params:
-        params_ws.append([p.get("key", ""), p.get("value", "")])
+        params_ws.append([_safe_text(p.get("key", "")),
+                           _safe_text(p.get("value", ""))])
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(output_path))
