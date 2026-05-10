@@ -42,13 +42,13 @@ function formatCost(value: number): string {
     class="page"
     aria-labelledby="page-title"
   >
-    <header class="header">
+    <header class="page-header">
       <h1 id="page-title">
         项目列表
       </h1>
       <button
         type="button"
-        class="primary"
+        class="btn btn-primary"
         @click="goNew"
       >
         新建项目
@@ -85,12 +85,13 @@ function formatCost(value: number): string {
       <li
         v-for="p in store.items"
         :key="p.id"
-        class="card"
+        class="card project-card"
       >
         <header class="card-head">
           <h3>{{ p.name }}</h3>
           <span
-            class="mode-badge"
+            class="badge"
+            :class="p.mode === 'forward' ? 'badge-primary' : 'badge-data'"
             :data-mode="p.mode"
           >{{ p.mode === "forward" ? "正向" : "反向" }}</span>
         </header>
@@ -119,13 +120,14 @@ function formatCost(value: number): string {
         <footer class="card-actions">
           <button
             type="button"
+            class="btn btn-sm"
             @click="open(p.id)"
           >
             打开
           </button>
           <button
             type="button"
-            class="danger"
+            class="btn btn-sm btn-danger"
             @click="remove(p.id)"
           >
             删除
@@ -138,91 +140,69 @@ function formatCost(value: number): string {
 
 <style scoped>
 .page {
-  padding: var(--space-6);
-  max-width: 1200px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
-.header {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-6);
 }
-.primary {
-  min-height: 44px;
-  padding: 0 var(--space-4);
-  background: var(--color-accent);
-  color: oklch(100% 0 0);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.primary:hover {
-  filter: brightness(1.05);
+.page-header h1 {
+  margin: 0;
 }
 .cards {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--space-4);
 }
-.card {
-  background: oklch(100% 0 0);
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  box-shadow: 0 1px 3px oklch(0% 0 0 / 0.1);
+.project-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 .card-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--space-3);
 }
 .card-head h3 {
   margin: 0;
-}
-.mode-badge {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: oklch(95% 0.05 250);
-  color: var(--color-accent);
-}
-.mode-badge[data-mode="reverse"] {
-  background: oklch(95% 0.06 25);
-  color: var(--color-error);
+  font-size: var(--font-size-md);
+  color: var(--color-text-title);
 }
 .meta {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+.meta > div {
+  display: flex;
+  align-items: baseline;
   gap: var(--space-2);
-  margin: var(--space-3) 0;
-  font-size: 14px;
 }
 .meta dt {
-  font-weight: 600;
-  color: oklch(40% 0 0);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  min-width: 32px;
 }
 .meta dd {
   margin: 0;
+  color: var(--color-text-body);
 }
 .card-actions {
   display: flex;
   gap: var(--space-2);
-}
-.card-actions button {
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid oklch(85% 0 0);
-  background: oklch(100% 0 0);
-  cursor: pointer;
-}
-.card-actions button:hover {
-  filter: brightness(0.97);
-}
-.danger {
-  color: var(--color-error);
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
 }
 </style>

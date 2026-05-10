@@ -30,25 +30,27 @@ const tree = computed(() => {
     class="tree"
     aria-label="模块树"
   >
-    <ul>
+    <ul class="tree-root">
       <li
         v-for="sub in tree"
         :key="sub.subsystem"
       >
         <details open>
           <summary>{{ sub.subsystem }}</summary>
-          <ul>
+          <ul class="tree-leaves">
             <li
               v-for="m in sub.modules"
               :key="m.name"
               data-test="leaf"
               role="button"
               tabindex="0"
+              class="leaf"
               @click="emit('select', { subsystem: sub.subsystem, l1_module: m.name })"
               @keydown.enter="emit('select', { subsystem: sub.subsystem, l1_module: m.name })"
               @keydown.space.prevent="emit('select', { subsystem: sub.subsystem, l1_module: m.name })"
             >
-              {{ m.name }} <span class="count">({{ m.count }})</span>
+              <span class="leaf-name">{{ m.name }}</span>
+              <span class="count">{{ m.count }}</span>
             </li>
           </ul>
         </details>
@@ -60,39 +62,73 @@ const tree = computed(() => {
 <style scoped>
 .tree {
   padding: var(--space-3);
-  width: 240px;
-  border-right: 1px solid oklch(90% 0 0);
+  width: var(--layout-sidebar-width);
   height: 100%;
   overflow: auto;
+  background: var(--color-bg-hover);
+  font-size: var(--font-size-sm);
 }
-ul {
+.tree-root,
+.tree-leaves {
   list-style: none;
-  padding: 0 0 0 var(--space-3);
+  padding: 0;
   margin: 0;
 }
-li {
-  padding: var(--space-1) 0;
-  cursor: pointer;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-}
-li:hover,
-li:focus {
-  background: oklch(95% 0.05 250);
-  outline: none;
-}
-.count {
-  color: oklch(50% 0 0);
-  font-size: 12px;
-  margin-left: var(--space-1);
+.tree-leaves {
+  padding-left: var(--space-3);
 }
 summary {
   font-weight: 600;
+  color: var(--color-text-title);
   cursor: pointer;
-  padding: var(--space-1) 0;
-  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
+  min-height: var(--touch-target);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+summary:hover {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+.leaf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  min-height: var(--touch-target);
+  border-radius: var(--radius-md);
+  color: var(--color-text-body);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.leaf:hover,
+.leaf:focus {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  outline: none;
+}
+.leaf-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.count {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  min-width: 20px;
+  text-align: center;
+}
+.leaf:hover .count,
+.leaf:focus .count {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 </style>

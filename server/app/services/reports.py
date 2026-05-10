@@ -15,7 +15,10 @@ TEMPLATE_PATH = Path(__file__).parent.parent.parent / "templates" / "report-v1.x
 
 
 def _exports_dir(project_id: str) -> Path:
-    p = settings.data_dir / "exports" / project_id
+    # settings.export_dir 在 Settings._derive_paths 中派生为 data_dir/exports
+    # （除非 COST_EXPORT_DIR 显式设置）。
+    assert settings.export_dir is not None
+    p = settings.export_dir / project_id
     p.mkdir(parents=True, exist_ok=True)
     return p
 

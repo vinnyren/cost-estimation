@@ -179,3 +179,67 @@ describe("API client", () => {
     await expect(client.get("/api/projects")).rejects.toBeInstanceOf(ApiError);
   });
 });
+
+describe("api Proxy raw passthrough (regression)", () => {
+  // Regression for a production bug found in e2e:
+  // The Proxy used to apply `.bind(instance)` to every method-typed value,
+  // which silently stripped `.get`/`.post`/etc. method properties off the
+  // AxiosInstance returned by `api.raw` (an AxiosInstance is a callable
+  // function with method properties). Direct callers like `reports.download`
+  // (which uses `api.raw.get(url, { responseType: 'blob' })`) then crashed at
+  // runtime with `api.raw.get is not a function`. The fix short-circuits
+  // `prop === "raw"` to return the bare instance.
+  beforeEach(() => {
+    sessionStorage.clear();
+    sessionStorage.setItem("auth_token", "test-token-123");
+    vi.resetAllMocks();
+    vi.resetModules();
+  });
+
+  it("api.raw 透传 AxiosInstance（保留 .get/.post 等方法属性，未被 .bind() 剥离）", async () => {
+    // Construct a callable function that also carries method properties — this
+    // mirrors a real AxiosInstance shape (Axios returns a function with
+    // `.get`/`.post`/`.interceptors` attached).
+    const mockGet = vi.fn().mockResolvedValue({ data: new Blob(["x"]) });
+    const mockInstance = function placeholderInstance() {
+      /* AxiosInstance is callable; tests don't invoke it directly */
+    } as unknown as {
+      (): unknown;
+      get: ReturnType<typeof vi.fn>;
+      post: ReturnType<typeof vi.fn>;
+      patch: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
+      interceptors: {
+        request: { use: ReturnType<typeof vi.fn> };
+        response: { use: ReturnType<typeof vi.fn> };
+      };
+    };
+    mockInstance.get = mockGet;
+    mockInstance.post = vi.fn();
+    mockInstance.patch = vi.fn();
+    mockInstance.delete = vi.fn();
+    mockInstance.interceptors = {
+      request: { use: vi.fn() },
+      response: { use: vi.fn() },
+    };
+    (axios.create as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockInstance);
+
+    // Re-import so the module-scoped `_api` singleton is reset and the Proxy
+    // creates a fresh client backed by our mock instance.
+    const { api } = await import("@/api/client");
+
+    // raw should be a callable whose method properties are still attached
+    // (i.e. not bound away).
+    expect(typeof api.raw).toBe("function");
+    expect(typeof api.raw.get).toBe("function");
+    expect(typeof api.raw.post).toBe("function");
+    expect(typeof api.raw.patch).toBe("function");
+    expect(typeof api.raw.delete).toBe("function");
+
+    // And the methods route to the mock — confirms raw is the same instance,
+    // not a stripped/wrapped clone.
+    const r = await api.raw.get("/test");
+    expect(mockGet).toHaveBeenCalledWith("/test");
+    expect(r.data).toBeInstanceOf(Blob);
+  });
+});

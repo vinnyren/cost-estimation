@@ -67,6 +67,42 @@ index-url = https://pypi.tuna.tsinghua.edu.cn/simple
 
 → FP 表有 5 版历史快照，前端"参数管理 → 快照"Tab 可回滚（v1 实现仅查看，回滚 API `POST /api/projects/{id}/functions/restore?version=N`）。
 
+## 升级（v1.0 → v1.1）
+
+> v1.1 引入 FK ondelete CASCADE，但 **SQLite 不支持在已存在的库上 ALTER FK 约束**。
+
+如果你从 v1.0 升级且**仍遇到删除项目时 500 错误**，按以下步骤重建库：
+
+```bash
+DATA_DIR="$HOME/.claude/projects/cost-estimation"
+
+# 1. 备份旧库
+cp "$DATA_DIR/db/cost.sqlite" "$DATA_DIR/db/cost.sqlite.v1.0.bak"
+
+# 2. 导出旧库（如需保留 SQL 全量备份）
+sqlite3 "$DATA_DIR/db/cost.sqlite" .dump > /tmp/v1.0-data.sql
+
+# 3. 删除旧库
+rm "$DATA_DIR/db/cost.sqlite"
+
+# 4. 用 v1.1 schema 重新初始化
+PLUGIN_DIR="$HOME/.claude/plugins/cache/cost-estimation"
+"$PLUGIN_DIR/server/.venv/bin/python" -m app.bootstrap \
+  --db "$DATA_DIR/db/cost.sqlite" \
+  --seed "$PLUGIN_DIR/server/app/data/csbmk_202510.json"
+
+# 5. 手动重建项目元信息（建议）
+```
+
+> 建议：如果项目数较少，最简单的做法是删除旧库后从 v1.0 备份的 Excel 报告封面页誊抄项目元信息，再重新上传 FP 清单。
+
+### 升级数据迁移注意
+
+- 全局参数表（params_global）会从 seed JSON 重建为 v1.1 默认值
+- 项目元信息（projects 表）需要手动重建（建议从 v1.0 备份的 Excel 报告封面页誊抄）
+- FP 清单需重新上传或手动录入
+- 历史快照（fp_snapshots）会丢失（v1.0 累积的版本历史）
+
 ## 卸载
 
 ```bash

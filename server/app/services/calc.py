@@ -8,18 +8,28 @@ from . import params as ps
 from . import functions as fs
 
 
-def _resolve_items(db: Session, project_id: str, payload: dict) -> list[FpItem]:
+def _resolve_items(
+    db: Session, project_id: str, payload: dict, mode: str = "forward"
+) -> list[FpItem]:
     """Get FpItem list from payload, or fall back to DB functions for the project.
 
     Server keeps items optional in schema; if caller does not supply, we read
     every FunctionPoint of the project. This keeps existing API tests (which
     pass items explicitly) working while letting the frontend send only
     project_id.
+
+    forward 模式下若既无 payload.items 也无 DB function points，抛
+    NO_FUNCTION_POINTS（返回 422 给前端，避免静默 scale_us=0 的"看似坏了"体验）。
+    reverse 模式不需要 items（仅用 target_total），所以不强制。
     """
     raw_items = payload.get("items")
     if raw_items:
         return [FpItem(us=i["us"]) for i in raw_items]
     db_items = fs.list_for_project(db, project_id)
+    if not db_items and mode == "forward":
+        raise ValueError(
+            "NO_FUNCTION_POINTS: 项目暂无功能点，请先在 FP 编辑屏添加或上传文档让 AI 提取"
+        )
     return [FpItem(us=fp.us) for fp in db_items]
 
 
@@ -33,7 +43,7 @@ def run_forward(db: Session, project_id: str, payload: dict) -> dict:
         ProjectInputs(industry=proj.industry, city=proj.city, phase=proj.phase),
     )
     inp = ForwardInput(
-        items=_resolve_items(db, project_id, payload),
+        items=_resolve_items(db, project_id, payload, mode="forward"),
         dev_factor=payload.get("dev_factor", 1.0),
         ops_factor=payload.get("ops_factor", 1.0),
         include_dev=payload.get("include_dev", True),
