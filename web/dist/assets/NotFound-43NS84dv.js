@@ -1,2 +1,0 @@
-import{d as s,a,c as r,b as e,h as l,_ as p}from"./index-DiAZWDfY.js";const c={class:"page","aria-labelledby":"title",role:"alert"},i=s({__name:"NotFound",setup(u){const o=l();function n(){o.replace({name:"project-list"})}return(d,t)=>(a(),r("section",c,[t[0]||(t[0]=e("h1",{id:"title"}," 页面不存在 ",-1)),t[1]||(t[1]=e("p",null,"请检查 URL，或返回项目列表重新进入。",-1)),e("button",{type:"button",class:"btn btn-primary",onClick:n}," 返回项目列表 ")]))}}),m=p(i,[["__scopeId","data-v-a23f0d4f"]]);export{m as default};
-//# sourceMappingURL=NotFound-43NS84dv.js.map
