@@ -3,6 +3,7 @@ import { onMounted, ref, computed } from "vue";
 import { useParamsStore } from "@/stores/params";
 import { useResultsStore } from "@/stores/results";
 import OverrideField from "@/components/OverrideField.vue";
+import FactorTable from "@/components/FactorTable.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 
@@ -46,6 +47,68 @@ const eff = computed(() => store.effective);
 async function patchOverride(key: string, value: unknown): Promise<void> {
   await store.applyOverride(props.projectId, { [key]: value });
   results.markParamsChanged();
+}
+
+// 因子展示标签 — key 名为 CSBMK 数据中的 factor name，value 为中文显示名
+const FACTOR_LABELS: Record<string, string> = {
+  // factors_dev
+  app_type: "应用类型",
+  integrity_level: "完整性等级",
+  non_func: "非功能性要求",
+  platform: "运行平台",
+  team_bg: "团队背景",
+  // factors_ops
+  update_freq: "更新频率",
+  support: "支持方式",
+  security_level: "安全等级",
+  business_importance: "业务重要性",
+  response_time: "响应时间",
+  team_exp: "团队经验",
+  automation: "自动化程度",
+  deployment: "部署方式",
+  user_scale: "用户规模",
+  system_relevance: "关联系统数",
+};
+
+interface FactorLevel {
+  multiplier: number;
+  description?: string;
+}
+
+/**
+ * CSBMK 中 factors_dev / factors_ops 的 level value 是直接数字 (e.g. 1.0)，
+ * FactorTable 期望 { multiplier: number } 形态。这里做适配。
+ */
+function normalizeLevels(
+  rawLevels: Record<string, unknown>,
+): Record<string, FactorLevel> {
+  const out: Record<string, FactorLevel> = {};
+  for (const [k, v] of Object.entries(rawLevels)) {
+    if (typeof v === "number") {
+      out[k] = { multiplier: v };
+    } else if (
+      v &&
+      typeof v === "object" &&
+      typeof (v as { multiplier?: unknown }).multiplier === "number"
+    ) {
+      out[k] = {
+        multiplier: (v as { multiplier: number }).multiplier,
+        description: (v as { description?: string }).description,
+      };
+    }
+  }
+  return out;
+}
+
+async function onFactorEdit(
+  group: "factors_dev" | "factors_ops",
+  factorName: string,
+  payload: { levelKey: string; value: number },
+): Promise<void> {
+  // CSBMK 数据中 level 值为直接数字，path = "{group}.{factor}.{level}"，
+  // 末端是 scalar — 与 _path_resolves_to_leaf 校验吻合。
+  const path = `${group}.${factorName}.${payload.levelKey}`;
+  await patchOverride(path, payload.value);
 }
 </script>
 
@@ -182,6 +245,50 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
             />
           </template>
         </div>
+      </section>
+
+      <section
+        v-else-if="activeTab === 'factors_dev' && eff && eff.factors_dev"
+        role="tabpanel"
+        class="panel"
+      >
+        <h2>开发调整因子</h2>
+        <p class="hint">
+          开发工作量调整因子 — 各因子按所选级别系数链式相乘后作用于开发工作量。
+        </p>
+        <FactorTable
+          v-for="(levels, factorName) in eff.factors_dev"
+          :key="`dev-${String(factorName)}`"
+          :factor="{
+            name: String(factorName),
+            label: FACTOR_LABELS[String(factorName)] ?? String(factorName),
+            levels: normalizeLevels(levels as Record<string, unknown>),
+          }"
+          scope="global"
+          @update:multiplier="(payload) => onFactorEdit('factors_dev', String(factorName), payload)"
+        />
+      </section>
+
+      <section
+        v-else-if="activeTab === 'factors_ops' && eff && eff.factors_ops"
+        role="tabpanel"
+        class="panel"
+      >
+        <h2>运维调整因子</h2>
+        <p class="hint">
+          运维工作量调整因子 — 各因子按所选级别系数链式相乘后作用于运维工作量。
+        </p>
+        <FactorTable
+          v-for="(levels, factorName) in eff.factors_ops"
+          :key="`ops-${String(factorName)}`"
+          :factor="{
+            name: String(factorName),
+            label: FACTOR_LABELS[String(factorName)] ?? String(factorName),
+            levels: normalizeLevels(levels as Record<string, unknown>),
+          }"
+          scope="global"
+          @update:multiplier="(payload) => onFactorEdit('factors_ops', String(factorName), payload)"
+        />
       </section>
 
       <section

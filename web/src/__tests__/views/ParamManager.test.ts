@@ -80,7 +80,7 @@ describe("ParamManager", () => {
     expect(w.text()).toContain("参数 500");
   });
 
-  it("第 3+ Tab 显示「v2 完成」骨架", async () => {
+  it("未实装 Tab（规模变更 / 快照）显示「v2 完成」骨架", async () => {
     router.push("/projects/1/parameters");
     await router.isReady();
     const w = mount(ParamManager, {
@@ -89,8 +89,99 @@ describe("ParamManager", () => {
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
-    await tabs[2].trigger("click");
+    // tabs[4] = scale_change（GAP-B 已实装 factors_dev/_ops，仅规模变更/快照仍是骨架）
+    await tabs[4].trigger("click");
     expect(w.text()).toContain("v2 完成");
+  });
+
+  it("开发因子 Tab → 渲染 FactorTable 表 + 改值调 override 用 factors_dev.{name}.{level} 路径 (GAP-B)", async () => {
+    const effWithFactors = {
+      ...baseEffective,
+      factors_dev: {
+        app_type: { 业务处理: 1.0, 软件集成: 1.2 },
+        platform: { JAVA: 1.0, C: 1.5 },
+      },
+    };
+    (paramsApi.effective as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(effWithFactors);
+    (paramsApi.override as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ...effWithFactors,
+      factors_dev: {
+        app_type: { 业务处理: 1.0, 软件集成: 1.5 },
+        platform: { JAVA: 1.0, C: 1.5 },
+      },
+      overrides: { "factors_dev.app_type.软件集成": 1.5 },
+    });
+    router.push("/projects/1/parameters");
+    await router.isReady();
+    const w = mount(ParamManager, {
+      props: { projectId: "p-1" },
+      global: { plugins: [createPinia(), router, ElementPlus] },
+    });
+    await flushPromises();
+    const tabs = w.findAll("[role='tab']");
+    await tabs[2].trigger("click"); // factors_dev
+    await flushPromises();
+
+    // 渲染 factor 卡片 (data-factor) + 中文标签
+    expect(w.find('[data-factor="app_type"]').exists()).toBe(true);
+    expect(w.find('[data-factor="platform"]').exists()).toBe(true);
+    expect(w.text()).toContain("应用类型");
+    expect(w.text()).toContain("运行平台");
+
+    // 找到 app_type/软件集成 输入（值 1.20）并改成 1.5
+    const card = w.find('[data-factor="app_type"]');
+    const inputs = card.findAll("input[type='number']");
+    const target = inputs.find(
+      (i) => (i.element as HTMLInputElement).value === "1.20",
+    )!;
+    expect(target).toBeTruthy();
+    await target.setValue("1.5");
+    await target.trigger("change");
+    await flushPromises();
+
+    expect(paramsApi.override).toHaveBeenCalledWith("p-1", {
+      "factors_dev.app_type.软件集成": 1.5,
+    });
+  });
+
+  it("运维因子 Tab → 渲染 FactorTable + 改值用 factors_ops.{name}.{level} 路径 (GAP-B)", async () => {
+    const effWithOps = {
+      ...baseEffective,
+      factors_ops: {
+        update_freq: { quarterly: 0.95, monthly: 1.0, frequent: 1.12 },
+      },
+    };
+    (paramsApi.effective as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(effWithOps);
+    (paramsApi.override as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ...effWithOps,
+      overrides: { "factors_ops.update_freq.frequent": 1.25 },
+    });
+    router.push("/projects/1/parameters");
+    await router.isReady();
+    const w = mount(ParamManager, {
+      props: { projectId: "p-1" },
+      global: { plugins: [createPinia(), router, ElementPlus] },
+    });
+    await flushPromises();
+    const tabs = w.findAll("[role='tab']");
+    await tabs[3].trigger("click"); // factors_ops
+    await flushPromises();
+
+    expect(w.find('[data-factor="update_freq"]').exists()).toBe(true);
+    expect(w.text()).toContain("更新频率");
+
+    const card = w.find('[data-factor="update_freq"]');
+    const inputs = card.findAll("input[type='number']");
+    const target = inputs.find(
+      (i) => (i.element as HTMLInputElement).value === "1.12",
+    )!;
+    await target.setValue("1.25");
+    await target.trigger("change");
+    await flushPromises();
+
+    expect(paramsApi.override).toHaveBeenCalledWith("p-1", {
+      "factors_ops.update_freq.frequent": 1.25,
+    });
   });
 
   it("OverrideField 改值 → 调 paramsApi.override 并 mark params changed", async () => {
