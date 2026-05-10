@@ -1,0 +1,8 @@
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
