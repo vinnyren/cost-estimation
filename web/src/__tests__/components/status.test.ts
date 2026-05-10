@@ -4,6 +4,7 @@ import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import EmptyState from "@/components/status/EmptyState.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import StaleBanner from "@/components/status/StaleBanner.vue";
+import PartialState from "@/components/status/PartialState.vue";
 
 describe("Status components", () => {
   it("LoadingSkeleton 渲染指定行数", () => {
@@ -44,5 +45,26 @@ describe("Status components", () => {
     const wrapper = mount(StaleBanner);
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted().recompute).toBeTruthy();
+  });
+
+  it("PartialState 显示 doneCount/totalCount 进度", () => {
+    const wrapper = mount(PartialState, {
+      props: { doneCount: 3, totalCount: 7 },
+    });
+    expect(wrapper.text()).toContain("3 / 7");
+    const progress = wrapper.find("progress");
+    expect(progress.exists()).toBe(true);
+    expect(progress.attributes("value")).toBe("3");
+    expect(progress.attributes("max")).toBe("7");
+  });
+
+  it("PartialState cancellable=true 时点击触发 cancel 事件", async () => {
+    const wrapper = mount(PartialState, {
+      props: { doneCount: 1, totalCount: 5, cancellable: true },
+    });
+    const btn = wrapper.find("button");
+    expect(btn.exists()).toBe(true);
+    await btn.trigger("click");
+    expect(wrapper.emitted().cancel).toBeTruthy();
   });
 });
