@@ -29,8 +29,8 @@ defineProps<{ rows?: number }>();
   position: relative;
   overflow: hidden;
   height: 32px;
-  border-radius: var(--radius-sm);
-  background: oklch(94% 0 0);
+  border-radius: var(--radius-md);
+  background: var(--color-border);
 }
 .skeleton-row::before {
   content: "";
@@ -39,7 +39,7 @@ defineProps<{ rows?: number }>();
   background: linear-gradient(
     90deg,
     transparent,
-    oklch(97% 0 0 / 0.7),
+    rgba(255, 255, 255, 0.6),
     transparent
   );
   transform: translateX(-100%);

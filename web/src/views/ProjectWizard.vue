@@ -111,88 +111,124 @@ async function submit(): Promise<void> {
     class="page"
     aria-labelledby="title"
   >
-    <header>
+    <header class="page-header">
       <h1 id="title">
-        新建项目（第 {{ step }} / {{ TOTAL_STEPS }} 步）
+        新建项目
       </h1>
+      <span class="text-muted step-indicator">第 {{ step }} / {{ TOTAL_STEPS }} 步</span>
+    </header>
+    <div class="progress-wrap">
       <progress
         :value="step"
         :max="TOTAL_STEPS"
       />
-    </header>
+    </div>
 
-    <form @submit.prevent>
+    <form
+      class="card wizard-card"
+      @submit.prevent
+    >
       <fieldset v-if="step === 1">
         <legend>选择评估模式</legend>
-        <label><input
-          v-model="form.mode"
-          type="radio"
-          value="forward"
-        > 正向（已知功能点 → 估算造价）</label>
-        <label><input
-          v-model="form.mode"
-          type="radio"
-          value="reverse"
-        > 反向（已知目标造价 → 反推功能点）</label>
+        <div class="radio-group">
+          <label class="radio-row">
+            <input
+              v-model="form.mode"
+              type="radio"
+              value="forward"
+            >
+            <span>正向（已知功能点 → 估算造价）</span>
+          </label>
+          <label class="radio-row">
+            <input
+              v-model="form.mode"
+              type="radio"
+              value="reverse"
+            >
+            <span>反向（已知目标造价 → 反推功能点）</span>
+          </label>
+        </div>
       </fieldset>
 
       <fieldset v-else-if="step === 2">
         <legend>项目名称</legend>
-        <label>名称 <input
-          v-model="form.name"
-          type="text"
-          required
-        ></label>
+        <label class="field">
+          <span class="field-label">名称</span>
+          <input
+            v-model="form.name"
+            type="text"
+            required
+          >
+        </label>
       </fieldset>
 
       <fieldset v-else-if="step === 3">
         <legend>城市与行业</legend>
-        <label>城市 <select v-model="form.city">
-          <option
-            v-for="c in CITIES"
-            :key="c"
-            :value="c"
-          >{{ c }}</option>
-        </select></label>
-        <label>行业 <select v-model="form.industry">
-          <option
-            v-for="i in INDUSTRIES"
-            :key="i"
-            :value="i"
-          >{{ i }}</option>
-        </select></label>
+        <label class="field">
+          <span class="field-label">城市</span>
+          <select v-model="form.city">
+            <option
+              v-for="c in CITIES"
+              :key="c"
+              :value="c"
+            >{{ c }}</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">行业</span>
+          <select v-model="form.industry">
+            <option
+              v-for="i in INDUSTRIES"
+              :key="i"
+              :value="i"
+            >{{ i }}</option>
+          </select>
+        </label>
       </fieldset>
 
       <fieldset v-else-if="step === 4">
         <legend>评估阶段</legend>
-        <label
-          v-for="s in STAGES"
-          :key="s.value"
-        >
-          <input
-            v-model="form.phase"
-            type="radio"
-            :value="s.value"
-          > {{ s.label }}
-        </label>
+        <div class="radio-group">
+          <label
+            v-for="s in STAGES"
+            :key="s.value"
+            class="radio-row"
+          >
+            <input
+              v-model="form.phase"
+              type="radio"
+              :value="s.value"
+            >
+            <span>{{ s.label }}</span>
+          </label>
+        </div>
       </fieldset>
 
       <fieldset v-else-if="step === 5">
         <legend>{{ form.mode === "reverse" ? "目标金额" : "确认信息" }}</legend>
         <template v-if="form.mode === 'reverse'">
-          <label>目标总造价（元） <input
-            v-model.number="form.target_total"
-            type="number"
-            min="0"
-          ></label>
-          <label>α 调整系数 <input
-            v-model.number="form.alpha"
-            type="number"
-            min="0"
-            step="0.01"
-          ></label>
+          <label class="field">
+            <span class="field-label">目标总造价（元）</span>
+            <input
+              v-model.number="form.target_total"
+              type="number"
+              min="0"
+            >
+          </label>
+          <label class="field">
+            <span class="field-label">α 调整系数</span>
+            <input
+              v-model.number="form.alpha"
+              type="number"
+              min="0"
+              step="0.01"
+            >
+          </label>
         </template>
-        <pre v-else>{{ JSON.stringify(form, null, 2) }}</pre>
+        <pre
+          v-else
+          class="confirm-summary"
+        >{{ JSON.stringify(form, null, 2) }}</pre>
         <p
           v-if="errorMsg"
           role="alert"
@@ -205,6 +241,7 @@ async function submit(): Promise<void> {
       <div class="nav">
         <button
           type="button"
+          class="btn"
           :disabled="step === 1 || submitting"
           @click="back"
         >
@@ -213,6 +250,7 @@ async function submit(): Promise<void> {
         <button
           v-if="step < TOTAL_STEPS"
           type="button"
+          class="btn btn-primary"
           data-test="wizard-next"
           :disabled="!canNext"
           @click="next"
@@ -222,6 +260,7 @@ async function submit(): Promise<void> {
         <button
           v-else
           type="button"
+          class="btn btn-primary"
           :disabled="!canNext || submitting"
           @click="submit"
         >
@@ -233,13 +272,128 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
-.page { padding: var(--space-6); max-width: 720px; margin: 0 auto; }
-progress { width: 100%; height: 8px; }
-fieldset { border: 1px solid oklch(85% 0 0); padding: var(--space-4); border-radius: var(--radius-md); }
-legend { font-weight: 600; padding: 0 var(--space-2); }
-label { display: block; margin: var(--space-3) 0; }
-input[type="text"], input[type="number"], select { min-height: 44px; padding: 0 var(--space-2); width: 100%; box-sizing: border-box; }
-.nav { display: flex; gap: var(--space-3); margin-top: var(--space-4); }
-.nav button { min-height: 44px; padding: 0 var(--space-4); }
-.error { color: var(--color-error); }
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 720px;
+  margin: 0 auto;
+}
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.page-header h1 {
+  margin: 0;
+}
+.step-indicator {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.progress-wrap {
+  width: 100%;
+}
+progress {
+  width: 100%;
+  height: 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  appearance: none;
+  background: var(--color-bg);
+}
+progress::-webkit-progress-bar {
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+}
+progress::-webkit-progress-value {
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  transition: width var(--duration-normal) var(--ease-out);
+}
+progress::-moz-progress-bar {
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+}
+.wizard-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+legend {
+  font-weight: 600;
+  color: var(--color-text-title);
+  font-size: var(--font-size-md);
+  padding: 0;
+  margin-bottom: var(--space-2);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.field-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.radio-row:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+.radio-row input[type="radio"] {
+  accent-color: var(--color-primary);
+  margin: 0;
+  height: auto;
+}
+.confirm-summary {
+  background: var(--color-bg);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-body);
+  margin: 0;
+  overflow: auto;
+  max-height: 240px;
+}
+.nav {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.error {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-danger);
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
 </style>

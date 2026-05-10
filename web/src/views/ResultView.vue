@@ -92,13 +92,14 @@ const hasReverse = computed(() => reverseResult.value !== null);
     class="page"
     aria-labelledby="title"
   >
-    <header class="head">
+    <header class="page-header">
       <h1 id="title">
         评估结果（项目 #{{ projectId }} ·
         {{ project?.mode === "reverse" ? "反向" : "正向" }}）
       </h1>
       <button
         type="button"
+        class="btn"
         @click="back"
       >
         返回 FP 编辑
@@ -153,30 +154,33 @@ const hasReverse = computed(() => reverseResult.value !== null);
       v-else-if="project?.mode === 'reverse'"
       class="reverse"
     >
-      <fieldset>
+      <fieldset class="card reverse-card">
         <legend>反算输入</legend>
-        <label>
-          目标总造价（元）
+        <label class="field">
+          <span class="field-label">目标总造价（元）</span>
           <input
             v-model.number="targetTotal"
             type="number"
             min="0"
           >
         </label>
-        <label>
-          其他费用（元）
+        <label class="field">
+          <span class="field-label">其他费用（元）</span>
           <input
             v-model.number="otherCost"
             type="number"
             min="0"
           >
         </label>
-        <button
-          type="button"
-          @click="reverseCalc"
-        >
-          反算
-        </button>
+        <div class="reverse-actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            @click="reverseCalc"
+          >
+            反算
+          </button>
+        </div>
       </fieldset>
 
       <div
@@ -210,6 +214,7 @@ const hasReverse = computed(() => reverseResult.value !== null);
     <footer class="dl-bar">
       <button
         type="button"
+        class="btn btn-primary"
         :disabled="downloading"
         @click="download"
       >
@@ -221,54 +226,71 @@ const hasReverse = computed(() => reverseResult.value !== null);
 
 <style scoped>
 .page {
-  padding: var(--space-6);
-  max-width: 1200px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
-.head {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-4);
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
-.head button,
-.reverse button,
-.dl-bar button {
-  min-height: 44px;
-  padding: 0 var(--space-3);
+.page-header h1 {
+  margin: 0;
 }
 .cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-4);
-  align-items: center;
-  padding: var(--space-4) 0;
+  align-items: stretch;
 }
-.reverse fieldset {
-  padding: var(--space-3);
-  margin-bottom: var(--space-4);
-  border: 1px solid oklch(85% 0 0);
-  border-radius: var(--radius-md);
+@media (max-width: 768px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
 }
-.reverse label {
-  display: block;
-  margin: var(--space-2) 0;
+.reverse {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
-.reverse input {
-  min-height: 44px;
+.reverse-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+.reverse-card legend {
+  font-weight: 600;
+  font-size: var(--font-size-md);
+  color: var(--color-text-title);
   padding: 0 var(--space-2);
 }
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.field-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+.reverse-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
 .dl-bar {
-  margin-top: var(--space-6);
+  margin-top: var(--space-4);
   display: flex;
   justify-content: center;
-}
-.dl-bar button {
-  background: var(--color-accent);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  padding: 0 var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 </style>

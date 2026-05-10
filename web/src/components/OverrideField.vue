@@ -40,7 +40,7 @@ function reset(): void {
     class="field"
     :data-overridden="isOverridden"
   >
-    <label>
+    <label class="field-row">
       <span class="label">{{ label }}</span>
       <input
         :value="modelValue"
@@ -52,63 +52,84 @@ function reset(): void {
         @input="onInput"
       >
     </label>
-    <span
+    <div
       v-if="isOverridden"
-      :id="`${label}-override-note`"
-      data-test="override-badge"
-      class="badge"
-      role="status"
-    >自定义</span>
-    <button
-      v-if="isOverridden"
-      type="button"
-      data-test="reset-btn"
-      class="reset"
-      :aria-label="`恢复 ${label} 为默认值`"
-      @click="reset"
+      class="badges"
     >
-      ↺
-    </button>
+      <span
+        :id="`${label}-override-note`"
+        data-test="override-badge"
+        class="badge badge-warning"
+        role="status"
+      >自定义</span>
+      <button
+        type="button"
+        data-test="reset-btn"
+        class="reset"
+        :aria-label="`恢复 ${label} 为默认值`"
+        @click="reset"
+      >
+        ↺
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .field {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  flex-direction: column;
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  position: relative;
-  transition: background var(--duration-fast) var(--ease-out);
+  border-radius: var(--radius-md);
+  border-left: 3px solid transparent;
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out);
 }
 .field[data-overridden="true"] {
-  background: var(--color-warn-bg);
-  border-left: 3px solid var(--color-warn-stripe);
+  background: var(--color-warning-bg);
+  border-left-color: var(--color-warning);
+}
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 .label {
-  font-size: 14px;
-  min-width: 100px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
 }
-input {
-  min-height: 44px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
+.field input {
+  width: 100%;
 }
-.badge {
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: var(--color-warn-stripe);
-  color: white;
+.field[data-overridden="true"] input {
+  border-color: var(--color-warning);
+}
+.badges {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 .reset {
-  min-height: 44px;
-  min-width: 44px;
+  height: 24px;
+  width: 24px;
   padding: 0;
   background: transparent;
-  border: 1px solid oklch(75% 0 0);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-warning);
+  color: var(--color-warning);
+  border-radius: var(--radius-md);
   cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.reset:hover {
+  background: var(--color-warning);
+  color: #ffffff;
 }
 </style>

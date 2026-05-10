@@ -1,18 +1,79 @@
 :root {
-  --color-surface: oklch(98% 0 0);
-  --color-text: oklch(18% 0 0);
-  --color-accent: oklch(68% 0.21 250);
-  --color-warn-bg: oklch(96% 0.08 95);
-  --color-warn-stripe: oklch(70% 0.15 70);
-  --color-error: oklch(60% 0.22 25);
+  /* === 色彩 === */
+  /* 品牌主色（深蓝） */
+  --color-primary: #165DFF;
+  --color-primary-hover: #4080FF;
+  --color-primary-active: #0E42D2;
+  --color-primary-bg: #E8F3FF;
+
+  /* 状态色 */
+  --color-success: #00B42A;
+  --color-success-bg: #E8FFEA;
+  --color-warning: #FF7D00;
+  --color-warning-bg: #FFF7E8;
+  --color-danger: #F53F3F;
+  --color-danger-bg: #FFECE8;
+  --color-data: #722ED1;
+  --color-data-bg: #F5E8FF;
+
+  /* 中性色 */
+  --color-text-title: #1D2129;
+  --color-text-body: #4E5969;
+  --color-text-muted: #86909C;
+  --color-text-disabled: #C9CDD4;
+  --color-border: #E5E6EB;
+  --color-border-strong: #C9CDD4;
+  --color-bg: #F2F3F5;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-hover: #F7F8FA;
+
+  /* === 字号 === */
+  --font-family: Inter, "Microsoft YaHei", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --line-height-base: 1.55;
+  --line-height-tight: 1.4;
+
+  /* === 间距 === */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
-  --radius-sm: 4px;
-  --radius-md: 8px;
+  --space-10: 40px;
+
+  /* === 圆角 === */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+
+  /* === 阴影 === */
+  --shadow-sm: 0 1px 2px rgba(29, 33, 41, 0.04);
+  --shadow-md: 0 2px 8px rgba(29, 33, 41, 0.08);
+  --shadow-lg: 0 4px 12px rgba(29, 33, 41, 0.12);
+
+  /* === 动效 === */
   --duration-fast: 150ms;
+  --duration-normal: 250ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* === Layout === */
+  --layout-max-width: 1280px;
+  --layout-sidebar-width: 240px;
+  --layout-header-height: 56px;
+  --touch-target: 36px;
+  --touch-target-comfortable: 44px;
+
+  /* === Legacy 兼容（保留旧 token 名以避免组件样式断裂） === */
+  --color-surface: var(--color-bg);
+  --color-text: var(--color-text-body);
+  --color-accent: var(--color-primary);
+  --color-warn-bg: var(--color-warning-bg);
+  --color-warn-stripe: var(--color-warning);
+  --color-error: var(--color-danger);
 }

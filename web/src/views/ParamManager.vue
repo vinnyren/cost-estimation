@@ -54,9 +54,11 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
     class="page"
     aria-labelledby="title"
   >
-    <h1 id="title">
-      参数管理
-    </h1>
+    <header class="page-header">
+      <h1 id="title">
+        参数管理
+      </h1>
+    </header>
 
     <LoadingSkeleton
       v-if="loading"
@@ -72,7 +74,10 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
       @retry="load"
     />
 
-    <div v-else>
+    <div
+      v-else
+      class="card param-card"
+    >
       <div
         role="tablist"
         class="tabs"
@@ -80,7 +85,9 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
         <button
           v-for="t in TABS"
           :key="t.id"
+          type="button"
           role="tab"
+          class="tab"
           :aria-selected="activeTab === t.id"
           :data-active="activeTab === t.id"
           @click="activeTab = t.id"
@@ -151,38 +158,66 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
 
 <style scoped>
 .page {
-  padding: var(--space-6);
-  max-width: 1200px;
-  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.page-header h1 {
+  margin: 0;
+}
+.param-card {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 .tabs {
   display: flex;
-  gap: var(--space-2);
-  border-bottom: 1px solid oklch(85% 0 0);
-  margin-bottom: var(--space-4);
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-hover);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
 }
-.tabs button {
-  min-height: 44px;
-  padding: 0 var(--space-3);
+.tab {
+  height: var(--touch-target-comfortable);
+  padding: 0 var(--space-4);
   background: transparent;
   border: none;
-  cursor: pointer;
   border-bottom: 2px solid transparent;
+  color: var(--color-text-body);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
 }
-.tabs button[data-active="true"] {
-  border-bottom-color: var(--color-accent);
-  color: var(--color-accent);
+.tab:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+.tab[data-active="true"] {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-bg-elevated);
 }
 .panel {
-  padding: var(--space-3) 0;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.panel h2 {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+.hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  margin: 0;
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: var(--space-2);
-}
-.hint {
-  color: oklch(50% 0 0);
-  font-size: 14px;
 }
 </style>

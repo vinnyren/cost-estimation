@@ -72,6 +72,12 @@ function sourceLabel(source: FunctionPoint["source"] | undefined): string {
   if (source === "ai_extracted") return "AI 提取";
   return "手工";
 }
+
+function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
+  if (source === "allocator") return "badge badge-warning";
+  if (source === "ai_extracted") return "badge badge-data";
+  return "badge badge-muted";
+}
 </script>
 
 <template>
@@ -79,19 +85,21 @@ function sourceLabel(source: FunctionPoint["source"] | undefined): string {
     class="page"
     aria-labelledby="title"
   >
-    <header class="head">
+    <header class="page-header">
       <h1 id="title">
         FP 编辑（项目 #{{ projectId }}）
       </h1>
       <div class="actions">
         <button
           type="button"
+          class="btn"
           @click="goParams"
         >
           参数管理
         </button>
         <button
           type="button"
+          class="btn btn-primary"
           @click="calcAndGo"
         >
           计算 → 结果页
@@ -125,11 +133,11 @@ function sourceLabel(source: FunctionPoint["source"] | undefined): string {
       v-else
       class="layout"
     >
-      <aside>
+      <aside class="sidebar">
         <ModuleTree :functions="functions" />
       </aside>
       <main class="grid-body">
-        <table>
+        <table class="data-table">
           <thead>
             <tr>
               <th scope="col">
@@ -160,6 +168,7 @@ function sourceLabel(source: FunctionPoint["source"] | undefined): string {
               v-for="(fp, i) in functions"
               :key="fp.id"
               :data-source="fp.source"
+              :class="{ 'row-allocator': fp.source === 'allocator' }"
             >
               <td>{{ i + 1 }}</td>
               <td>{{ fp.subsystem }}</td>
@@ -168,7 +177,7 @@ function sourceLabel(source: FunctionPoint["source"] | undefined): string {
               <td>{{ fp.ufp }}</td>
               <td>{{ fp.us.toFixed(2) }}</td>
               <td>
-                <span :class="`source-${fp.source}`">{{ sourceLabel(fp.source) }}</span>
+                <span :class="sourceBadgeClass(fp.source)">{{ sourceLabel(fp.source) }}</span>
               </td>
             </tr>
           </tbody>
@@ -188,69 +197,56 @@ function sourceLabel(source: FunctionPoint["source"] | undefined): string {
 
 <style scoped>
 .page {
-  padding: var(--space-4);
-  height: 100vh;
   display: flex;
   flex-direction: column;
+  gap: var(--space-4);
+  height: calc(100vh - var(--layout-header-height) - var(--space-6) * 2);
+  min-height: 480px;
 }
-.head {
+.page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+.page-header h1 {
+  margin: 0;
 }
 .actions {
   display: flex;
   gap: var(--space-2);
 }
-.actions button {
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  background: var(--color-accent);
-  color: oklch(100% 0 0);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.actions button:hover {
-  filter: brightness(1.05);
-}
 .layout {
   display: flex;
   flex: 1;
   min-height: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.sidebar {
+  border-right: 1px solid var(--color-border);
+  background: var(--color-bg-hover);
+  flex-shrink: 0;
 }
 .grid-body {
   flex: 1;
   overflow: auto;
-  padding: 0 var(--space-3);
+  padding: var(--space-3);
 }
-table {
-  width: 100%;
-  border-collapse: collapse;
+.grid-body table.data-table {
+  border: none;
+  box-shadow: none;
 }
-th,
-td {
-  padding: var(--space-2);
-  border-bottom: 1px solid oklch(92% 0 0);
-  text-align: left;
+.row-allocator {
+  background: var(--color-warning-bg);
 }
-th {
-  background: oklch(96% 0 0);
-  position: sticky;
-  top: 0;
-}
-tr[data-source="allocator"] {
-  background: oklch(96% 0.06 25 / 0.4);
-}
-.source-manual {
-  color: oklch(40% 0 0);
-}
-.source-ai_extracted {
-  color: var(--color-accent);
-}
-.source-allocator {
-  color: var(--color-error);
-  font-weight: 600;
+.row-allocator:hover {
+  background: var(--color-warning-bg) !important;
+  filter: brightness(0.98);
 }
 </style>
