@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from .context import EvaluationContext
 
 
@@ -28,6 +28,9 @@ class ForwardResult:
     cost_ops_yuan: dict
     cost_other_yuan: float
     cost_total_yuan: dict
+    # v2.0 T7：calc layer 把因子缺失等 non-fatal 提示挂这里返给前端，UI
+    # 在 ResultCard 顶部以黄条形式展示，避免用户以为"算了就是这个数"。
+    warning_messages: list[str] = field(default_factory=list)
 
 
 BANDS = ("P10", "P50", "P90")
