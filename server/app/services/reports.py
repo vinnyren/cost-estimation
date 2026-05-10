@@ -6,7 +6,8 @@ from ..config import settings
 from ..core.context import EvaluationContext, ProjectInputs
 from ..core.forward import calculate_forward, ForwardInput, FpItem
 from ..db.models import Project, FunctionPoint
-from ..exporters.excel import render
+from ..exporters.excel import render, TemplateBrokenError
+from ..exporters.fallback import render_fallback
 from . import params as ps
 
 
@@ -42,8 +43,8 @@ def generate_excel(db: Session, project_id: str) -> Path:
     r = calculate_forward(ctx, inp)
 
     out = _exports_dir(project_id) / f"评估报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    render(
-        TEMPLATE_PATH, out,
+
+    render_kwargs = dict(
         project_name=proj.name,
         project_overview=f"客户：{proj.client or '—'} / 评估方：{proj.evaluator or '—'} / 阶段：{proj.phase}",
         scale_adjusted=r.scale_adjusted,
@@ -76,4 +77,9 @@ def generate_excel(db: Session, project_id: str) -> Path:
             {"key": "基准数据版本", "value": proj.basis_data_ver, "source": "system"},
         ],
     )
+
+    try:
+        render(TEMPLATE_PATH, out, **render_kwargs)
+    except TemplateBrokenError:
+        render_fallback(out, **render_kwargs)
     return out
