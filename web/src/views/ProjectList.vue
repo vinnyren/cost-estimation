@@ -6,6 +6,7 @@ import { ApiError } from "@/api/client";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import EmptyState from "@/components/status/EmptyState.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
+import ProjectActionMenu from "@/components/ProjectActionMenu.vue";
 
 const COST_PER_WAN = 10000;
 const COST_DECIMALS = 2;
@@ -127,24 +128,8 @@ function open(id: string): void {
   router.push({ name: "fp-editor", params: { id } });
 }
 
-async function remove(id: string): Promise<void> {
-  if (!window.confirm("确认删除项目？")) return;
-  try {
-    await projectsApi.remove(id);
-    // Optimistic-ish: drop the row locally; if it was the last on the page,
-    // reload to surface page-clamping / show preceding page.
-    items.value = items.value.filter((p) => p.id !== id);
-    total.value = Math.max(0, total.value - 1);
-    if (items.value.length === 0 && page.value > 1) {
-      page.value -= 1;
-      await reload();
-    } else if (items.value.length === 0) {
-      await reload();
-    }
-  } catch (e) {
-    error.value = e instanceof ApiError ? e : new ApiError("UNKNOWN", String(e));
-  }
-}
+// v2.0 T21 — delete/copy moved into ProjectActionMenu, which emits @deleted/
+// @copied; we just reload() in response so the list reflects the new state.
 
 function formatCost(value: number): string {
   return (value / COST_PER_WAN).toFixed(COST_DECIMALS);
@@ -333,13 +318,12 @@ onMounted(() => {
           >
             打开
           </button>
-          <button
-            type="button"
-            class="btn btn-sm btn-danger"
-            @click="remove(p.id)"
-          >
-            删除
-          </button>
+          <ProjectActionMenu
+            :project-id="p.id"
+            :project-name="p.name"
+            @deleted="reload"
+            @copied="reload"
+          />
         </footer>
       </li>
     </ul>

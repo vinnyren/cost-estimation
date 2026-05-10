@@ -14,6 +14,8 @@ vi.mock("@/api/projects", () => ({
     query: vi.fn(),
     create: vi.fn(),
     remove: vi.fn(),
+    // v2.0 T21 — ProjectActionMenu (mounted inside each card) imports copy/remove.
+    copy: vi.fn(),
   },
 }));
 
@@ -132,25 +134,27 @@ describe("ProjectList", () => {
     expect(router.currentRoute.value.params.id).toBe("p-42");
   });
 
-  it("点击「删除」→ confirm=false 时不调 remove API", async () => {
+  // v2.0 T21 — delete moved into ProjectActionMenu (⋯ menu on each card).
+  // Open the menu, then click 删除 inside it.
+  it("点击 ⋯ → 删除 → confirm=false 时不调 remove API", async () => {
     queryMock().mockResolvedValue(okResult([project({ id: "p-7", name: "p" })], { total: 1 }));
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     const w = mountList();
     await flushPromises();
-    const delBtn = w.findAll("button").find((b) => b.text() === "删除");
-    await delBtn!.trigger("click");
+    await w.find('[data-testid="action-menu-trigger"]').trigger("click");
+    await w.find('[data-testid="action-menu-delete"]').trigger("click");
     expect(confirmSpy).toHaveBeenCalled();
     expect(projectsApi.remove).not.toHaveBeenCalled();
   });
 
-  it("点击「删除」→ confirm=true 时调 remove API", async () => {
+  it("点击 ⋯ → 删除 → confirm=true 时调 remove API", async () => {
     queryMock().mockResolvedValue(okResult([project({ id: "p-7", name: "p" })], { total: 1 }));
     removeMock().mockResolvedValue(undefined);
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const w = mountList();
     await flushPromises();
-    const delBtn = w.findAll("button").find((b) => b.text() === "删除");
-    await delBtn!.trigger("click");
+    await w.find('[data-testid="action-menu-trigger"]').trigger("click");
+    await w.find('[data-testid="action-menu-delete"]').trigger("click");
     await flushPromises();
     expect(projectsApi.remove).toHaveBeenCalledWith("p-7");
   });

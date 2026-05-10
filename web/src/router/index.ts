@@ -56,6 +56,12 @@ const routes: RouteRecordRaw[] = [
     props: (route) => ({ projectId: String(route.params.id) }),
   },
   {
+    // v2.0 T21 — per-project audit timeline (GAP-J 前端).
+    path: "/projects/:id/audit",
+    name: "project-audit",
+    component: () => import("@/views/AuditView.vue"),
+  },
+  {
     // SPA fallback: any unmatched URL resolves here so users see a real
     // "page not found" instead of a blank body under the layout shell.
     path: "/:pathMatch(.*)*",
