@@ -81,6 +81,12 @@ class Project(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    audit_logs = relationship(
+        "AuditLog",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class FunctionPoint(Base):
@@ -220,3 +226,30 @@ class ParamSnapshot(Base):
     label = Column(String)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     payload_json = Column(Text, nullable=False)
+
+
+class AuditLog(Base):
+    """v2.0 GAP-J — 项目级审计日志。
+
+    由 app/middleware/audit.py 在 PATCH/POST/PUT/DELETE on /api/projects/* 自动写入。
+    actor 字段为 v3 多用户预留；当前单用户始终为 "user"。
+    """
+    __tablename__ = "audit_log"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(
+        String,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    ts = Column(DateTime, server_default=func.now(), nullable=False, index=True)
+    actor = Column(String, default="user")
+    action = Column(String, nullable=False)
+    target = Column(String)
+    diff_json = Column(Text)
+
+    project = relationship("Project", back_populates="audit_logs")
+
+
+Index("ix_audit_log_project_ts", AuditLog.project_id, AuditLog.ts)
