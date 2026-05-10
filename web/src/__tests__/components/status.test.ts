@@ -20,6 +20,22 @@ describe("Status components", () => {
     expect(wrapper.find("button").text()).toBe("新建第一个项目");
   });
 
+  it("EmptyState 点击 CTA 触发 cta-click 事件", async () => {
+    const wrapper = mount(EmptyState, {
+      props: { title: "x", ctaLabel: "go" },
+    });
+    await wrapper.find("button").trigger("click");
+    expect(wrapper.emitted()["cta-click"]).toBeTruthy();
+  });
+
+  it("ErrorBanner retryable=true 时点重试触发 retry 事件", async () => {
+    const wrapper = mount(ErrorBanner, {
+      props: { problem: "x", cause: "y", suggestion: "z", retryable: true },
+    });
+    await wrapper.find("[data-test='retry']").trigger("click");
+    expect(wrapper.emitted().retry).toBeTruthy();
+  });
+
   it("ErrorBanner 显示 problem + cause + 重试按钮", () => {
     const wrapper = mount(ErrorBanner, {
       props: {

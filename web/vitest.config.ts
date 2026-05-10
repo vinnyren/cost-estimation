@@ -12,13 +12,20 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],
-      // lines/statements gate at 80% (Plan 3 Task 11 target).
-      // functions/branches are dragged down by API modules with no unit
-      // tests yet (calc/params/projects/reports/uploads/functions). They are
-      // exercised indirectly through view tests; gating them at 80% would
-      // require either mocking at HTTP layer or writing thin unit shims.
-      // Tracked as concern in Task 11 report.
-      thresholds: { lines: 80, statements: 80, functions: 30, branches: 71 },
+      // Exclude untestable bootstrap (main.ts), pure type files, config files,
+      // and test files themselves from coverage. Without these exclusions the
+      // app entry drags functions/branches well below 80% even with full
+      // unit-test coverage of the testable surface.
+      include: ["src/**/*.{ts,vue}"],
+      exclude: [
+        "src/main.ts",
+        "src/api/types.ts",
+        "src/**/*.d.ts",
+        "src/__tests__/**",
+        "**/node_modules/**",
+        "**/dist/**",
+      ],
+      thresholds: { lines: 80, statements: 80, functions: 80, branches: 80 },
     },
   },
 });

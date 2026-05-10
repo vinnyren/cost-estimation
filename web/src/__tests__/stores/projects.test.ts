@@ -28,6 +28,16 @@ vi.mock("@/api/projects", () => ({
       created_at: "",
       updated_at: "",
     }),
+    patch: vi.fn().mockResolvedValue({
+      id: 1,
+      name: "p1-renamed",
+      mode: "forward",
+      city: "北京",
+      industry: "电子政务",
+      stage: "bidding",
+      created_at: "",
+      updated_at: "",
+    }),
     remove: vi.fn().mockResolvedValue(undefined),
   },
 }));
@@ -62,5 +72,24 @@ describe("projectsStore", () => {
     await store.fetchAll();
     await store.remove(1);
     expect(store.items).toHaveLength(0);
+  });
+
+  it("patch 更新对应 item", async () => {
+    const store = useProjectsStore();
+    await store.fetchAll();
+    await store.patch(1, { name: "p1-renamed" });
+    expect(store.items[0].name).toBe("p1-renamed");
+  });
+
+  it("fetchAll 失败 → state=error 且 error 暴露 ApiError", async () => {
+    const projectsModule = await import("@/api/projects");
+    (projectsModule.projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("网络错"),
+    );
+    const store = useProjectsStore();
+    await store.fetchAll();
+    expect(store.state).toBe("error");
+    expect(store.error).not.toBeNull();
+    expect(store.error?.message).toContain("网络错");
   });
 });

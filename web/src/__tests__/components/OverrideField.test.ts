@@ -33,4 +33,15 @@ describe("OverrideField", () => {
     expect(w.find("[data-test='override-badge']").exists()).toBe(true);
     expect(w.find("[data-overridden='true']").exists()).toBe(true);
   });
+
+  it("input 事件 → emit update:modelValue 转 number", async () => {
+    const w = mount(OverrideField, {
+      props: { label: "x", modelValue: 1, defaultValue: 1 },
+    });
+    const input = w.find("input");
+    await input.setValue("8.5");
+    const emitted = w.emitted()["update:modelValue"] as Array<unknown[]> | undefined;
+    expect(emitted).toBeTruthy();
+    expect(emitted![0][0]).toBe(8.5);
+  });
 });
