@@ -11,24 +11,32 @@ describe("API client", () => {
     vi.resetAllMocks();
   });
 
-  it("注入 X-Auth-Token 请求头", async () => {
-    const post = vi.fn().mockResolvedValue({ data: { ok: true, data: { id: 1 } } });
+  it("注入 X-Auth-Token 请求头（拦截器单一注入点）", () => {
+    // The request interceptor is the single token-injection point. We verify
+    // the registered callback injects X-Auth-Token immutably, since the axios
+    // mock's interceptors.request.use is a vi.fn() that never invokes it.
+    const requestUse = vi.fn();
     (axios.create as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      post,
+      post: vi.fn(),
       get: vi.fn(),
       patch: vi.fn(),
       delete: vi.fn(),
-      interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+      interceptors: { request: { use: requestUse }, response: { use: vi.fn() } },
     });
-    const client = createClient();
-    await client.post("/api/projects", { name: "x" });
-    expect(post).toHaveBeenCalledWith(
-      "/api/projects",
-      { name: "x" },
-      expect.objectContaining({
-        headers: expect.objectContaining({ "X-Auth-Token": "test-token-123" }),
-      }),
-    );
+    createClient();
+    expect(requestUse).toHaveBeenCalledTimes(1);
+    const interceptor = requestUse.mock.calls[0][0] as (c: {
+      headers?: Record<string, string>;
+    }) => { headers?: Record<string, string> };
+    const inputConfig = { headers: { "X-Requested-With": "XMLHttpRequest" } };
+    const result = interceptor(inputConfig);
+    expect(result.headers).toMatchObject({
+      "X-Requested-With": "XMLHttpRequest",
+      "X-Auth-Token": "test-token-123",
+    });
+    // Immutability: the original config must not have been mutated.
+    expect(inputConfig.headers).toEqual({ "X-Requested-With": "XMLHttpRequest" });
+    expect(result).not.toBe(inputConfig);
   });
 
   it("解封成功响应：{ok:true,data} → data", async () => {

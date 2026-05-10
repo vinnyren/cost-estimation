@@ -11,8 +11,9 @@ export const uploadsApi = {
   upload: async (projectId: number, file: File): Promise<UploadResult> => {
     const form = new FormData();
     form.append("file", file);
-    return api.post<UploadResult>(`/api/projects/${projectId}/uploads`, form, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    // Do NOT set Content-Type manually — axios detects FormData and generates
+    // the correct multipart/form-data header with a boundary. Hand-writing
+    // "multipart/form-data" without a boundary breaks server-side parsing.
+    return api.post<UploadResult>(`/api/projects/${projectId}/uploads`, form);
   },
 };
