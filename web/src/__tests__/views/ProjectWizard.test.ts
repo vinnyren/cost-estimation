@@ -105,6 +105,108 @@ describe("ProjectWizard", () => {
     expect(w.text()).toContain("选择评估模式");
   });
 
+  it("反向模式：mode='reverse' 时 step 5 显示目标金额输入", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+
+    // step 1 → reverse
+    const radios = w.findAll("input[type='radio']");
+    await radios[1].setValue();
+    expect((w.find("[data-test='wizard-next']").element as HTMLButtonElement).disabled).toBe(false);
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    // step 2 → name
+    await w.find("input[type='text']").setValue("反向项目");
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    // step 3 → defaults
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    // step 4 → defaults
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    // step 5 → reverse branch should render the target_total + alpha inputs
+    expect(w.text()).toContain("目标金额");
+    expect(w.text()).toContain("目标总造价");
+    expect(w.text()).toContain("α 调整系数");
+    // The number inputs for target_total + alpha are present.
+    const numberInputs = w.findAll("input[type='number']");
+    expect(numberInputs.length).toBe(2);
+  });
+
+  it("反向模式 submit：form.target_total 正确映射到 payload.target_cost", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+
+    // step 1 → reverse
+    const radios = w.findAll("input[type='radio']");
+    await radios[1].setValue();
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    // step 2 → name
+    await w.find("input[type='text']").setValue("反向项目");
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    // step 3 → defaults
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    // step 4 → defaults
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    // step 5 → fill target_total + alpha. Order: target_total first, alpha second.
+    const numberInputs = w.findAll("input[type='number']");
+    await numberInputs[0].setValue(800000);
+    await numberInputs[1].setValue(1.2);
+
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    expect(submitBtn).toBeDefined();
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    expect(projectsApi.create).toHaveBeenCalledTimes(1);
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    // Mapping: form.target_total → payload.target_cost (the backend field).
+    // form.target_total itself must NOT leak into the payload — only the
+    // mapped/aliased field does.
+    expect(payload).toMatchObject({
+      mode: "reverse",
+      name: "反向项目",
+      target_cost: 800000,
+      alpha_dev: 1.2,
+    });
+    expect(payload).not.toHaveProperty("target_total");
+    expect(payload).not.toHaveProperty("alpha");
+  });
+
+  it("正向模式 submit：payload 不带 target_cost", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+
+    // step 1 → forward (radios[0])
+    const radios = w.findAll("input[type='radio']");
+    await radios[0].setValue();
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    await w.find("input[type='text']").setValue("正向项目");
+    await w.find("[data-test='wizard-next']").trigger("click");
+    await w.find("[data-test='wizard-next']").trigger("click");
+    await w.find("[data-test='wizard-next']").trigger("click");
+
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(payload.mode).toBe("forward");
+    // forward 模式不应携带 target_cost（条件映射）
+    expect(payload.target_cost).toBeUndefined();
+  });
+
   it("submit 失败 → 显示 errorMsg（role=alert）", async () => {
     (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error("名称重复"),
