@@ -37,9 +37,9 @@ def run_forward(db: Session, project_id: str, payload: dict) -> dict:
     proj = db.query(Project).filter_by(id=project_id).first()
     if not proj:
         raise ValueError("PROJECT_NOT_FOUND")
-    full_params = ps.get_global(db)
+    eff = ps.get_effective(db, project_id)
     ctx = EvaluationContext.from_dict(
-        full_params,
+        ps.effective_to_calc_dict(eff),
         ProjectInputs(industry=proj.industry, city=proj.city, phase=proj.phase),
     )
     inp = ForwardInput(
@@ -58,9 +58,9 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
     proj = db.query(Project).filter_by(id=project_id).first()
     if not proj:
         raise ValueError("PROJECT_NOT_FOUND")
-    full_params = ps.get_global(db)
+    eff = ps.get_effective(db, project_id)
     ctx = EvaluationContext.from_dict(
-        full_params,
+        ps.effective_to_calc_dict(eff),
         ProjectInputs(industry=proj.industry, city=proj.city, phase=proj.phase),
     )
     inp = ReverseInput(
