@@ -20,9 +20,7 @@
     "element-plus": "^2.7.6",
     "pinia": "^2.1.7",
     "vue": "^3.4.31",
-    "vue-router": "^4.4.0",
-    "vxe-table": "^4.6.17",
-    "xe-utils": "^3.5.30"
+    "vue-router": "^4.4.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
