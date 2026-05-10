@@ -44,3 +44,22 @@ omit = ["*/tests/*"]
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "raise NotImplementedError"]
 fail_under = 80
+
+[tool.mutmut]
+paths_to_mutate = ["app/core/"]
+backup = false
+# 仅跑 core 相关的 unit tests（不依赖 repo-root 路径），避开 mutmut v3 在
+# server/mutants/ 子目录下 cwd 时打破 Path(__file__).parent.parent.parent 的假设。
+# excel_exporter / validator / golden / integration 都在 mutants cwd 下找不到外部文件，故排除。
+tests_dir = [
+    "tests/unit/test_forward.py",
+    "tests/unit/test_reverse.py",
+    "tests/unit/test_allocator.py",
+    "tests/unit/test_factors.py",
+    "tests/unit/test_context.py",
+    "tests/unit/test_models.py",
+]
+do_not_mutate = [
+    "*/__init__.py",
+    "*__pycache__*",
+]
