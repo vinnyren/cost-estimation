@@ -23,3 +23,8 @@ __pycache__/
 # 临时
 .coverage
 htmlcov/
+
+# Web frontend
+web/node_modules/
+web/dist/
+web/coverage/

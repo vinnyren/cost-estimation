@@ -14,12 +14,23 @@ async def auth_middleware(
 ) -> Response:
     """Token-based auth middleware (CSRF defense layer 1).
 
-    Allows /health unauthenticated. All other paths require a token via either
-    the X-Auth-Token header or the ?t= query parameter, matching settings.auth_token.
+    Allows /health unauthenticated. Allows non-/api/ GET requests (SPA shell +
+    static assets like /, /assets/*, deep-link fallback paths like /projects/1)
+    because browsers issue these requests without an X-Auth-Token header. The
+    SPA shell carries no sensitive data; the token still protects every /api/*
+    route (state-changing or otherwise).
+
+    All other paths require a token via either the X-Auth-Token header or the
+    ?t= query parameter, matching settings.auth_token.
 
     Uses secrets.compare_digest() for constant-time comparison to mitigate timing attacks.
     """
-    if request.url.path == "/health":
+    path = request.url.path
+    if path == "/health":
+        return await call_next(request)
+    # SPA shell + static asset bypass: GET 且 path 不以 /api/ 开头 → 免认证
+    # （仅当生产期挂载了 web/dist 时这些路径才存在；否则会落入 FastAPI 404）
+    if request.method == "GET" and not path.startswith("/api/"):
         return await call_next(request)
     sent = request.headers.get("X-Auth-Token") or request.query_params.get("t") or ""
     expected = settings.auth_token or ""

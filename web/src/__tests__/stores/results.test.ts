@@ -1,0 +1,60 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { setActivePinia, createPinia } from "pinia";
+import { useResultsStore } from "@/stores/results";
+
+describe("resultsStore", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it("paramsChangedAt 之后 forwardResult 标记 stale", () => {
+    const store = useResultsStore();
+    store.setForwardResult({
+      scale_adjusted: 332.75,
+      effort_pm: { P10: 50, P50: 80, P90: 110 },
+      cost_yuan: { P10: 300000, P50: 489180, P90: 700000 },
+    });
+    expect(store.isStale).toBe(false);
+    store.markParamsChanged();
+    expect(store.isStale).toBe(true);
+  });
+
+  it("setForwardResult 清除 stale 标志", () => {
+    const store = useResultsStore();
+    store.markParamsChanged();
+    store.setForwardResult({
+      scale_adjusted: 100,
+      effort_pm: { P10: 1, P50: 2, P90: 3 },
+      cost_yuan: { P10: 1, P50: 2, P90: 3 },
+    });
+    expect(store.isStale).toBe(false);
+  });
+
+  it("setReverseResult 写入 reverseResult + 更新 lastComputedAt", () => {
+    const store = useResultsStore();
+    store.setReverseResult({
+      fp_total: { P10: 100, P50: 200, P90: 300 },
+      recommended_band: "P50",
+    });
+    expect(store.reverseResult).toEqual({
+      fp_total: { P10: 100, P50: 200, P90: 300 },
+      recommended_band: "P50",
+    });
+    expect(store.lastComputedAt).toBeGreaterThan(0);
+  });
+
+  it("clear() 清空所有结果与时间戳", () => {
+    const store = useResultsStore();
+    store.setForwardResult({
+      scale_adjusted: 1,
+      effort_pm: { P10: 1, P50: 2, P90: 3 },
+      cost_yuan: { P10: 1, P50: 2, P90: 3 },
+    });
+    store.markParamsChanged();
+    store.clear();
+    expect(store.forwardResult).toBeNull();
+    expect(store.reverseResult).toBeNull();
+    expect(store.lastComputedAt).toBe(0);
+    expect(store.paramsChangedAt).toBe(0);
+  });
+});

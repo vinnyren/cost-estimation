@@ -1,0 +1,86 @@
+import { describe, it, expect } from "vitest";
+import { mount } from "@vue/test-utils";
+import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
+import EmptyState from "@/components/status/EmptyState.vue";
+import ErrorBanner from "@/components/status/ErrorBanner.vue";
+import StaleBanner from "@/components/status/StaleBanner.vue";
+import PartialState from "@/components/status/PartialState.vue";
+
+describe("Status components", () => {
+  it("LoadingSkeleton 渲染指定行数", () => {
+    const wrapper = mount(LoadingSkeleton, { props: { rows: 8 } });
+    expect(wrapper.findAll("[data-test='skeleton-row']")).toHaveLength(8);
+  });
+
+  it("EmptyState 显示 title + cta-label", () => {
+    const wrapper = mount(EmptyState, {
+      props: { title: "项目库为空", ctaLabel: "新建第一个项目" },
+    });
+    expect(wrapper.text()).toContain("项目库为空");
+    expect(wrapper.find("button").text()).toBe("新建第一个项目");
+  });
+
+  it("EmptyState 点击 CTA 触发 cta-click 事件", async () => {
+    const wrapper = mount(EmptyState, {
+      props: { title: "x", ctaLabel: "go" },
+    });
+    await wrapper.find("button").trigger("click");
+    expect(wrapper.emitted()["cta-click"]).toBeTruthy();
+  });
+
+  it("ErrorBanner retryable=true 时点重试触发 retry 事件", async () => {
+    const wrapper = mount(ErrorBanner, {
+      props: { problem: "x", cause: "y", suggestion: "z", retryable: true },
+    });
+    await wrapper.find("[data-test='retry']").trigger("click");
+    expect(wrapper.emitted().retry).toBeTruthy();
+  });
+
+  it("ErrorBanner 显示 problem + cause + 重试按钮", () => {
+    const wrapper = mount(ErrorBanner, {
+      props: {
+        problem: "无法加载项目",
+        cause: "网络断开",
+        suggestion: "请检查网络连接后重试",
+        retryable: true,
+      },
+    });
+    expect(wrapper.text()).toContain("无法加载项目");
+    expect(wrapper.text()).toContain("网络断开");
+    expect(wrapper.find("[data-test='retry']").exists()).toBe(true);
+  });
+
+  it("ErrorBanner 用 role=alert 暴露给屏幕阅读器", () => {
+    const wrapper = mount(ErrorBanner, {
+      props: { problem: "x", cause: "y", suggestion: "z" },
+    });
+    expect(wrapper.find("[role='alert']").exists()).toBe(true);
+  });
+
+  it("StaleBanner 触发 recompute 事件", async () => {
+    const wrapper = mount(StaleBanner);
+    await wrapper.find("button").trigger("click");
+    expect(wrapper.emitted().recompute).toBeTruthy();
+  });
+
+  it("PartialState 显示 doneCount/totalCount 进度", () => {
+    const wrapper = mount(PartialState, {
+      props: { doneCount: 3, totalCount: 7 },
+    });
+    expect(wrapper.text()).toContain("3 / 7");
+    const progress = wrapper.find("progress");
+    expect(progress.exists()).toBe(true);
+    expect(progress.attributes("value")).toBe("3");
+    expect(progress.attributes("max")).toBe("7");
+  });
+
+  it("PartialState cancellable=true 时点击触发 cancel 事件", async () => {
+    const wrapper = mount(PartialState, {
+      props: { doneCount: 1, totalCount: 5, cancellable: true },
+    });
+    const btn = wrapper.find("button");
+    expect(btn.exists()).toBe(true);
+    await btn.trigger("click");
+    expect(wrapper.emitted().cancel).toBeTruthy();
+  });
+});
