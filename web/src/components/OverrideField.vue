@@ -1,21 +1,27 @@
 <script setup lang="ts">
 import { computed } from "vue";
 
-const props = defineProps<{
-  label: string;
-  modelValue: number | string;
-  defaultValue: number | string;
-  step?: number;
-  min?: number;
-  max?: number;
-}>();
+const props = withDefaults(
+  defineProps<{
+    label: string;
+    modelValue: number | string;
+    defaultValue: number | string;
+    overridden?: boolean;
+    step?: number;
+    min?: number;
+    max?: number;
+  }>(),
+  { overridden: undefined, step: undefined, min: undefined, max: undefined },
+);
 
 const emit = defineEmits<{
   (e: "update:modelValue", v: number | string): void;
   (e: "reset"): void;
 }>();
 
-const isOverridden = computed(() => props.modelValue !== props.defaultValue);
+const isOverridden = computed(() =>
+  props.overridden ?? (props.modelValue !== props.defaultValue),
+);
 
 function onInput(e: Event): void {
   const target = e.target as HTMLInputElement;

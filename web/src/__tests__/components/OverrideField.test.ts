@@ -25,4 +25,12 @@ describe("OverrideField", () => {
     await w.find("[data-test='reset-btn']").trigger("click");
     expect(w.emitted().reset).toBeTruthy();
   });
+
+  it("外部 overridden=true 强制显示徽章（即使 modelValue===defaultValue）", () => {
+    const w = mount(OverrideField, {
+      props: { label: "x", modelValue: 5, defaultValue: 5, overridden: true },
+    });
+    expect(w.find("[data-test='override-badge']").exists()).toBe(true);
+    expect(w.find("[data-overridden='true']").exists()).toBe(true);
+  });
 });

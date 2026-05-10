@@ -10,7 +10,7 @@ export const useParamsStore = defineStore("params", () => {
   async function loadFor(projectId: number): Promise<void> {
     const resp = await paramsApi.effective(projectId);
     effective.value = resp;
-    overrides.value = (resp.overrides ?? {}) as Record<string, unknown>;
+    overrides.value = ((resp?.overrides ?? {}) as Record<string, unknown>);
     loadedFor.value = projectId;
   }
 
@@ -20,11 +20,24 @@ export const useParamsStore = defineStore("params", () => {
   ): Promise<void> {
     const resp = await paramsApi.override(projectId, patch);
     effective.value = resp;
-    overrides.value = (resp.overrides ?? {}) as Record<string, unknown>;
+    overrides.value = ((resp?.overrides ?? {}) as Record<string, unknown>);
   }
 
   function isOverridden(path: string): boolean {
-    return path in overrides.value;
+    if (!overrides.value) return false;
+    // 直接 key 命中
+    if (path in overrides.value) return true;
+    // 嵌套 path 命中（如 city_rate.北京.dev）
+    const parts = path.split(".");
+    let cur: unknown = overrides.value;
+    for (const p of parts) {
+      if (cur && typeof cur === "object" && p in (cur as Record<string, unknown>)) {
+        cur = (cur as Record<string, unknown>)[p];
+      } else {
+        return false;
+      }
+    }
+    return true;
   }
 
   return { effective, overrides, loadedFor, loadFor, applyOverride, isOverridden };

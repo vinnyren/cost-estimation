@@ -43,4 +43,19 @@ describe("ParamManager", () => {
     const tabs = w.findAll("[role='tab']");
     expect(tabs.length).toBeGreaterThanOrEqual(6);
   });
+
+  it("点击第 2 个 Tab 后 aria-selected 切换", async () => {
+    router.push("/projects/1/parameters");
+    await router.isReady();
+    const w = mount(ParamManager, {
+      props: { projectId: 1 },
+      global: { plugins: [createPinia(), router, ElementPlus] },
+    });
+    await flushPromises();
+    const tabs = w.findAll("[role='tab']");
+    expect(tabs[0].attributes("aria-selected")).toBe("true");
+    await tabs[1].trigger("click");
+    expect(tabs[1].attributes("aria-selected")).toBe("true");
+    expect(tabs[0].attributes("aria-selected")).toBe("false");
+  });
 });

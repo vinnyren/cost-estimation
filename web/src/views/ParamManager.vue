@@ -105,6 +105,7 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
             :label="`${city}（开发）`"
             :model-value="rate.dev"
             :default-value="rate.dev"
+            :overridden="store.isOverridden(`city_rate.${String(city)}.dev`)"
             @update:model-value="(nv) => patchOverride(`city_rate.${String(city)}.dev`, nv)"
           />
         </div>
@@ -127,6 +128,7 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
               :label="`${String(ind)} ${band}`"
               :model-value="(bands as Record<Band, number>)[band]"
               :default-value="(bands as Record<Band, number>)[band]"
+              :overridden="store.isOverridden(`productivity_dev.${String(ind)}.${band}`)"
               @update:model-value="(nv) => patchOverride(`productivity_dev.${String(ind)}.${band}`, nv)"
             />
           </template>
