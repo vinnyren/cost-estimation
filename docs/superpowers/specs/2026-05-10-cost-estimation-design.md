@@ -95,6 +95,10 @@ cost-estimation-plugin/
 ├── .claude-plugin/marketplace.json
 ├── plugin.json
 ├── README.md
+├── commands/                        # Plugin slash commands
+│   ├── setup.md                     # /cost-estimation:setup
+│   ├── cost.md                      # /cost
+│   └── cost-stop.md                 # /cost-stop
 ├── skills/cost-estimation/
 │   ├── SKILL.md
 │   ├── doc-extract.md
@@ -132,10 +136,6 @@ cost-estimation-plugin/
 │   │   ├── stores/
 │   │   └── composables/
 │   └── dist/
-├── scripts/
-│   ├── install.sh
-│   ├── start.sh
-│   └── stop.sh
 └── tests/
     ├── unit/
     ├── integration/
@@ -481,48 +481,121 @@ wb.save(output_path)
 
 ## 8. Skill 与一键安装
 
-### 8.1 Plugin 元信息
+### 8.1 Plugin 元信息（符合 Claude Code 实际格式）
+
+**`.claude-plugin/marketplace.json`**（用户添加 marketplace 的入口）：
 
 ```json
-// .claude-plugin/marketplace.json
 {
-  "name": "cost-estimation",
-  "description": "基于 GB/T 36964 / T/CCUA 005-2024 / CSBMK®-202510 的软件造价制作系统",
-  "version": "1.0.0",
-  "skills": [
+  "name": "cost-estimation-marketplace",
+  "owner": {
+    "name": "<author>",
+    "email": "<author@example.com>"
+  },
+  "metadata": {
+    "description": "软件造价评估工具集",
+    "version": "1.0.0"
+  },
+  "plugins": [
     {
-      "path": "skills/cost-estimation",
-      "description": "软件造价评估 · NESMA 估算 · 双向（FP↔成本）"
+      "name": "cost-estimation",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/your-org/cost-estimation.git"
+      },
+      "description": "基于 GB/T 36964 / T/CCUA 005-2024 / CSBMK®-202510 的软件造价制作系统",
+      "version": "1.0.0",
+      "strict": true
     }
-  ],
-  "commands": [
-    { "name": "cost", "description": "启动造价评估 Web 服务" },
-    { "name": "cost-stop", "description": "停止后端服务" }
-  ],
-  "post_install": "scripts/install.sh"
+  ]
 }
 ```
 
-### 8.2 用户安装命令
+**`.claude-plugin/plugin.json`**（plugin 自身元信息）：
 
-```bash
-# 在 Claude Code 内
-/plugin install github.com/your-org/cost-estimation
+```json
+{
+  "name": "cost-estimation",
+  "description": "软件造价评估 · NESMA 估算 · 双向（FP↔成本）",
+  "version": "1.0.0",
+  "author": { "name": "<author>", "url": "<repo-url>" },
+  "commands": [
+    "./commands/setup.md",
+    "./commands/cost.md",
+    "./commands/cost-stop.md"
+  ],
+  "license": "MIT",
+  "keywords": ["cost-estimation", "function-points", "GB-T-36964", "CSBMK"]
+}
 ```
 
-### 8.3 install.sh 主要步骤
+### 8.2 用户安装与首次使用流程
 
-1. 创建 `~/.claude/projects/cost-estimation/{db,uploads,exports}` 目录
-2. 在 `server/` 下创建 Python venv（python3 -m venv .venv）
-3. `pip install -r requirements.txt`（fastapi/uvicorn/openpyxl/pdfplumber/python-docx/sqlalchemy/pydantic）
-4. `python -m app.bootstrap` 初始化 SQLite + 写入 CSBMK®-202510 默认参数
+由于 Claude Code 的 plugin 协议**没有 post_install 钩子**，依赖安装通过 slash 命令实现：
 
-### 8.4 start.sh 启动逻辑
+```
+1. /plugin marketplace add github.com/your-org/cost-estimation
+2. /plugin install cost-estimation
+3. /cost-estimation:setup    ← 首次运行：建 venv、装依赖、初始化 SQLite
+4. /cost                      ← 日常使用：启动后端 + 开浏览器
+```
 
-1. 检查 8788 端口是否已占用；占用则提示并退出
-2. `nohup uvicorn app.main:app --host 127.0.0.1 --port 8788 &`
-3. 轮询 `/health` 等待就绪
-4. `open http://127.0.0.1:8788/`
+### 8.3 commands/setup.md（首次安装命令）
+
+```markdown
+---
+description: 首次安装：建立 Python venv、安装依赖、初始化 SQLite + CSBMK 数据
+allowed-tools: Bash, Read
+---
+
+执行以下步骤，按顺序：
+
+1. 检测 Plugin 安装路径：
+   ```bash
+   PLUGIN_DIR="$HOME/.claude/plugins/data/cost-estimation"
+   DATA_DIR="$HOME/.claude/projects/cost-estimation"
+   ```
+
+2. 创建数据目录：`mkdir -p "$DATA_DIR"/{db,uploads,exports}`
+
+3. 在 `$PLUGIN_DIR/server` 下创建 venv 并安装依赖：
+   ```bash
+   cd "$PLUGIN_DIR/server"
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt --quiet
+   ```
+
+4. 初始化 SQLite + seed CSBMK®-202510 参数：
+   ```bash
+   python -m app.bootstrap \
+     --db "$DATA_DIR/db/cost.sqlite" \
+     --seed "$PLUGIN_DIR/server/app/data/csbmk_202510.json"
+   ```
+
+5. 报告："✓ 安装完成。运行 /cost 即可启动 Web 界面"
+```
+
+### 8.4 commands/cost.md（日常启动命令）
+
+```markdown
+---
+description: 启动造价评估 Web 服务并打开浏览器
+allowed-tools: Bash
+---
+
+启动后端：
+
+1. 检查 8788 端口是否已占用，若占用则尝试 8789–8800 并写入 `~/.claude/projects/cost-estimation/.port`
+2. 启动 uvicorn（后台）：
+   ```bash
+   nohup "$PLUGIN_DIR/server/.venv/bin/uvicorn" \
+     app.main:app --host 127.0.0.1 --port "$PORT" \
+     > /tmp/cost-estimation.log 2>&1 &
+   ```
+3. 轮询 `http://127.0.0.1:$PORT/health` 直到就绪（最多 10 秒）
+4. `open http://127.0.0.1:$PORT/`
+```
 
 ### 8.5 SKILL.md 触发与编排
 
@@ -534,19 +607,20 @@ description: Use when the user wants to do software cost estimation per Chinese 
 
 ## 使用流程
 
-1. 用户调用 `/cost` 时运行 `scripts/start.sh` 启动后端
-2. 浏览器自动打开 http://localhost:8788/
-3. 用户在 FP 编辑页点 "AI 辅助提取" 时本 Skill 接管：
-   - 读取项目目录下 uploads/*.{pdf,docx,xlsx}
+1. 用户调用 `/cost` 命令（由 commands/cost.md 处理）启动后端 + 打开浏览器
+2. 用户在 FP 编辑页点 "AI 辅助提取" 时本 Skill 自动激活：
+   - 通过 GET `/api/projects/{id}/uploads` 拿到上传文件清单
+   - 读取项目目录下 `~/.claude/projects/cost-estimation/uploads/<id>/*.{pdf,docx,xlsx}`
    - 按 NESMA 估算法生成 FP 初稿（参考 reference/nesma-rules.md）
-   - 调用 POST /api/projects/{id}/functions/bulk 写回
-4. 反向模式："AI 辅助分摊" 调 POST /api/calc/allocate
+   - 调用 POST `/api/projects/{id}/functions/bulk` 写回（每条带 source=claude_draft）
+3. 反向模式："AI 辅助分摊" 时本 Skill 同样激活，调 POST `/api/calc/allocate`
 
 ## 不要做的事
 
 - 不在会话里逐个询问 FP 项（让用户在 Web 表格里编辑）
 - 不修改 params_global 表（用 params_override）
-- 不直接生成 Excel；调 GET /api/reports/excel/{id}
+- 不直接生成 Excel；调 GET `/api/reports/excel/{id}`
+- 不主动启动后端（由 /cost 命令负责）
 ```
 
 ---
@@ -608,7 +682,7 @@ description: Use when the user wants to do software cost estimation per Chinese 
 | Claude 提取的 FP 项数 = 0 | UI 提示"未识别到功能项，请检查文档质量或手动添加" |
 | 反向计算预算 ≤ 0 | 返回 INVALID_PARAM "目标金额必须大于其他费用" |
 | 城市/行业不在 CSBMK | 接受为自定义键，但提示"非内置参数，请在参数库手动维护" |
-| 8788 端口被占用 | start.sh 自动尝试 8789…8800；写入实际端口到 `.port` 文件 |
+| 8788 端口被占用 | `/cost` 命令自动尝试 8789…8800；写入实际端口到 `.port` 文件 |
 | 参数被改后未重新计算 | 结果页顶部显示橙色"已过期"横条，提供"重新计算"按钮 |
 | FP 总数为 0 时尝试计算 | 返回 INVALID_STATE "FP 清单为空" |
 | Excel 导出时 FP 项 > 5000 | 走流式写入；超过 10000 项警告并询问是否继续 |
@@ -655,7 +729,7 @@ description: Use when the user wants to do software cost estimation per Chinese 
 | Phase 3 · 文档解析 | PDF/Word/Excel 解析 + Skill SKILL.md | 3 天 |
 | Phase 4 · Excel 导出 | openpyxl 模板 + 7 Sheet 渲染 | 3 天 |
 | Phase 5 · 前端 | Vue 5 屏 + vxe-table + Pinia | 7 天 |
-| Phase 6 · 打包安装 | Plugin 元信息 + install.sh / start.sh | 2 天 |
+| Phase 6 · 打包安装 | Plugin 元信息 + commands/{setup,cost,cost-stop}.md | 2 天 |
 | Phase 7 · 测试与文档 | 80% 覆盖 + E2E + 用户文档 | 4 天 |
 
 总计约 28 个工作日。
