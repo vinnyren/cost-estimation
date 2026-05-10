@@ -278,10 +278,44 @@ async function submit(): Promise<void> {
       </fieldset>
 
       <fieldset v-else-if="currentStep === 4">
-        <legend>正向 / 反向</legend>
-        <p class="placeholder">
-          将在 T16 填充：mode + 反向模式 target_total
-        </p>
+        <legend>计算模式</legend>
+        <div
+          class="radio-group"
+          role="radiogroup"
+          aria-label="计算模式"
+        >
+          <label class="radio">
+            <input
+              v-model="form.mode"
+              type="radio"
+              name="mode"
+              value="forward"
+            >
+            <span>正向 — 已有功能点 → 估算成本</span>
+          </label>
+          <label class="radio">
+            <input
+              v-model="form.mode"
+              type="radio"
+              name="mode"
+              value="reverse"
+            >
+            <span>反向 — 已有目标成本 → 推算功能点</span>
+          </label>
+        </div>
+        <label
+          v-if="form.mode === 'reverse'"
+          class="field"
+        >
+          <span class="field-label">目标总成本（元） *</span>
+          <input
+            v-model.number="form.target_total"
+            name="target_total"
+            type="number"
+            min="1"
+            required
+          >
+        </label>
       </fieldset>
 
       <fieldset v-else-if="currentStep === 5">

@@ -189,8 +189,132 @@ describe("ProjectWizard skeleton (T13)", () => {
     expect(payload.target_cost).toBeUndefined();
   });
 
-  // TODO(T15-T18): mode 选择 UI 落地后再补 reverse 模式 target_total → target_cost
-  // 映射、α 输入等端到端用例。
+  // TODO(T17-T18): factors_dev / factors_ops / 确认页 UI 落地后再补对应端到端用例。
+});
+
+/**
+ * NOTE (T16 — Wizard step 4 正/反向):
+ *   Step 4 落地：mode radio 二选一 / reverse 时显示 target_total / target_total=0
+ *   时禁止前进 / reverse + target_total 提交时映射到 payload.target_cost。
+ */
+
+describe("Wizard step 4 — mode + target_total (T16)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p-99",
+      name: "new",
+      project_type: "dev_only",
+      mode: "reverse",
+      city: "北京",
+      industry: "电子政务",
+      phase: "bidding",
+      basis_data_ver: "CSBMK®-202510",
+      created_at: "",
+      updated_at: "",
+    });
+  });
+
+  async function gotoStep4() {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("项目甲");
+    await w.find("[data-test='wizard-next']").trigger("click"); // → step 2
+    await w.find("[data-test='wizard-next']").trigger("click"); // → step 3
+    await w.find("[data-test='wizard-next']").trigger("click"); // → step 4
+    await flushPromises();
+    return w;
+  }
+
+  it("渲染 forward + reverse radio 两个选项", async () => {
+    const w = await gotoStep4();
+    const radios = w.findAll('input[type="radio"][name="mode"]');
+    expect(radios.length).toBe(2);
+    const values = radios.map((r) => (r.element as HTMLInputElement).value);
+    expect(values).toContain("forward");
+    expect(values).toContain("reverse");
+    expect(w.text()).toContain("正向");
+    expect(w.text()).toContain("反向");
+  });
+
+  it("默认 forward 模式：target_total 输入框不显示", async () => {
+    const w = await gotoStep4();
+    expect(w.find('input[name="target_total"]').exists()).toBe(false);
+  });
+
+  it("切到 reverse 模式：target_total number input 出现", async () => {
+    const w = await gotoStep4();
+    const radios = w.findAll('input[type="radio"][name="mode"]');
+    const reverseRadio = radios.find(
+      (r) => (r.element as HTMLInputElement).value === "reverse",
+    )!;
+    await reverseRadio.setValue();
+    await flushPromises();
+
+    const targetInput = w.find('input[name="target_total"]');
+    expect(targetInput.exists()).toBe(true);
+    expect((targetInput.element as HTMLInputElement).type).toBe("number");
+  });
+
+  it("reverse + target_total=0 时下一步按钮 disabled", async () => {
+    const w = await gotoStep4();
+    const radios = w.findAll('input[type="radio"][name="mode"]');
+    const reverseRadio = radios.find(
+      (r) => (r.element as HTMLInputElement).value === "reverse",
+    )!;
+    await reverseRadio.setValue();
+    await flushPromises();
+
+    // target_total 默认值是 0
+    const nextBtn = w.find("[data-test='wizard-next']");
+    expect((nextBtn.element as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("reverse + target_total>0 时下一步按钮启用", async () => {
+    const w = await gotoStep4();
+    const radios = w.findAll('input[type="radio"][name="mode"]');
+    const reverseRadio = radios.find(
+      (r) => (r.element as HTMLInputElement).value === "reverse",
+    )!;
+    await reverseRadio.setValue();
+    await flushPromises();
+
+    await w.find('input[name="target_total"]').setValue(10000);
+    await flushPromises();
+
+    const nextBtn = w.find("[data-test='wizard-next']");
+    expect((nextBtn.element as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("reverse 模式 submit：payload.target_cost 映射 target_total", async () => {
+    const w = await gotoStep4();
+    const radios = w.findAll('input[type="radio"][name="mode"]');
+    const reverseRadio = radios.find(
+      (r) => (r.element as HTMLInputElement).value === "reverse",
+    )!;
+    await reverseRadio.setValue();
+    await flushPromises();
+
+    await w.find('input[name="target_total"]').setValue(10000);
+    await flushPromises();
+
+    // step 4 → 5 → 6 → 7
+    for (let i = 0; i < 3; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+    }
+
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    expect(submitBtn).toBeDefined();
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(payload.mode).toBe("reverse");
+    expect(payload.target_cost).toBe(10000);
+  });
 });
 
 /**
