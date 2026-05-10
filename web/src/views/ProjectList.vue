@@ -45,6 +45,11 @@ const SORTS: Array<{ value: NonNullable<ProjectQuery["sort"]>; label: string }> 
   { value: "name", label: "名称" },
 ];
 
+function phaseLabel(value: string | undefined): string {
+  const found = PHASES.find((p) => p.value === value);
+  return found?.label ?? value ?? "—";
+}
+
 const filter = reactive({
   q: "",
   city: "" as string,
@@ -299,7 +304,7 @@ onMounted(() => {
           </div>
           <div>
             <dt>阶段</dt>
-            <dd>{{ p.phase }}</dd>
+            <dd>{{ phaseLabel(p.phase) }}</dd>
           </div>
           <div v-if="p.total_fp !== undefined">
             <dt>FP</dt>
