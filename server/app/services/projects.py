@@ -1,5 +1,9 @@
+import shutil
 import uuid
+
 from sqlalchemy.orm import Session
+
+from ..config import settings
 from ..db.models import Project as ProjectORM
 from ..schemas.project import ProjectCreate, ProjectPatch
 
@@ -30,6 +34,14 @@ def delete(db: Session, project_id: str) -> bool:
     p = get(db, project_id)
     if not p:
         return False
-    db.delete(p)
+    # 删除磁盘上传/解析/导出目录，避免 cascade 后磁盘留下孤儿文件。
+    # 失败用 ignore_errors=True 容忍权限或路径异常 — DB cascade 仍要正常推进。
+    for base in (settings.upload_dir, settings.parsed_dir, settings.export_dir):
+        if base is None:
+            continue
+        target = base / project_id
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=True)
+    db.delete(p)  # cascade 自动清 fps/snapshots/results/overrides/uploads 行
     db.commit()
     return True

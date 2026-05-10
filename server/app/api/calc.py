@@ -13,7 +13,21 @@ def forward(payload: CalcForwardRequest, db: Session = Depends(get_db)):
     try:
         result = svc.run_forward(db, payload.project_id, payload.model_dump())
     except ValueError as e:
-        raise HTTPException(404, detail={"error": {"code": str(e)}})
+        msg = str(e)
+        code = msg.split(":")[0]
+        # PROJECT_NOT_FOUND → 404；其他业务可恢复错误（如 NO_FUNCTION_POINTS）→ 422
+        if code == "PROJECT_NOT_FOUND":
+            raise HTTPException(404, detail={"error": {"code": code}})
+        raise HTTPException(
+            422,
+            detail={
+                "error": {
+                    "code": code,
+                    "problem": msg,
+                    "fix": "请先在 FP 编辑屏添加功能点，或上传文档让 AI 提取",
+                }
+            },
+        )
     return {"ok": True, "data": result}
 
 

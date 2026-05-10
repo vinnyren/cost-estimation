@@ -144,3 +144,34 @@ async def test_delete_empty_project_still_works(client_with_project):
     assert del_r.status_code in (200, 204), del_r.text
     get_r = await c.get(f"/api/projects/{pid}", headers=H)
     assert get_r.status_code == 404
+
+
+async def test_delete_project_removes_disk_dirs(client_with_project, tmp_path):
+    """回归 v1.1 polish 发现的 LOW-MEDIUM bug：旧版 services.projects.delete
+    只删 DB 行，不清理磁盘 uploads/<pid>/、parsed/<pid>/、exports/<pid>/。
+    修法：在 cascade 之前 shutil.rmtree(target, ignore_errors=True)。
+
+    本测试用 fixture 中已设置的 COST_DATA_DIR=tmp_path 推断 settings.upload_dir
+    等派生路径，手工预置目录后调用 DELETE，断言目录消失。
+    """
+    c, pid, _engine = client_with_project
+
+    # fixture 中 COST_DATA_DIR=tmp_path（参见上方 fixture）。派生路径：
+    #   uploads = tmp_path / "uploads"
+    #   parsed  = tmp_path / "parsed"
+    #   exports = tmp_path / "exports"
+    upload_dir = tmp_path / "uploads" / pid
+    parsed_dir = tmp_path / "parsed" / pid
+    export_dir = tmp_path / "exports" / pid
+    for d in (upload_dir, parsed_dir, export_dir):
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "demo.txt").write_text("dummy", encoding="utf-8")
+    assert upload_dir.exists() and parsed_dir.exists() and export_dir.exists()
+
+    del_r = await c.delete(f"/api/projects/{pid}", headers=H)
+    assert del_r.status_code in (200, 204), del_r.text
+
+    # 物理目录与孤儿文件已清理
+    assert not upload_dir.exists(), "uploads/<pid>/ 应被 delete 服务清理"
+    assert not parsed_dir.exists(), "parsed/<pid>/ 应被 delete 服务清理"
+    assert not export_dir.exists(), "exports/<pid>/ 应被 delete 服务清理"
