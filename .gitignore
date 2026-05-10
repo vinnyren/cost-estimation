@@ -25,7 +25,7 @@ htmlcov/
 
 # Web frontend
 web/node_modules/
-web/dist/
+# web/dist/ is intentionally tracked: plugin distribution via git clone needs prebuilt assets
 web/coverage/
 
 # Playwright

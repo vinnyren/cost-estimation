@@ -114,9 +114,20 @@ cd server && bash scripts/run_mutmut.sh
 ## 发布
 
 1. 更新 `server/pyproject.toml` + `web/package.json` + `.claude-plugin/plugin.json` 的 version
-2. 更新 `CHANGELOG.md`
-3. tag + push
-4. 在 marketplace 仓库更新 `marketplace.json` 的 plugin URL（指向新 tag）
+2. **构建前端产物**（必须）：
+   ```bash
+   cd web && pnpm install && pnpm build
+   ```
+3. **提交 web/dist/**：
+   ```bash
+   git add web/dist/
+   git commit -m "build(web): produce dist for v<VERSION> release"
+   ```
+4. 更新 `CHANGELOG.md`（如有）
+5. tag + push
+6. 在 marketplace 仓库更新 `marketplace.json` 的 plugin URL（指向新 tag）
+
+> 重要：因 plugin 通过 git clone 分发，**dist 必须随源码一起 commit**，否则用户 `/cost` 启动后浏览器空白。如忘记 build/commit dist，`commands/setup.md` 会尝试本地构建作为 fallback，但要求用户机器上有 Node.js 20+ 与 pnpm 9。
 
 ## 关键设计决策
 
