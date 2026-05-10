@@ -39,3 +39,38 @@ async def test_api_with_valid_token_via_header_passes(secured_client):
 async def test_api_with_valid_token_via_query_passes(secured_client):
     r = await secured_client.get("/api/projects?t=test-secret-token-xyz")
     assert r.status_code != 401
+
+
+async def test_post_with_evil_origin_blocked(secured_client):
+    r = await secured_client.post(
+        "/api/projects",
+        headers={
+            "X-Auth-Token": "test-secret-token-xyz",
+            "Origin": "https://evil.com",
+            "Content-Type": "application/json",
+        },
+        json={"name": "x"},
+    )
+    assert r.status_code == 403
+    assert r.json()["error"]["code"] == "FORBIDDEN_ORIGIN"
+
+
+async def test_post_with_localhost_origin_passes(secured_client):
+    r = await secured_client.post(
+        "/api/projects",
+        headers={
+            "X-Auth-Token": "test-secret-token-xyz",
+            "Origin": "http://127.0.0.1:8788",
+            "Content-Type": "application/json",
+        },
+        json={"name": "x"},
+    )
+    assert r.status_code != 403
+
+
+async def test_get_without_origin_passes(secured_client):
+    r = await secured_client.get(
+        "/api/projects",
+        headers={"X-Auth-Token": "test-secret-token-xyz"},
+    )
+    assert r.status_code != 403
