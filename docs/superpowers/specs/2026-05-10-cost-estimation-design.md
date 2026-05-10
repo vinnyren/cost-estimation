@@ -768,3 +768,59 @@ description: Use when the user wants to do software cost estimation per Chinese 
 - 评估报告 Word 导出
 - 移动端响应式
 - 与 Linear/Jira 集成（功能项导入导出）
+
+---
+
+<!-- AUTONOMOUS DECISION LOG -->
+## 16. /autoplan 评审报告（2026-05-10）
+
+### 16.1 跨阶段主题（多阶段独立涌现）
+
+| 主题 | 出现阶段 | 信号强度 |
+|---|---|---|
+| **合规/审计可信链缺位** | CEO + Eng + DX | 高（3/4 阶段） |
+| **反向模式存在合规红线 / 业务语义混乱** | CEO + Design + Eng | 高 |
+| **缺失状态/错误路径未定义** | Design + Eng + DX | 高 |
+| **安装路径不可靠（PEP 668 / 网络 / 命令一致性）** | Eng + DX | 高 |
+| **Vue+FastAPI+SQLite 全栈可能过度工程** | CEO（双声音） | 中 |
+| **API 风格不统一** | DX（双声音） | 中 |
+
+### 16.2 决策审计追踪
+
+| # | Phase | Decision | Classification | Principle | Rationale | 处置 |
+|---|---|---|---|---|---|---|
+| 1 | CEO | 是否做"对话主导 MVP"先验证用户 | **USER CHALLENGE** | — | 双模型都建议先做 5 天对话式 MVP 验证用户而非 28 天完整方案 | → 提交用户决策 |
+| 2 | CEO | 是否补竞品矩阵与差异化定位 | TASTE | P1 完整 | 当前 0 字提到竞品 | → 推荐补 |
+| 3 | CEO | 反向模式合规水印 | MECHANICAL | P1 完整 | 不加水印有合规红线 | → 必须加 |
+| 4 | Design | 缺失状态矩阵（5 态 × 5 屏） | MECHANICAL | P1 完整 | 不补到实施阶段 4 程序员 4 版 | → 必须补 §6.5 |
+| 5 | Design | 反向三档命名与推荐 | MECHANICAL | P5 显式 | "紧/标/松"对非技术用户不可判 | → 改"乐观/中位/保守" + P50 默认推荐 |
+| 6 | Design | 可访问性基线（WCAG 2.1 AA） | TASTE | P1 完整 | 政府采购合规风险 | → 推荐补 §6.6 |
+| 7 | Eng | PDR 三档业务语义重写 | MECHANICAL | P5 显式 | 当前注释"高生产率=小规模"业务含义错 | → 必须改算法文档 |
+| 8 | Eng | localhost CSRF 防护（token + Origin + CORS） | MECHANICAL | P1 完整 | CRITICAL 安全 | → 必须加 |
+| 9 | Eng | Allocator 锁定项分两段计算 | MECHANICAL | P5 显式 | locked 与 1% 容差冲突 | → 必须改 |
+| 10 | Eng | fp_snapshots 触发器按 project_id 分组 | MECHANICAL | P5 显式 | cross-project 挤压 | → 必须改 |
+| 11 | Eng | 文档解析异步化（threadpool/进程池） | MECHANICAL | P1 完整 | 50MB PDF 阻塞 event loop | → 必须改 |
+| 12 | Eng | service 层 + EvaluationContext | TASTE | P5 显式 | 当前路由直接调 core 难测 | → 推荐补 |
+| 13 | Eng | 黄金测试数据：fixture 内置 CSBMK®-202210 | MECHANICAL | P1 完整 | spec §1.2 与 §5.4 矛盾 | → 必须解决 |
+| 14 | DX | `/cost-estimation:*` 命名空间统一 | MECHANICAL | P5 显式 | 三种风格混用 | → 必须改 |
+| 15 | DX | 错误消息 problem+cause+fix+docs_url 四字段 | MECHANICAL | P1 完整 | 当前仅"返回 X" | → 必须改 |
+| 16 | DX | setup preflight + 镜像 + 离线 wheels | MECHANICAL | P1 完整 | PEP 668 / 中国网络 | → 必须补 |
+| 17 | DX | API 风格统一（resource over RPC 或反之） | TASTE | P5 显式 | 风格混搭 | → 推荐统一 |
+| 18 | DX | Excel 批量导入 FP 一等公民化 | MECHANICAL | P5 显式 | 离线 / 跳过 AI 路径必备 | → 必须加 |
+| 19 | DX | 验收标准 §14 与 §8.2 矛盾 | MECHANICAL | P5 显式 | 一处说"自动 venv"一处说"必须手跑 setup" | → 必须修 §14 |
+| 20 | CEO | 6 个用户访谈 + 数据治理策略 | **USER CHALLENGE** | — | 双模型都建议在工程前先验证 | → 提交用户决策 |
+
+### 16.3 双声音报告
+
+- CEO Voices：Codex（10 项战略发现）+ Claude subagent（6 项），Consensus 6/6 confirmed
+- Design Voices：Codex（9 项）+ Claude subagent（8 项），Consensus 7/7 confirmed
+- Eng Voices：Codex（8 项）+ Claude subagent（10 项），Consensus 6/6 confirmed
+- DX Voices：Codex（8 项）+ Claude subagent（8 项），Consensus 6/6 confirmed
+
+
+- COSMIC 方法（GB/T 42452）完整支持
+- 多用户 + 角色权限 + 远程部署
+- 历史 CSBMK 版本切换
+- 评估报告 Word 导出
+- 移动端响应式
+- 与 Linear/Jira 集成（功能项导入导出）
