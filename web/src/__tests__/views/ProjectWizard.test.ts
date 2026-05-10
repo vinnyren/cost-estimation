@@ -12,6 +12,13 @@ vi.mock("@/api/projects", () => ({
   },
 }));
 
+vi.mock("@/api/params", () => ({
+  paramsApi: {
+    effective: vi.fn().mockResolvedValue({ cf: { bidding: 1.21 } }),
+    global: vi.fn().mockResolvedValue({ cf: { bidding: 1.21 } }),
+  },
+}));
+
 const fpRoute = {
   path: "/projects/:id/functions",
   name: "fp-editor",
@@ -30,7 +37,17 @@ const mountWizard = () =>
     global: { plugins: [createPinia(), router, ElementPlus] },
   });
 
-describe("ProjectWizard", () => {
+/**
+ * NOTE (T13 — Wizard 5 → 7 steps skeleton):
+ *   Steps reorganized: 1 基础信息 / 2 项目类型 / 3 阶段 / 4 正/反向 /
+ *   5 开发因子 / 6 运维因子 / 7 确认。
+ *   Steps 2-7 are placeholders until T14-T18 fill them in. The end-to-end
+ *   submit flow (mode → target_cost mapping, error display) will be re-asserted
+ *   once those tasks land. For now we cover what survives the skeleton: step 1
+ *   inputs, advance gating, and (with default form state) a step 7 submit.
+ */
+
+describe("ProjectWizard skeleton (T13)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
@@ -48,11 +65,12 @@ describe("ProjectWizard", () => {
     });
   });
 
-  it("初始处于第 1 步：模式选择", async () => {
+  it("初始处于第 1 步：基础信息", async () => {
     router.push("/projects/new");
     await router.isReady();
     const w = mountWizard();
-    expect(w.text()).toContain("选择评估模式");
+    expect(w.text()).toContain("基础信息");
+    expect(w.find('input[name="name"]').exists()).toBe(true);
   });
 
   it("name 为空时不能进入下一步", async () => {
@@ -63,26 +81,61 @@ describe("ProjectWizard", () => {
     expect((nextBtn.element as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("逐步前进 next/back 后，第 5 步 forward 模式 submit → 调 create + 跳路由", async () => {
+  it("填了 name 之后可以前进，back 返回上一步", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("项目甲");
+    const nextBtn = w.find("[data-test='wizard-next']");
+    expect((nextBtn.element as HTMLButtonElement).disabled).toBe(false);
+    await nextBtn.trigger("click");
+    expect(w.text()).toContain("项目类型");
+    const backBtn = w.findAll("button").find((b) => b.text() === "上一步");
+    await backBtn!.trigger("click");
+    expect(w.text()).toContain("基础信息");
+  });
+
+  it("步骤指示器渲染 7 个 step，data-active 跟随 currentStep", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    const steps = w.findAll('[data-testid="wizard-step"]');
+    expect(steps.length).toBe(7);
+    expect(steps[0].attributes("data-active")).toBe("true");
+    expect(steps[1].attributes("data-active")).toBe("false");
+
+    await w.find('input[name="name"]').setValue("项目甲");
+    await w.find("[data-test='wizard-next']").trigger("click");
+    const stepsAfter = w.findAll('[data-testid="wizard-step"]');
+    expect(stepsAfter[0].attributes("data-active")).toBe("false");
+    expect(stepsAfter[0].attributes("data-done")).toBe("true");
+    expect(stepsAfter[1].attributes("data-active")).toBe("true");
+  });
+
+  it("step 1 含 client + evaluator 字段", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    expect(w.find('input[name="client"]').exists()).toBe(true);
+    expect(w.find('input[name="evaluator"]').exists()).toBe(true);
+  });
+
+  it("默认 forward 模式逐步前进到 step 7 → submit 调 create + 跳路由", async () => {
     router.push("/projects/new");
     await router.isReady();
     const w = mountWizard();
 
-    // step 1 → 选 forward 后 next
-    await w.findAll("input[type='radio']")[0].setValue();
+    // step 1 → 填名称
+    await w.find('input[name="name"]').setValue("项目甲");
     await w.find("[data-test='wizard-next']").trigger("click");
 
-    // step 2 → 填名称
-    await w.find("input[type='text']").setValue("项目甲");
-    await w.find("[data-test='wizard-next']").trigger("click");
+    // step 2-6 都是 placeholder（默认值合法）→ 连续 next
+    for (let i = 0; i < 5; i++) {
+      const btn = w.find("[data-test='wizard-next']");
+      await btn.trigger("click");
+    }
 
-    // step 3 → 默认值即合法（北京 + 电子政务）
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 4 → 默认 bidding 即合法
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 5 forward → submit
+    // step 7 → 创建项目
     const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
     expect(submitBtn).toBeDefined();
     await submitBtn!.trigger("click");
@@ -93,120 +146,6 @@ describe("ProjectWizard", () => {
     expect(router.currentRoute.value.name).toBe("fp-editor");
   });
 
-  it("back 按钮回到上一步", async () => {
-    router.push("/projects/new");
-    await router.isReady();
-    const w = mountWizard();
-    await w.findAll("input[type='radio']")[0].setValue();
-    await w.find("[data-test='wizard-next']").trigger("click");
-    expect(w.text()).toContain("项目名称");
-    const backBtn = w.findAll("button").find((b) => b.text() === "上一步");
-    await backBtn!.trigger("click");
-    expect(w.text()).toContain("选择评估模式");
-  });
-
-  it("反向模式：mode='reverse' 时 step 5 显示目标金额输入", async () => {
-    router.push("/projects/new");
-    await router.isReady();
-    const w = mountWizard();
-
-    // step 1 → reverse
-    const radios = w.findAll("input[type='radio']");
-    await radios[1].setValue();
-    expect((w.find("[data-test='wizard-next']").element as HTMLButtonElement).disabled).toBe(false);
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 2 → name
-    await w.find("input[type='text']").setValue("反向项目");
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 3 → defaults
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 4 → defaults
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 5 → reverse branch should render the target_total + alpha inputs
-    expect(w.text()).toContain("目标金额");
-    expect(w.text()).toContain("目标总造价");
-    expect(w.text()).toContain("α 调整系数");
-    // The number inputs for target_total + alpha are present.
-    const numberInputs = w.findAll("input[type='number']");
-    expect(numberInputs.length).toBe(2);
-  });
-
-  it("反向模式 submit：form.target_total 正确映射到 payload.target_cost", async () => {
-    router.push("/projects/new");
-    await router.isReady();
-    const w = mountWizard();
-
-    // step 1 → reverse
-    const radios = w.findAll("input[type='radio']");
-    await radios[1].setValue();
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 2 → name
-    await w.find("input[type='text']").setValue("反向项目");
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 3 → defaults
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 4 → defaults
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    // step 5 → fill target_total + alpha. Order: target_total first, alpha second.
-    const numberInputs = w.findAll("input[type='number']");
-    await numberInputs[0].setValue(800000);
-    await numberInputs[1].setValue(1.2);
-
-    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
-    expect(submitBtn).toBeDefined();
-    await submitBtn!.trigger("click");
-    await flushPromises();
-    await flushPromises();
-
-    expect(projectsApi.create).toHaveBeenCalledTimes(1);
-    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    // Mapping: form.target_total → payload.target_cost (the backend field).
-    // form.target_total itself must NOT leak into the payload — only the
-    // mapped/aliased field does.
-    expect(payload).toMatchObject({
-      mode: "reverse",
-      name: "反向项目",
-      target_cost: 800000,
-      alpha_dev: 1.2,
-    });
-    expect(payload).not.toHaveProperty("target_total");
-    expect(payload).not.toHaveProperty("alpha");
-  });
-
-  it("正向模式 submit：payload 不带 target_cost", async () => {
-    router.push("/projects/new");
-    await router.isReady();
-    const w = mountWizard();
-
-    // step 1 → forward (radios[0])
-    const radios = w.findAll("input[type='radio']");
-    await radios[0].setValue();
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    await w.find("input[type='text']").setValue("正向项目");
-    await w.find("[data-test='wizard-next']").trigger("click");
-    await w.find("[data-test='wizard-next']").trigger("click");
-    await w.find("[data-test='wizard-next']").trigger("click");
-
-    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
-    await submitBtn!.trigger("click");
-    await flushPromises();
-    await flushPromises();
-
-    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(payload.mode).toBe("forward");
-    // forward 模式不应携带 target_cost（条件映射）
-    expect(payload.target_cost).toBeUndefined();
-  });
-
   it("submit 失败 → 显示 errorMsg（role=alert）", async () => {
     (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error("名称重复"),
@@ -215,12 +154,10 @@ describe("ProjectWizard", () => {
     await router.isReady();
     const w = mountWizard();
 
-    await w.findAll("input[type='radio']")[0].setValue();
-    await w.find("[data-test='wizard-next']").trigger("click");
-    await w.find("input[type='text']").setValue("dup");
-    await w.find("[data-test='wizard-next']").trigger("click");
-    await w.find("[data-test='wizard-next']").trigger("click");
-    await w.find("[data-test='wizard-next']").trigger("click");
+    await w.find('input[name="name"]').setValue("dup");
+    for (let i = 0; i < 6; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+    }
 
     const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
     await submitBtn!.trigger("click");
@@ -228,4 +165,26 @@ describe("ProjectWizard", () => {
     await flushPromises();
     expect(w.text()).toContain("名称重复");
   });
+
+  it("默认 forward submit 不携带 target_cost", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+
+    await w.find('input[name="name"]').setValue("正向项目");
+    for (let i = 0; i < 6; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+    }
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(payload.mode).toBe("forward");
+    expect(payload.target_cost).toBeUndefined();
+  });
+
+  // TODO(T14-T18): mode 选择 UI 落地后再补 reverse 模式 target_total → target_cost
+  // 映射、α 输入、project_type 等端到端用例。
 });
