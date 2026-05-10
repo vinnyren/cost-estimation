@@ -9,6 +9,12 @@ export interface EffectiveParams {
   factors_ops: Record<string, Record<string, number>>;
   hours_per_pm: number;
   ops_cost_ratio: { P50: number };
+  /**
+   * 规模变更因子 — CSBMK®-202510 暂未提供，但 v2 后续可能通过 override 注入。
+   * 形态：scalar map（add / remove / modify / convert / threshold → number），
+   * 或嵌套 map（细分变更类型）。两种都按 leaf 渲染。
+   */
+  scale_change?: Record<string, number | Record<string, number>>;
   overrides?: Record<string, unknown>;
 }
 

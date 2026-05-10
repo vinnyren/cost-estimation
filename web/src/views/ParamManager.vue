@@ -49,6 +49,15 @@ async function patchOverride(key: string, value: unknown): Promise<void> {
   results.markParamsChanged();
 }
 
+// 规模变更因子展示标签 — 处理需求 增加 / 减少 / 修改 / 转换 / 变更率门槛
+const SCALE_CHANGE_LABELS: Record<string, string> = {
+  add: "新增",
+  remove: "删除",
+  modify: "修改",
+  convert: "转换",
+  threshold: "变更率门槛",
+};
+
 // 因子展示标签 — key 名为 CSBMK 数据中的 factor name，value 为中文显示名
 const FACTOR_LABELS: Record<string, string> = {
   // factors_dev
@@ -270,6 +279,64 @@ async function onFactorEdit(
       </section>
 
       <section
+        v-else-if="activeTab === 'scale_change' && eff && eff.scale_change"
+        role="tabpanel"
+        class="panel"
+      >
+        <h2>规模变更因子</h2>
+        <p class="hint">
+          规模变更因子 — 处理需求增加 / 减少 / 修改 / 转换的场景。
+        </p>
+        <table class="rate-table">
+          <thead>
+            <tr>
+              <th>变更类型</th>
+              <th>因子值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template
+              v-for="(value, key) in eff.scale_change"
+              :key="String(key)"
+            >
+              <tr v-if="typeof value === 'number'">
+                <td>{{ SCALE_CHANGE_LABELS[String(key)] ?? String(key) }}</td>
+                <td>
+                  <OverrideField
+                    :label="SCALE_CHANGE_LABELS[String(key)] ?? String(key)"
+                    :model-value="value as number"
+                    :default-value="value as number"
+                    :overridden="store.isOverridden(`scale_change.${String(key)}`)"
+                    @update:model-value="(nv) => patchOverride(`scale_change.${String(key)}`, nv)"
+                  />
+                </td>
+              </tr>
+              <tr
+                v-for="(sub, subKey) in (value as Record<string, number>)"
+                v-else
+                :key="`${String(key)}.${String(subKey)}`"
+              >
+                <td>
+                  {{ SCALE_CHANGE_LABELS[String(key)] ?? String(key) }}
+                  /
+                  {{ SCALE_CHANGE_LABELS[String(subKey)] ?? String(subKey) }}
+                </td>
+                <td>
+                  <OverrideField
+                    :label="`${String(key)}/${String(subKey)}`"
+                    :model-value="sub"
+                    :default-value="sub"
+                    :overridden="store.isOverridden(`scale_change.${String(key)}.${String(subKey)}`)"
+                    @update:model-value="(nv) => patchOverride(`scale_change.${String(key)}.${String(subKey)}`, nv)"
+                  />
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </section>
+
+      <section
         v-else-if="activeTab === 'factors_ops' && eff && eff.factors_ops"
         role="tabpanel"
         class="panel"
@@ -398,5 +465,30 @@ async function onFactorEdit(
   font-weight: 600;
   color: var(--color-text-body);
   padding-top: var(--space-2);
+}
+.rate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+.rate-table thead th {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+.rate-table tbody td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.rate-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.rate-table tbody td:first-child {
+  font-weight: 500;
+  color: var(--color-text-body);
+  white-space: nowrap;
 }
 </style>

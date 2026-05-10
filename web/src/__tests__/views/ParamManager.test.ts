@@ -80,7 +80,7 @@ describe("ParamManager", () => {
     expect(w.text()).toContain("参数 500");
   });
 
-  it("未实装 Tab（规模变更 / 快照）显示「v2 完成」骨架", async () => {
+  it("未实装 Tab（快照）显示「v2 完成」骨架", async () => {
     router.push("/projects/1/parameters");
     await router.isReady();
     const w = mount(ParamManager, {
@@ -89,8 +89,77 @@ describe("ParamManager", () => {
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
-    // tabs[4] = scale_change（GAP-B 已实装 factors_dev/_ops，仅规模变更/快照仍是骨架）
-    await tabs[4].trigger("click");
+    // tabs[5] = snapshots（GAP-B 已实装 factors_dev/_ops 和 scale_change，仅快照仍是骨架）
+    await tabs[5].trigger("click");
+    expect(w.text()).toContain("v2 完成");
+  });
+
+  it("规模变更 Tab → 渲染各变更类型行 + 改值用 scale_change.{key} 路径 (GAP-B)", async () => {
+    const effWithScale = {
+      ...baseEffective,
+      scale_change: {
+        add: 1.0,
+        remove: 0.6,
+        modify: 0.8,
+        convert: 0.5,
+        threshold: 0.05,
+      },
+    };
+    (paramsApi.effective as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(effWithScale);
+    (paramsApi.override as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ...effWithScale,
+      scale_change: { ...effWithScale.scale_change, modify: 0.9 },
+      overrides: { "scale_change.modify": 0.9 },
+    });
+    router.push("/projects/1/parameters");
+    await router.isReady();
+    const w = mount(ParamManager, {
+      props: { projectId: "p-1" },
+      global: { plugins: [createPinia(), router, ElementPlus] },
+    });
+    await flushPromises();
+    const tabs = w.findAll("[role='tab']");
+    await tabs[4].trigger("click"); // scale_change
+    await flushPromises();
+
+    // 渲染五种变更类型的中文标签 + 表格结构
+    expect(w.text()).toContain("规模变更因子");
+    expect(w.text()).toContain("新增");
+    expect(w.text()).toContain("删除");
+    expect(w.text()).toContain("修改");
+    expect(w.text()).toContain("转换");
+    expect(w.text()).toContain("变更率门槛");
+
+    // 五行 + thead 行
+    const rows = w.findAll(".rate-table tbody tr");
+    expect(rows.length).toBe(5);
+
+    // 找到 modify 行（值 0.80）并改为 0.9
+    const inputs = w.findAll(".rate-table input[type='number']");
+    const target = inputs.find(
+      (i) => (i.element as HTMLInputElement).value === "0.8",
+    );
+    expect(target).toBeTruthy();
+    await target!.setValue("0.9");
+    await flushPromises();
+
+    expect(paramsApi.override).toHaveBeenCalledWith("p-1", {
+      "scale_change.modify": 0.9,
+    });
+  });
+
+  it("规模变更 Tab → 未提供 scale_change 时落到 v2 骨架", async () => {
+    // baseEffective 无 scale_change → tab 应展示「v2 完成」占位
+    router.push("/projects/1/parameters");
+    await router.isReady();
+    const w = mount(ParamManager, {
+      props: { projectId: "p-1" },
+      global: { plugins: [createPinia(), router, ElementPlus] },
+    });
+    await flushPromises();
+    const tabs = w.findAll("[role='tab']");
+    await tabs[4].trigger("click"); // scale_change
+    await flushPromises();
     expect(w.text()).toContain("v2 完成");
   });
 
