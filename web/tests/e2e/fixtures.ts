@@ -3,7 +3,7 @@ import { test as base, expect } from "@playwright/test";
 const TOKEN = process.env.E2E_AUTH_TOKEN ?? "e2e-token";
 
 type CostFixtures = {
-  freshProject: { id: number; name: string };
+  freshProject: { id: string; name: string };
 };
 
 export const test = base.extend<CostFixtures>({
@@ -13,15 +13,17 @@ export const test = base.extend<CostFixtures>({
       headers: { "X-Auth-Token": TOKEN },
       data: {
         name,
+        project_type: "dev_only",
         mode: "forward",
         city: "北京",
         industry: "电子政务",
-        stage: "bidding",
+        phase: "bidding",
+        basis_data_ver: "CSBMK®-202510",
       },
     });
     expect(created.ok()).toBeTruthy();
     const body = await created.json();
-    const id = body.data.id;
+    const id: string = body.data.id;
 
     await use({ id, name });
 

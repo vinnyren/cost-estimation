@@ -13,11 +13,11 @@ export interface ReverseResult {
 }
 
 export const calcApi = {
-  forward: (body: { project_id: number }) => api.post<ForwardResult>("/api/calc/forward", body),
-  reverse: (body: { project_id: number; target_total: number; other_cost: number }) =>
+  forward: (body: { project_id: string }) => api.post<ForwardResult>("/api/calc/forward", body),
+  reverse: (body: { project_id: string; target_total: number; other_cost: number }) =>
     api.post<ReverseResult>("/api/calc/reverse", body),
-  allocate: (body: { project_id: number; target_us: number; cf: number }) =>
-    api.post<{ items: Array<{ id: number; us: number; audit_tag?: string }> }>(
+  allocate: (body: { project_id: string; target_us: number; cf: number }) =>
+    api.post<{ items: Array<{ id: string; us: number; audit_tag?: string }> }>(
       "/api/calc/allocate",
       body,
     ),

@@ -35,12 +35,14 @@ describe("ProjectWizard", () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 99,
+      id: "p-99",
       name: "new",
+      project_type: "dev_only",
       mode: "forward",
       city: "北京",
       industry: "电子政务",
-      stage: "bidding",
+      phase: "bidding",
+      basis_data_ver: "CSBMK®-202510",
       created_at: "",
       updated_at: "",
     });

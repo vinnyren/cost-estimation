@@ -5,9 +5,9 @@ import { paramsApi, type EffectiveParams } from "@/api/params";
 export const useParamsStore = defineStore("params", () => {
   const effective = ref<EffectiveParams | null>(null);
   const overrides = ref<Record<string, unknown>>({});
-  const loadedFor = ref<number | null>(null);
+  const loadedFor = ref<string | null>(null);
 
-  async function loadFor(projectId: number): Promise<void> {
+  async function loadFor(projectId: string): Promise<void> {
     const resp = await paramsApi.effective(projectId);
     effective.value = resp;
     overrides.value = ((resp?.overrides ?? {}) as Record<string, unknown>);
@@ -15,7 +15,7 @@ export const useParamsStore = defineStore("params", () => {
   }
 
   async function applyOverride(
-    projectId: number,
+    projectId: string,
     patch: Record<string, unknown>,
   ): Promise<void> {
     const resp = await paramsApi.override(projectId, patch);

@@ -23,11 +23,11 @@ describe("uploadsApi", () => {
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(reply);
     const file = new File(["abcd"], "spec.txt", { type: "text/plain" });
 
-    const result = await uploadsApi.upload(123, file);
+    const result = await uploadsApi.upload("p-123", file);
 
     expect(api.post).toHaveBeenCalledTimes(1);
     const [url, body] = (api.post as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toBe("/api/projects/123/uploads");
+    expect(url).toBe("/api/projects/p-123/uploads");
     expect(body).toBeInstanceOf(FormData);
     // FormData.get returns File-like value; verify the field exists
     const sent = (body as FormData).get("file");

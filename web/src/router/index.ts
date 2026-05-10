@@ -41,19 +41,19 @@ const routes: RouteRecordRaw[] = [
     path: "/projects/:id/functions",
     name: "fp-editor",
     component: () => import("@/views/FpEditor.vue"),
-    props: (route) => ({ projectId: Number(route.params.id) }),
+    props: (route) => ({ projectId: String(route.params.id) }),
   },
   {
     path: "/projects/:id/parameters",
     name: "param-manager",
     component: () => import("@/views/ParamManager.vue"),
-    props: (route) => ({ projectId: Number(route.params.id) }),
+    props: (route) => ({ projectId: String(route.params.id) }),
   },
   {
     path: "/projects/:id/result",
     name: "result-view",
     component: () => import("@/views/ResultView.vue"),
-    props: (route) => ({ projectId: Number(route.params.id) }),
+    props: (route) => ({ projectId: String(route.params.id) }),
   },
 ];
 

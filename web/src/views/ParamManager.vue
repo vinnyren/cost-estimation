@@ -6,7 +6,7 @@ import OverrideField from "@/components/OverrideField.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 
-const props = defineProps<{ projectId: number }>();
+const props = defineProps<{ projectId: string }>();
 
 const store = useParamsStore();
 const results = useResultsStore();

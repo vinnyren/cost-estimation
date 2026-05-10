@@ -9,7 +9,7 @@ import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import EmptyState from "@/components/status/EmptyState.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 
-const props = defineProps<{ projectId: number }>();
+const props = defineProps<{ projectId: string }>();
 
 const router = useRouter();
 // results store reserved for future use (stale tracking when params change)
@@ -67,7 +67,7 @@ function goParams(): void {
   router.push({ name: "param-manager", params: { id: props.projectId } });
 }
 
-function sourceLabel(source: FunctionPoint["source"]): string {
+function sourceLabel(source: FunctionPoint["source"] | undefined): string {
   if (source === "allocator") return "预算倒推";
   if (source === "ai_extracted") return "AI 提取";
   return "手工";
@@ -163,7 +163,7 @@ function sourceLabel(source: FunctionPoint["source"]): string {
             >
               <td>{{ i + 1 }}</td>
               <td>{{ fp.subsystem }}</td>
-              <td>{{ fp.module_l1 }}</td>
+              <td>{{ fp.l1_module }}</td>
               <td>{{ fp.category }}</td>
               <td>{{ fp.ufp }}</td>
               <td>{{ fp.us.toFixed(2) }}</td>

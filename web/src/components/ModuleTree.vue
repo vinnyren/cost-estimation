@@ -3,18 +3,20 @@ import { computed } from "vue";
 import type { FunctionPoint } from "@/api/functions";
 
 const props = defineProps<{
-  functions: Pick<FunctionPoint, "id" | "subsystem" | "module_l1" | "category" | "us">[];
+  functions: Pick<FunctionPoint, "id" | "subsystem" | "l1_module" | "category" | "us">[];
 }>();
 const emit = defineEmits<{
-  (e: "select", payload: { subsystem: string; module_l1: string }): void;
+  (e: "select", payload: { subsystem: string; l1_module: string }): void;
 }>();
 
 const tree = computed(() => {
   const map = new Map<string, Map<string, number>>();
   for (const fp of props.functions) {
-    if (!map.has(fp.subsystem)) map.set(fp.subsystem, new Map());
-    const sub = map.get(fp.subsystem)!;
-    sub.set(fp.module_l1, (sub.get(fp.module_l1) ?? 0) + 1);
+    const subsystem = fp.subsystem ?? "未分组";
+    const l1 = fp.l1_module ?? "未分类";
+    if (!map.has(subsystem)) map.set(subsystem, new Map());
+    const sub = map.get(subsystem)!;
+    sub.set(l1, (sub.get(l1) ?? 0) + 1);
   }
   return Array.from(map.entries()).map(([sub, mods]) => ({
     subsystem: sub,
@@ -42,9 +44,9 @@ const tree = computed(() => {
               data-test="leaf"
               role="button"
               tabindex="0"
-              @click="emit('select', { subsystem: sub.subsystem, module_l1: m.name })"
-              @keydown.enter="emit('select', { subsystem: sub.subsystem, module_l1: m.name })"
-              @keydown.space.prevent="emit('select', { subsystem: sub.subsystem, module_l1: m.name })"
+              @click="emit('select', { subsystem: sub.subsystem, l1_module: m.name })"
+              @keydown.enter="emit('select', { subsystem: sub.subsystem, l1_module: m.name })"
+              @keydown.space.prevent="emit('select', { subsystem: sub.subsystem, l1_module: m.name })"
             >
               {{ m.name }} <span class="count">({{ m.count }})</span>
             </li>

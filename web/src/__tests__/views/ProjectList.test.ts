@@ -61,12 +61,14 @@ describe("ProjectList", () => {
     (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       items: [
         {
-          id: 1,
+          id: "p-1",
           name: "test-p1",
           mode: "forward",
           city: "北京",
           industry: "电子政务",
-          stage: "bidding",
+          phase: "bidding",
+          project_type: "dev_only",
+          basis_data_ver: "CSBMK®-202510",
           total_cost: 250_000,
           total_fp: 100,
           created_at: "",
@@ -110,12 +112,14 @@ describe("ProjectList", () => {
     (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       items: [
         {
-          id: 42,
+          id: "p-42",
           name: "p",
           mode: "forward",
           city: "北京",
           industry: "电子政务",
-          stage: "bidding",
+          phase: "bidding",
+          project_type: "dev_only",
+          basis_data_ver: "CSBMK®-202510",
           created_at: "",
           updated_at: "",
         },
@@ -130,19 +134,21 @@ describe("ProjectList", () => {
     await openBtn!.trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("fp-editor");
-    expect(router.currentRoute.value.params.id).toBe("42");
+    expect(router.currentRoute.value.params.id).toBe("p-42");
   });
 
   it("点击「删除」→ confirm=false 时不调 remove API", async () => {
     (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       items: [
         {
-          id: 7,
+          id: "p-7",
           name: "p",
           mode: "forward",
           city: "北京",
           industry: "电子政务",
-          stage: "bidding",
+          phase: "bidding",
+          project_type: "dev_only",
+          basis_data_ver: "CSBMK®-202510",
           created_at: "",
           updated_at: "",
         },
@@ -161,12 +167,14 @@ describe("ProjectList", () => {
     (projectsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       items: [
         {
-          id: 7,
+          id: "p-7",
           name: "p",
           mode: "forward",
           city: "北京",
           industry: "电子政务",
-          stage: "bidding",
+          phase: "bidding",
+          project_type: "dev_only",
+          basis_data_ver: "CSBMK®-202510",
           created_at: "",
           updated_at: "",
         },
@@ -179,6 +187,6 @@ describe("ProjectList", () => {
     const delBtn = w.findAll("button").find((b) => b.text() === "删除");
     await delBtn!.trigger("click");
     await flushPromises();
-    expect(projectsApi.remove).toHaveBeenCalledWith(7);
+    expect(projectsApi.remove).toHaveBeenCalledWith("p-7");
   });
 });

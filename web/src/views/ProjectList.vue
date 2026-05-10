@@ -23,11 +23,11 @@ function goNew(): void {
   router.push({ name: "project-wizard" });
 }
 
-function open(id: number): void {
+function open(id: string): void {
   router.push({ name: "fp-editor", params: { id } });
 }
 
-async function remove(id: number): Promise<void> {
+async function remove(id: string): Promise<void> {
   if (!window.confirm("确认删除项目？")) return;
   await store.remove(id);
 }
@@ -105,7 +105,7 @@ function formatCost(value: number): string {
           </div>
           <div>
             <dt>阶段</dt>
-            <dd>{{ p.stage }}</dd>
+            <dd>{{ p.phase }}</dd>
           </div>
           <div v-if="p.total_fp !== undefined">
             <dt>FP</dt>

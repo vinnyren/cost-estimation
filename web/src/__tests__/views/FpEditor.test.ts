@@ -45,7 +45,7 @@ describe("FpEditor", () => {
 
   it("空表态显示 hero CTA：上传文档让 AI 写第一稿", async () => {
     const w = mount(FpEditor, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -57,7 +57,7 @@ describe("FpEditor", () => {
       new Error("加载错"),
     );
     const w = mount(FpEditor, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -69,43 +69,46 @@ describe("FpEditor", () => {
     (functionsApi.list as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       items: [
         {
-          id: 1,
-          project_id: 1,
+          id: "f-1",
+          project_id: "p-1",
           subsystem: "S1",
-          module_l1: "M1",
+          l1_module: "M1",
           description: "d",
           category: "EI",
+          complexity: "low",
           ufp: 4,
-          reuse_ratio: 0,
-          modify_ratio: 0,
+          reuse_level: "low",
+          modify_type: "new",
           us: 4,
           source: "manual",
           version: 1,
         },
         {
-          id: 2,
-          project_id: 1,
+          id: "f-2",
+          project_id: "p-1",
           subsystem: "S2",
-          module_l1: "M2",
+          l1_module: "M2",
           description: "d",
           category: "EO",
+          complexity: "low",
           ufp: 5,
-          reuse_ratio: 0,
-          modify_ratio: 0,
+          reuse_level: "low",
+          modify_type: "new",
           us: 5,
           source: "ai_extracted",
           version: 1,
         },
         {
-          id: 3,
-          project_id: 1,
+          id: "f-3",
+          project_id: "p-1",
           subsystem: "S3",
-          module_l1: "M3",
+          l1_module: "M3",
           description: "d",
           category: "EQ",
+          complexity: "low",
           ufp: 3,
-          reuse_ratio: 0,
-          modify_ratio: 0,
+          reuse_level: "low",
+          modify_type: "new",
           us: 3,
           source: "allocator",
           version: 1,
@@ -113,7 +116,7 @@ describe("FpEditor", () => {
       ],
     });
     const w = mount(FpEditor, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -124,7 +127,7 @@ describe("FpEditor", () => {
 
   it("点击「参数管理」→ 路由跳 param-manager", async () => {
     const w = mount(FpEditor, {
-      props: { projectId: 7 },
+      props: { projectId: "p-7" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -132,12 +135,12 @@ describe("FpEditor", () => {
     await paramBtn!.trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("param-manager");
-    expect(router.currentRoute.value.params.id).toBe("7");
+    expect(router.currentRoute.value.params.id).toBe("p-7");
   });
 
   it("点击「计算 → 结果页」→ 路由跳 result-view", async () => {
     const w = mount(FpEditor, {
-      props: { projectId: 9 },
+      props: { projectId: "p-9" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -145,12 +148,12 @@ describe("FpEditor", () => {
     await calcBtn!.trigger("click");
     await flushPromises();
     expect(router.currentRoute.value.name).toBe("result-view");
-    expect(router.currentRoute.value.params.id).toBe("9");
+    expect(router.currentRoute.value.params.id).toBe("p-9");
   });
 
   it("点击 hero CTA → 触发 file input click（pickFile）", async () => {
     const w = mount(FpEditor, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
       attachTo: document.body,
     });
@@ -182,7 +185,7 @@ describe("FpEditor", () => {
     });
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
     const w = mount(FpEditor, {
-      props: { projectId: 5 },
+      props: { projectId: "p-5" },
       global: { plugins: [createPinia(), router, ElementPlus] },
       attachTo: document.body,
     });
@@ -192,7 +195,7 @@ describe("FpEditor", () => {
     Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
     await w.find("input[type='file']").trigger("change");
     await flushPromises();
-    expect(uploadsApi.upload).toHaveBeenCalledWith(5, file);
+    expect(uploadsApi.upload).toHaveBeenCalledWith("p-5", file);
     expect(alertSpy).toHaveBeenCalled();
     w.unmount();
   });

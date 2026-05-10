@@ -27,12 +27,12 @@ export const useProjectsStore = defineStore("projects", () => {
     return created;
   }
 
-  async function patch(id: number, body: Partial<Project>): Promise<void> {
+  async function patch(id: string, body: Partial<Project>): Promise<void> {
     const updated = await projectsApi.patch(id, body);
     items.value = items.value.map((p) => (p.id === id ? updated : p));
   }
 
-  async function remove(id: number): Promise<void> {
+  async function remove(id: string): Promise<void> {
     await projectsApi.remove(id);
     items.value = items.value.filter((p) => p.id !== id);
   }

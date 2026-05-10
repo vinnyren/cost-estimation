@@ -10,7 +10,7 @@ import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import StaleBanner from "@/components/status/StaleBanner.vue";
 
-const props = defineProps<{ projectId: number }>();
+const props = defineProps<{ projectId: string }>();
 
 const router = useRouter();
 const results = useResultsStore();

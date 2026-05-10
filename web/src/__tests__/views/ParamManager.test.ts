@@ -41,7 +41,7 @@ describe("ParamManager", () => {
     router.push("/projects/1/parameters");
     await router.isReady();
     const w = mount(ParamManager, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -53,7 +53,7 @@ describe("ParamManager", () => {
     router.push("/projects/1/parameters");
     await router.isReady();
     const w = mount(ParamManager, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -72,7 +72,7 @@ describe("ParamManager", () => {
     router.push("/projects/1/parameters");
     await router.isReady();
     const w = mount(ParamManager, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -84,7 +84,7 @@ describe("ParamManager", () => {
     router.push("/projects/1/parameters");
     await router.isReady();
     const w = mount(ParamManager, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -102,7 +102,7 @@ describe("ParamManager", () => {
     router.push("/projects/1/parameters");
     await router.isReady();
     const w = mount(ParamManager, {
-      props: { projectId: 1 },
+      props: { projectId: "p-1" },
       global: { plugins: [createPinia(), router, ElementPlus] },
     });
     await flushPromises();
@@ -110,6 +110,6 @@ describe("ParamManager", () => {
     const input = w.find("input[type='number']");
     await input.setValue(99999);
     await flushPromises();
-    expect(paramsApi.override).toHaveBeenCalledWith(1, { "city_rate.北京.dev": 99999 });
+    expect(paramsApi.override).toHaveBeenCalledWith("p-1", { "city_rate.北京.dev": 99999 });
   });
 });

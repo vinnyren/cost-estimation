@@ -24,7 +24,7 @@ describe("reportsApi", () => {
   });
 
   it("excelUrl 拼接路径 /api/reports/excel/:id", () => {
-    expect(reportsApi.excelUrl(42)).toBe("/api/reports/excel/42");
+    expect(reportsApi.excelUrl("p-42")).toBe("/api/reports/excel/p-42");
   });
 
   it("download 走 api.raw.get blob、触发 anchor.click 并清理 ObjectURL", async () => {
@@ -49,9 +49,9 @@ describe("reportsApi", () => {
       .mockReturnValue("blob:mock");
     const revokeUrlSpy = vi.spyOn(URL, "revokeObjectURL").mockReturnValue(undefined);
 
-    await reportsApi.download(7, "out.xlsx");
+    await reportsApi.download("p-7", "out.xlsx");
 
-    expect(api.raw.get).toHaveBeenCalledWith("/api/reports/excel/7", { responseType: "blob" });
+    expect(api.raw.get).toHaveBeenCalledWith("/api/reports/excel/p-7", { responseType: "blob" });
     expect(createElementSpy).toHaveBeenCalledWith("a");
     expect(createUrlSpy).toHaveBeenCalledTimes(1);
     expect(fakeAnchor.href).toBe("blob:mock");
@@ -76,7 +76,7 @@ describe("reportsApi", () => {
     vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
     vi.spyOn(URL, "revokeObjectURL").mockReturnValue(undefined);
 
-    await reportsApi.download(1);
+    await reportsApi.download("p-1");
     expect(fakeAnchor.download).toBe("造价报告.xlsx");
   });
 });
