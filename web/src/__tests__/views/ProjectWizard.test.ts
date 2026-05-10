@@ -14,8 +14,12 @@ vi.mock("@/api/projects", () => ({
 
 vi.mock("@/api/params", () => ({
   paramsApi: {
-    effective: vi.fn().mockResolvedValue({ cf: { bidding: 1.21 } }),
-    global: vi.fn().mockResolvedValue({ cf: { bidding: 1.21 } }),
+    effective: vi.fn().mockResolvedValue({
+      cf: { budget: 1.5, bidding: 1.21, planning: 1.1, change: 1.05, settled: 1.0 },
+    }),
+    global: vi.fn().mockResolvedValue({
+      cf: { budget: 1.5, bidding: 1.21, planning: 1.1, change: 1.05, settled: 1.0 },
+    }),
   },
 }));
 
@@ -310,5 +314,93 @@ describe("Wizard step 2 — project_type / alpha / include_ops (T14)", () => {
     const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(payload.alpha_dev).toBeCloseTo(0.8, 5);
     expect(payload.project_type).toBe("dev_and_ops");
+  });
+});
+
+/**
+ * NOTE (T15 — Wizard step 3 项目阶段 + CF 预览):
+ *   Step 3 落地：PhaseCfPreview 渲染 5 个阶段卡片，每张显示对应的 CF。
+ *   切换阶段 → form.phase 同步更新；最终 payload.phase 反映用户选择。
+ */
+
+describe("Wizard step 3 — phase + CF preview (T15)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p-99",
+      name: "new",
+      project_type: "dev_only",
+      mode: "forward",
+      city: "北京",
+      industry: "电子政务",
+      phase: "bidding",
+      basis_data_ver: "CSBMK®-202510",
+      created_at: "",
+      updated_at: "",
+    });
+  });
+
+  async function gotoStep3() {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("项目甲");
+    await w.find("[data-test='wizard-next']").trigger("click"); // → step 2
+    await w.find("[data-test='wizard-next']").trigger("click"); // → step 3
+    await flushPromises();
+    return w;
+  }
+
+  it("renders 5 phase options with CF values from effective", async () => {
+    const w = await gotoStep3();
+    const cards = w.findAll('[data-testid^="phase-card-"]');
+    expect(cards.length).toBe(5);
+
+    // 每个 phase card 应展示其 CF 数值（来自 mock 的 effective.cf）
+    const expectedCf: Record<string, string> = {
+      budget: "1.50",
+      bidding: "1.21",
+      planning: "1.10",
+      change: "1.05",
+      settled: "1.00",
+    };
+    for (const [key, val] of Object.entries(expectedCf)) {
+      const card = w.find(`[data-testid="phase-card-${key}"]`);
+      expect(card.exists()).toBe(true);
+      expect(card.text()).toContain(`CF = ${val}`);
+    }
+  });
+
+  it("clicking a phase card updates form.phase", async () => {
+    const w = await gotoStep3();
+
+    // 默认 bidding
+    const biddingCard = w.find('[data-testid="phase-card-bidding"]');
+    expect(biddingCard.attributes("data-active")).toBe("true");
+
+    // 切到 budget
+    const budgetRadio = w.find('[data-testid="phase-card-budget"] input[type="radio"]');
+    await budgetRadio.trigger("change");
+    await flushPromises();
+
+    expect(w.find('[data-testid="phase-card-budget"]').attributes("data-active")).toBe("true");
+    expect(w.find('[data-testid="phase-card-bidding"]').attributes("data-active")).toBe("false");
+
+    // 跳到 step 7 检查 form.phase 写入
+    for (let i = 0; i < 4; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+    }
+    expect(w.text()).toContain('"phase": "budget"');
+  });
+
+  it("CF 默认 1.00 when key missing from effective", async () => {
+    // 临时覆盖 mock 返回空 cf
+    const { paramsApi } = await import("@/api/params");
+    (paramsApi.global as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ cf: {} });
+
+    const w = await gotoStep3();
+    const biddingCard = w.find('[data-testid="phase-card-bidding"]');
+    expect(biddingCard.text()).toContain("CF = 1.00");
   });
 });

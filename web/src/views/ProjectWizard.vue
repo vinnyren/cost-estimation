@@ -10,6 +10,7 @@ import type {
   ProjectType,
 } from "@/api/projects";
 import AlphaSlider from "@/components/AlphaSlider.vue";
+import PhaseCfPreview from "@/components/PhaseCfPreview.vue";
 
 const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   dev_only: "仅开发",
@@ -268,10 +269,12 @@ async function submit(): Promise<void> {
       </fieldset>
 
       <fieldset v-else-if="currentStep === 3">
-        <legend>阶段</legend>
-        <p class="placeholder">
-          将在 T15 填充：评估阶段 + PhaseCfPreview
-        </p>
+        <legend>项目阶段</legend>
+        <PhaseCfPreview
+          :phase="form.phase"
+          :cf="effectiveParams?.cf ?? {}"
+          @update:phase="(v: string) => (form.phase = v as ProjectPhase)"
+        />
       </fieldset>
 
       <fieldset v-else-if="currentStep === 4">
