@@ -165,6 +165,13 @@ export const api: Client = new Proxy({} as Client, {
   get(_target, prop: keyof Client) {
     const instance = getApi();
     const value = instance[prop];
+    // `raw` is an AxiosInstance — itself a callable function with method
+    // properties (`raw.get`, `raw.post`, …). Binding it strips those methods,
+    // so we must return the bare instance for `raw` and bind only the
+    // method wrappers (`get`/`post`/`patch`/`delete`).
+    if (prop === "raw") {
+      return value;
+    }
     if (typeof value === "function") {
       return (value as (...args: unknown[]) => unknown).bind(instance);
     }

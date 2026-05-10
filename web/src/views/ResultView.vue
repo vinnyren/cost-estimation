@@ -130,22 +130,22 @@ const hasReverse = computed(() => reverseResult.value !== null);
     >
       <ResultCard
         :band="'P10'"
-        :value="forwardResult!.cost_yuan.P10"
+        :value="forwardResult!.cost_total_yuan.P10"
         :unit="'元'"
-        :description="`${forwardResult!.effort_pm.P10.toFixed(1)} 人月`"
+        :description="`${forwardResult!.effort_dev_hours.P10.toFixed(0)} 人时`"
       />
       <ResultCard
         :band="'P50'"
-        :value="forwardResult!.cost_yuan.P50"
+        :value="forwardResult!.cost_total_yuan.P50"
         :unit="'元'"
         :recommended="true"
-        :description="`${forwardResult!.effort_pm.P50.toFixed(1)} 人月 · 规模 ${forwardResult!.scale_adjusted.toFixed(2)} FP`"
+        :description="`${forwardResult!.effort_dev_hours.P50.toFixed(0)} 人时 · 规模 ${forwardResult!.scale_adjusted.toFixed(2)} FP`"
       />
       <ResultCard
         :band="'P90'"
-        :value="forwardResult!.cost_yuan.P90"
+        :value="forwardResult!.cost_total_yuan.P90"
         :unit="'元'"
-        :description="`${forwardResult!.effort_pm.P90.toFixed(1)} 人月`"
+        :description="`${forwardResult!.effort_dev_hours.P90.toFixed(0)} 人时`"
       />
     </div>
 
@@ -185,21 +185,21 @@ const hasReverse = computed(() => reverseResult.value !== null);
       >
         <ResultCard
           :band="'P10'"
-          :value="reverseResult!.fp_total.P10"
+          :value="reverseResult!.scale_adjusted_bands.P10"
           :unit="'FP'"
           :recommended="reverseResult!.recommended_band === 'P10'"
           :description="'乐观（高生产率假设 → FP 较大）'"
         />
         <ResultCard
           :band="'P50'"
-          :value="reverseResult!.fp_total.P50"
+          :value="reverseResult!.scale_adjusted_bands.P50"
           :unit="'FP'"
           :recommended="reverseResult!.recommended_band === 'P50'"
           :description="'中位（建议采纳）'"
         />
         <ResultCard
           :band="'P90'"
-          :value="reverseResult!.fp_total.P90"
+          :value="reverseResult!.scale_adjusted_bands.P90"
           :unit="'FP'"
           :recommended="reverseResult!.recommended_band === 'P90'"
           :description="'保守（低生产率假设 → FP 较小）'"

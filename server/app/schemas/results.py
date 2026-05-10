@@ -7,7 +7,7 @@ class FpItemIn(BaseModel):
 
 class CalcForwardRequest(BaseModel):
     project_id: str
-    items: list[FpItemIn]
+    items: list[FpItemIn] | None = None
     dev_factor: float = 1.0
     ops_factor: float = 1.0
     include_dev: bool = True

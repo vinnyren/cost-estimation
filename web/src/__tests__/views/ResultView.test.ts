@@ -17,9 +17,15 @@ vi.mock("@/api/projects", () => ({
 vi.mock("@/api/calc", () => ({
   calcApi: {
     forward: vi.fn().mockResolvedValue({
+      scale_us: 275,
       scale_adjusted: 332.75,
-      effort_pm: { P10: 50, P50: 80, P90: 110 },
-      cost_yuan: { P10: 300000, P50: 489180, P90: 700000 },
+      cf_used: 1.21,
+      effort_dev_hours: { P10: 800, P50: 1600, P90: 2400 },
+      effort_ops_hours: { P10: 0, P50: 0, P90: 0 },
+      cost_dev_yuan: { P10: 300000, P50: 489180, P90: 700000 },
+      cost_ops_yuan: { P10: 0, P50: 0, P90: 0 },
+      cost_other_yuan: 0,
+      cost_total_yuan: { P10: 300000, P50: 489180, P90: 700000 },
     }),
     reverse: vi.fn(),
   },
@@ -179,7 +185,13 @@ describe("ResultView", () => {
   it("reverse 模式：targetTotal>0 → 调 reverse API 并显示三档 FP", async () => {
     vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
     vi.mocked(calcApi.reverse).mockResolvedValueOnce({
-      fp_total: { P10: 100, P50: 200, P90: 300 },
+      budget_for_dev: 950_000,
+      budget_for_ops: 0,
+      scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
+      scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
+      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      cf_used: 1.25,
       recommended_band: "P50" as const,
     });
     router.push("/projects/2/result");
