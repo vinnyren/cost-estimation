@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, ApiError } from "./client";
 
 export type ProjectMode = "forward" | "reverse";
 export type ProjectType = "dev_only" | "ops_only" | "dev_and_ops";
@@ -31,6 +31,61 @@ export interface Project {
   updated_at: string;
 }
 
+// v2.0 T8 — query/copy go through the new {success,data,meta} envelope.
+//
+// The legacy projectsApi.list() still uses api.get + unwrap() (which only
+// understands {ok, data}); after T6 the backend now returns {success, data,
+// meta} for GET /api/projects, so .list() will be migrated to .query() in
+// T20 (ProjectList toolbar). Keeping list() intact for now to scope this
+// task to the API surface only.
+export interface ProjectQuery {
+  q?: string;
+  city?: string;
+  industry?: string;
+  phase?: ProjectPhase;
+  mode?: ProjectMode;
+  sort?: "created_at" | "updated_at" | "name" | "target_cost";
+  order?: "asc" | "desc";
+  page?: number;
+  size?: number;
+}
+
+export interface ProjectQueryResult {
+  data: Project[];
+  meta: { total: number; page: number; size: number };
+}
+
+interface NewEnvelope<T> {
+  success: boolean;
+  data: T;
+  error: { code: string; message?: string; details?: Record<string, unknown> } | null;
+  meta?: { total: number; page: number; size: number };
+}
+
+function unwrapNew<T>(payload: unknown): T {
+  if (!payload || typeof payload !== "object") {
+    throw new ApiError("INVALID_RESPONSE", "Server returned malformed envelope");
+  }
+  const env = payload as NewEnvelope<T>;
+  if (env.success) return env.data;
+  const e = env.error ?? { code: "UNKNOWN", message: "" };
+  throw new ApiError(e.code, e.message ?? "", e.details);
+}
+
+function buildQueryString(opts: ProjectQuery): string {
+  const params = new URLSearchParams();
+  // Filter out undefined, null, and empty-string values — the backend treats
+  // missing params as "no filter" and we don't want empty filters polluting
+  // the URL.
+  (Object.keys(opts) as Array<keyof ProjectQuery>).forEach((key) => {
+    const value = opts[key];
+    if (value !== undefined && value !== null && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+  return params.toString();
+}
+
 export const projectsApi = {
   list: () => api.get<Project[]>("/api/projects"),
   get: (id: string) => api.get<Project>(`/api/projects/${id}`),
@@ -38,4 +93,25 @@ export const projectsApi = {
   patch: (id: string, body: Partial<Project>) =>
     api.patch<Project>(`/api/projects/${id}`, body),
   remove: (id: string) => api.delete<void>(`/api/projects/${id}`),
+
+  async query(opts: ProjectQuery = {}): Promise<ProjectQueryResult> {
+    const qs = buildQueryString(opts);
+    const url = `/api/projects${qs ? "?" + qs : ""}`;
+    const resp = await api.raw.get<NewEnvelope<Project[]>>(url);
+    const data = unwrapNew<Project[]>(resp.data);
+    const meta = (resp.data as NewEnvelope<Project[]>).meta ?? {
+      total: data.length,
+      page: 1,
+      size: data.length,
+    };
+    return { data, meta };
+  },
+
+  async copy(srcId: string, name: string): Promise<Project> {
+    const resp = await api.raw.post<NewEnvelope<Project>>(
+      `/api/projects/${srcId}/copy`,
+      { name },
+    );
+    return unwrapNew<Project>(resp.data);
+  },
 };
