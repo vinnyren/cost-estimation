@@ -111,6 +111,40 @@ async def test_restore_unknown_project_404(client):
     assert r.status_code == 404
 
 
+async def test_list_snapshots_returns_metadata_only(client):
+    pid = await _make_project(client)
+    await _bulk(client, pid, [
+        {"name": "v1", "category": "EI", "complexity": "low",
+         "ufp": 3, "us": 3, "source": "manual"},
+    ], replace=True)
+    await _bulk(client, pid, [
+        {"name": "v2-a", "category": "EI", "complexity": "low",
+         "ufp": 3, "us": 3, "source": "manual"},
+        {"name": "v2-b", "category": "EI", "complexity": "low",
+         "ufp": 3, "us": 3, "source": "manual"},
+    ], replace=True)
+    r = await client.get(f"/api/projects/{pid}/functions/snapshots", headers=H)
+    assert r.status_code == 200
+    snaps = r.json()["data"]
+    # 至少 2 个快照（每次 bulk 写后产生）
+    assert len(snaps) >= 2
+    # 顶层字段齐全
+    for s in snaps:
+        assert "version" in s
+        assert "snapshot_at" in s
+        assert "fp_count" in s
+        # snapshot_json 不暴露（响应应该精简）
+        assert "snapshot_json" not in s
+    # 最新快照 fp_count=2（v2 之后），更早的有 fp_count=1（v1）
+    counts = [s["fp_count"] for s in snaps]
+    assert 2 in counts and 1 in counts
+
+
+async def test_list_snapshots_unknown_project_404(client):
+    r = await client.get("/api/projects/prj-nope/functions/snapshots", headers=H)
+    assert r.status_code == 404
+
+
 async def test_restore_marks_results_stale(client):
     """restore 后已有结果应被标记 stale，避免展示陈旧造价。"""
     pid = await _make_project(client)

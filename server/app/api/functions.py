@@ -53,6 +53,14 @@ def bulk(project_id: str, payload: BulkRequest, db: Session = Depends(get_db)):
     return {"ok": True, "data": {"written": n}}
 
 
+@router.get("/snapshots")
+def list_snapshots(project_id: str, db: Session = Depends(get_db)):
+    from ..db.models import Project
+    if not db.query(Project).filter_by(id=project_id).first():
+        raise HTTPException(404, detail={"error": {"code": "PROJECT_NOT_FOUND"}})
+    return {"ok": True, "data": svc.list_snapshots(db, project_id)}
+
+
 @router.post("/restore")
 def restore(project_id: str, version: int, db: Session = Depends(get_db)):
     try:

@@ -30,6 +30,30 @@ def list_for_project(db: Session, project_id: str) -> list[FunctionPoint]:
             .order_by(FunctionPoint.ord.asc().nullslast(), FunctionPoint.id.asc()).all())
 
 
+def list_snapshots(db: Session, project_id: str) -> list[dict]:
+    """Return snapshot metadata (no payload) so the UI can render a history
+    list cheaply. snapshot_json itself can be large — load it only when the
+    user actually invokes restore."""
+    rows = (
+        db.query(FPSnapshot)
+        .filter_by(project_id=project_id)
+        .order_by(FPSnapshot.id.desc())
+        .all()
+    )
+    return [
+        {
+            "id": s.id,
+            "version": s.version,
+            "snapshot_at": s.snapshot_at.isoformat() if s.snapshot_at else None,
+            "reason": s.reason,
+            # 同一 project 同一 version 可能有多条快照（restore 也会再快照），
+            # 这里一并 expose；前端按时间降序展示即可。
+            "fp_count": len(json.loads(s.snapshot_json) or []),
+        }
+        for s in rows
+    ]
+
+
 def create(db: Session, project_id: str, payload: FunctionPointCreate) -> FunctionPoint:
     if not db.query(Project).filter_by(id=project_id).first():
         raise ValueError("PROJECT_NOT_FOUND")

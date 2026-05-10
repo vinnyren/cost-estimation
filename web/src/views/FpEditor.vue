@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
 import { useRouter } from "vue-router";
-import { functionsApi, type FunctionPoint } from "@/api/functions";
+import { functionsApi, type FunctionPoint, type FpSnapshotMeta } from "@/api/functions";
 import { uploadsApi } from "@/api/uploads";
 import { useResultsStore } from "@/stores/results";
 import ModuleTree from "@/components/ModuleTree.vue";
@@ -20,6 +20,9 @@ const loading = ref(true);
 const error = ref<string | null>(null);
 const fileInput = ref<HTMLInputElement | null>(null);
 const uploading = ref(false);
+const historyOpen = ref(false);
+const snapshots = ref<FpSnapshotMeta[]>([]);
+const restoring = ref<number | null>(null);
 
 const isEmpty = computed(() => !loading.value && error.value === null && functions.value.length === 0);
 const isError = computed(() => !loading.value && error.value !== null);
@@ -67,6 +70,45 @@ function goParams(): void {
   router.push({ name: "param-manager", params: { id: props.projectId } });
 }
 
+async function toggleHistory(): Promise<void> {
+  if (historyOpen.value) {
+    historyOpen.value = false;
+    return;
+  }
+  try {
+    snapshots.value = await functionsApi.snapshots(props.projectId);
+    historyOpen.value = true;
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : "历史版本加载失败";
+  }
+}
+
+async function restoreVersion(version: number): Promise<void> {
+  const ok = window.confirm(
+    `确定恢复到 version ${version}？当前的功能点会被替换为该版本快照（恢复前会自动留一份当前快照便于反悔）。`,
+  );
+  if (!ok) return;
+  restoring.value = version;
+  try {
+    await functionsApi.restore(props.projectId, version);
+    historyOpen.value = false;
+    await load(); // 重新拉 FP 列表
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : "恢复失败";
+  } finally {
+    restoring.value = null;
+  }
+}
+
+function formatSnapTime(iso: string | null): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("zh-CN");
+  } catch {
+    return iso;
+  }
+}
+
 function sourceLabel(source: FunctionPoint["source"] | undefined): string {
   if (source === "allocator") return "预算倒推";
   if (source === "ai_extracted") return "AI 提取";
@@ -90,6 +132,56 @@ function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
         FP 编辑（项目 #{{ projectId }}）
       </h1>
       <div class="actions">
+        <div class="history-wrap">
+          <button
+            type="button"
+            class="btn"
+            :aria-expanded="historyOpen"
+            @click="toggleHistory"
+          >
+            历史版本 {{ historyOpen ? "▴" : "▾" }}
+          </button>
+          <div
+            v-if="historyOpen"
+            class="history-pop"
+            role="dialog"
+            aria-label="功能点历史版本"
+          >
+            <p
+              v-if="snapshots.length === 0"
+              class="history-empty"
+            >
+              暂无快照（每次批量写入会自动留一版）。
+            </p>
+            <ol
+              v-else
+              class="history-list"
+            >
+              <li
+                v-for="s in snapshots"
+                :key="s.id"
+              >
+                <div class="history-meta">
+                  <strong>v{{ s.version }}</strong>
+                  <span class="text-muted">{{ formatSnapTime(s.snapshot_at) }}</span>
+                  <span class="text-muted">{{ s.fp_count }} FP</span>
+                  <span
+                    v-if="s.reason"
+                    class="text-muted"
+                  >· {{ s.reason }}</span>
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  :disabled="restoring !== null"
+                  @click="restoreVersion(s.version)"
+                >
+                  {{ restoring === s.version ? "恢复中…" : "恢复此版本" }}
+                </button>
+              </li>
+            </ol>
+          </div>
+        </div>
         <button
           type="button"
           class="btn"
@@ -264,5 +356,55 @@ function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
 .row-allocator:hover {
   background: var(--color-warning-bg) !important;
   filter: brightness(0.98);
+}
+.history-wrap {
+  position: relative;
+}
+.history-pop {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-3);
+  min-width: 320px;
+  max-width: 480px;
+  max-height: 60vh;
+  overflow: auto;
+  z-index: 10;
+}
+.history-empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.history-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-hover);
+}
+.history-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--font-size-sm);
+}
+.btn-sm {
+  padding: 4px 10px;
+  font-size: var(--font-size-sm);
 }
 </style>

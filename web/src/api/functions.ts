@@ -32,6 +32,14 @@ export interface FunctionPoint {
   version: number;
 }
 
+export interface FpSnapshotMeta {
+  id: number;
+  version: number;
+  snapshot_at: string | null;
+  reason: string | null;
+  fp_count: number;
+}
+
 export const functionsApi = {
   list: (projectId: string) =>
     api.get<FunctionPoint[]>(`/api/projects/${projectId}/functions`),
@@ -39,6 +47,10 @@ export const functionsApi = {
     api.patch<FunctionPoint>(`/api/projects/${projectId}/functions/${fpId}`, body),
   bulk: (projectId: string, items: Partial<FunctionPoint>[]) =>
     api.post<{ written: number }>(`/api/projects/${projectId}/functions/bulk`, { items }),
+  snapshots: (projectId: string) =>
+    api.get<FpSnapshotMeta[]>(`/api/projects/${projectId}/functions/snapshots`),
   restore: (projectId: string, version: number) =>
-    api.post<void>(`/api/projects/${projectId}/functions/restore?version=${version}`),
+    api.post<{ restored_version: number; fp_count: number }>(
+      `/api/projects/${projectId}/functions/restore?version=${version}`,
+    ),
 };
