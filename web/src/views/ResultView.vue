@@ -2,7 +2,12 @@
 import { onMounted, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { projectsApi, type Project } from "@/api/projects";
-import { calcApi, type ForwardResult, type ReverseResult } from "@/api/calc";
+import {
+  calcApi,
+  type ForwardResult,
+  type ReverseResult,
+  type AllocateOutput,
+} from "@/api/calc";
 import { reportsApi } from "@/api/reports";
 import { useResultsStore } from "@/stores/results";
 import ResultCard from "@/components/ResultCard.vue";
@@ -27,6 +32,62 @@ const downloading = ref(false);
 
 const targetTotal = ref(0);
 const otherCost = ref(0);
+
+// GAP-C: 反向 allocator — 把反向结果 P50 总规模按模块草稿权重分摊。
+const allocating = ref(false);
+const allocateHint = ref<string>("");
+const allocResult = ref<AllocateOutput[]>([]);
+const DEFAULT_DRAFTS_JSON = JSON.stringify(
+  [
+    { name: "前端", weight: 1 },
+    { name: "后端", weight: 1.5 },
+  ],
+  null,
+  0,
+);
+
+async function onAllocate(): Promise<void> {
+  if (!reverseResult.value) {
+    allocateHint.value = "请先点击「反算」生成三档 FP 结果。";
+    return;
+  }
+  const band = reverseResult.value.recommended_band ?? "P50";
+  const targetUs = reverseResult.value.scale_adjusted_bands?.[band];
+  if (!targetUs || targetUs <= 0) {
+    allocateHint.value = "无可用推荐档 FP — 请确认反向结果完整。";
+    return;
+  }
+  const draftsInput = window.prompt(
+    '输入模块草稿（JSON 数组，如 [{"name":"前端","weight":1},{"name":"后端","weight":1.5}]）。\n或在 Claude Code 跑 /cost-allocate <project_id> 让 AI 生成。',
+    DEFAULT_DRAFTS_JSON,
+  );
+  if (!draftsInput) return;
+  let drafts: Array<{ name: string; weight: number; locked?: boolean; locked_us?: number }>;
+  try {
+    drafts = JSON.parse(draftsInput);
+    if (!Array.isArray(drafts) || drafts.length === 0) {
+      throw new Error("drafts must be a non-empty array");
+    }
+  } catch (e: unknown) {
+    allocateHint.value =
+      "输入不是合法 JSON 数组：" + (e instanceof Error ? e.message : String(e));
+    return;
+  }
+  allocating.value = true;
+  allocateHint.value = "";
+  try {
+    allocResult.value = await calcApi.allocate({
+      project_id: props.projectId,
+      target_us: targetUs,
+      cf: reverseResult.value.cf_used,
+      drafts,
+    });
+  } catch (e: unknown) {
+    allocateHint.value = e instanceof Error ? e.message : "分摊失败";
+  } finally {
+    allocating.value = false;
+  }
+}
 
 onMounted(loadAndCompute);
 
@@ -222,6 +283,69 @@ const hasReverse = computed(() => reverseResult.value !== null);
           :description="'保守（低生产率假设 → FP 较小）'"
         />
       </div>
+
+      <section
+        v-if="hasReverse"
+        class="allocator-panel"
+        aria-labelledby="alloc-title"
+      >
+        <h3 id="alloc-title">
+          AI 模块分摊（GAP-C）
+        </h3>
+        <p class="alloc-desc">
+          反向计算给出三档总 FP；输入模块草稿（或让 Claude 通过 <code>/cost-allocate</code> 生成）→
+          按权重把推荐档总规模分摊到各模块。
+        </p>
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="allocating"
+          @click="onAllocate"
+        >
+          {{ allocating ? "计算中…" : "生成模块分摊" }}
+        </button>
+        <p
+          v-if="allocateHint"
+          class="hint"
+          role="status"
+        >
+          {{ allocateHint }}
+        </p>
+        <table
+          v-if="allocResult.length > 0"
+          class="alloc-table"
+          aria-label="模块分摊结果"
+        >
+          <thead>
+            <tr>
+              <th scope="col">
+                模块
+              </th>
+              <th scope="col">
+                分配 US（FP）
+              </th>
+              <th scope="col">
+                锁定
+              </th>
+              <th scope="col">
+                审计标签
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="r in allocResult"
+              :key="r.name"
+              data-testid="alloc-row"
+            >
+              <td>{{ r.name }}</td>
+              <td>{{ r.us.toFixed(2) }}</td>
+              <td>{{ r.locked ? "是" : "否" }}</td>
+              <td>{{ r.audit_tag ?? "—" }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
     </div>
 
     <footer
@@ -324,5 +448,52 @@ const hasReverse = computed(() => reverseResult.value !== null);
   font-size: var(--font-size-sm);
   text-align: center;
   max-width: 60ch;
+}
+.allocator-panel {
+  margin-top: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.allocator-panel h3 {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-text-title);
+}
+.alloc-desc {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+.alloc-desc code {
+  background: var(--color-bg-muted, #f5f5f5);
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 0.95em;
+}
+.alloc-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--space-2);
+}
+.alloc-table th,
+.alloc-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  font-size: var(--font-size-sm);
+}
+.alloc-table th {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+.hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 </style>

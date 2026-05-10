@@ -28,6 +28,7 @@ vi.mock("@/api/calc", () => ({
       cost_total_yuan: { P10: 300000, P50: 489180, P90: 700000 },
     }),
     reverse: vi.fn(),
+    allocate: vi.fn(),
   },
 }));
 
@@ -215,5 +216,141 @@ describe("ResultView", () => {
       other_cost: 50_000,
     });
     expect(w.text()).toContain("FP");
+  });
+
+  it("reverse 模式：allocator panel 仅在反算结果出现后渲染", async () => {
+    vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
+    router.push("/projects/2/result");
+    await router.isReady();
+    const w = mount(ResultView, {
+      props: { projectId: "p-2" },
+      global: { plugins: [createPinia(), router, ElementPlus] },
+    });
+    await flushPromises();
+    await flushPromises();
+    // 反算前 — 没有 panel
+    expect(w.text()).not.toContain("AI 模块分摊");
+    // 反算后 — panel 出现
+    vi.mocked(calcApi.reverse).mockResolvedValueOnce({
+      budget_for_dev: 950_000,
+      budget_for_ops: 0,
+      scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
+      scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
+      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      cf_used: 1.25,
+      recommended_band: "P50" as const,
+    });
+    await w.findAll("input[type='number']")[0].setValue(1_000_000);
+    const reverseBtn = w.findAll("button").find((b) => b.text() === "反算");
+    await reverseBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+    expect(w.text()).toContain("AI 模块分摊");
+    const allocBtn = w.findAll("button").find((b) => b.text() === "生成模块分摊");
+    expect(allocBtn).toBeDefined();
+  });
+
+  it("reverse 模式：forward project 不渲染 allocator panel", async () => {
+    vi.mocked(projectsApi.get).mockResolvedValueOnce(forwardProject);
+    router.push("/projects/1/result");
+    await router.isReady();
+    const w = mount(ResultView, {
+      props: { projectId: "p-1" },
+      global: { plugins: [createPinia(), router, ElementPlus] },
+    });
+    await flushPromises();
+    await flushPromises();
+    expect(w.text()).not.toContain("AI 模块分摊");
+    expect(w.findAll("button").find((b) => b.text() === "生成模块分摊")).toBeUndefined();
+  });
+
+  it("点击「生成模块分摊」→ 调 calcApi.allocate 并显示分摊行", async () => {
+    vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
+    vi.mocked(calcApi.reverse).mockResolvedValueOnce({
+      budget_for_dev: 950_000,
+      budget_for_ops: 0,
+      scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
+      scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
+      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      cf_used: 1.21,
+      recommended_band: "P50" as const,
+    });
+    vi.mocked(calcApi.allocate).mockResolvedValueOnce([
+      { name: "前端", us: 66.12, locked: false, audit_tag: "budget_derived" },
+      { name: "后端", us: 99.17, locked: false, audit_tag: "budget_derived" },
+    ]);
+    const promptSpy = vi
+      .spyOn(window, "prompt")
+      .mockReturnValue('[{"name":"前端","weight":1},{"name":"后端","weight":1.5}]');
+
+    router.push("/projects/2/result");
+    await router.isReady();
+    const w = mount(ResultView, {
+      props: { projectId: "p-2" },
+      global: { plugins: [createPinia(), router, ElementPlus] },
+    });
+    await flushPromises();
+    await flushPromises();
+    await w.findAll("input[type='number']")[0].setValue(1_000_000);
+    await w.findAll("button").find((b) => b.text() === "反算")!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+    const allocBtn = w.findAll("button").find((b) => b.text() === "生成模块分摊");
+    expect(allocBtn).toBeDefined();
+    await allocBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+    expect(calcApi.allocate).toHaveBeenCalledWith({
+      project_id: "p-2",
+      target_us: 200,
+      cf: 1.21,
+      drafts: [
+        { name: "前端", weight: 1 },
+        { name: "后端", weight: 1.5 },
+      ],
+    });
+    const rows = w.findAll("[data-testid='alloc-row']");
+    expect(rows.length).toBe(2);
+    expect(rows[0].text()).toContain("前端");
+    expect(rows[0].text()).toContain("66.12");
+    expect(rows[1].text()).toContain("后端");
+    expect(rows[1].text()).toContain("99.17");
+    promptSpy.mockRestore();
+  });
+
+  it("点击「生成模块分摊」遇到非法 JSON → 显示提示，不调 API", async () => {
+    vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
+    vi.mocked(calcApi.reverse).mockResolvedValueOnce({
+      budget_for_dev: 950_000,
+      budget_for_ops: 0,
+      scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
+      scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
+      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
+      cf_used: 1.21,
+      recommended_band: "P50" as const,
+    });
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("not-json-{{");
+
+    router.push("/projects/2/result");
+    await router.isReady();
+    const w = mount(ResultView, {
+      props: { projectId: "p-2" },
+      global: { plugins: [createPinia(), router, ElementPlus] },
+    });
+    await flushPromises();
+    await flushPromises();
+    await w.findAll("input[type='number']")[0].setValue(1_000_000);
+    await w.findAll("button").find((b) => b.text() === "反算")!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+    const allocBtn = w.findAll("button").find((b) => b.text() === "生成模块分摊");
+    await allocBtn!.trigger("click");
+    await flushPromises();
+    expect(w.text()).toContain("不是合法 JSON");
+    expect(calcApi.allocate).not.toHaveBeenCalled();
+    promptSpy.mockRestore();
   });
 });
