@@ -1,0 +1,35 @@
+{
+  "name": "实施规程附录 D · 政务服务平台",
+  "inputs": {
+    "industry": "电子政务",
+    "city": "北京",
+    "phase": "bidding",
+    "items_us_total": 275,
+    "dev_factor": 1.00,
+    "ops_factor": 1.18,
+    "include_dev": true,
+    "include_ops": true,
+    "other_cost": 25000,
+    "ops_factor_components": {
+      "business_importance": 1.10,
+      "security": 1.05,
+      "support": 0.89,
+      "update_freq": 0.95,
+      "response": 1.10,
+      "integrity": 1.00,
+      "platform": 1.00,
+      "team_exp": 1.00,
+      "deployment": 1.00,
+      "user_scale": 1.10,
+      "relevance": 1.00
+    }
+  },
+  "expected": {
+    "scale_adjusted": 332.75,
+    "effort_dev_p50_hours": 2236.08,
+    "effort_ops_p50_hours": 329.82,
+    "cost_total_p50_yuan": 489180,
+    "tolerance_yuan": 100,
+    "tolerance_hours": 0.5
+  }
+}
