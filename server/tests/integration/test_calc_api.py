@@ -43,3 +43,20 @@ async def test_forward_endpoint_smoke(client_with_project):
     data = r.json()["data"]
     assert data["scale_us"] == 275
     assert abs(data["scale_adjusted"] - 275 * 1.21) < 1e-6
+
+
+async def test_reverse_endpoint_three_bands(client_with_project):
+    c, pid = client_with_project
+    r = await c.post("/api/calc/reverse",
+                     headers={**H, "Content-Type": "application/json"},
+                     json={"project_id": pid, "target_total": 500000,
+                           "other_cost": 0, "include_ops": False,
+                           "alpha_dev": 1.0,
+                           "dev_factor": 1.0, "ops_factor": 1.0})
+    assert r.status_code == 200
+    data = r.json()["data"]
+    assert "scale_adjusted_bands" in data
+    # 三档 = 预算口径：P10 乐观（PDR 最高 → 规模最大），P90 保守（规模最小）
+    assert data["scale_adjusted_bands"]["P10"] > data["scale_adjusted_bands"]["P50"]
+    assert data["scale_adjusted_bands"]["P50"] > data["scale_adjusted_bands"]["P90"]
+    assert data["recommended_band"] == "P50"
