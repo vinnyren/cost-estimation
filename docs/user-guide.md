@@ -1,8 +1,9 @@
 # 软件造价制作系统 · 用户操作手册
 
-> 版本：v1.0.0 · 适用 plugin v1.0.0 · 数据基准 **CSBMK®-202510**
-> 编写日期：2026-05 · 适用方法学：NESMA 估算法（兼容 IFPUG 详细计数）
+> 版本：v2.0.0 · 适用 plugin v2.0.0 · 数据基准 **CSBMK®-202510**
+> 编写日期：2026-05-11 · 适用方法学：NESMA 估算法（兼容 IFPUG 详细计数）
 > 合规依据：GB/T 36964-2018 / T/CCUA 005-2024 / GB/T 28827.7-2022 / GB/T 42452-2023
+> v2.0 新增：11 项 gap-closure（详见[第 12 章](#第-12-章-v20-新功能与迁移)）
 
 ---
 
@@ -19,6 +20,7 @@
 - [第 9 章 最佳实践](#第-9-章-最佳实践)
 - [第 10 章 常见问题（FAQ）](#第-10-章-常见问题faq)
 - [第 11 章 国标依据](#第-11-章-国标依据)
+- [第 12 章 v2.0 新功能与迁移](#第-12-章-v20-新功能与迁移)
 - [附录 A 公式速查](#附录-a-公式速查)
 - [附录 B 词汇表](#附录-b-词汇表)
 - [附录 C 联系与支持](#附录-c-联系与支持)
@@ -1406,6 +1408,169 @@ CSBMK®-202510    ──── 默认参数（行业 / 城市 / 因子）
 
 ---
 
+## 第 12 章 v2.0 新功能与迁移
+
+> 版本说明：v2.0 是 v1.1 之后的 gap-closure 版本，闭环 11 项审计 gap（GAP-A 到 GAP-K）。本章按用户路径展开新增能力的实操方法。
+
+### 12.1 总览
+
+v2.0 在保留 v1.0 全部国标合规、CSBMK 数据集与三档算法的基础上，补全了 v1.1 后审计发现的 11 处用户体验与功能空缺，将 AI 提取从设计稿落地为可在 Claude Code 终端运行的 plugin 命令，并把所有 17+ 调整因子从隐藏配置提升为前端可视化操作。
+
+| Gap | 主题 | 入口 |
+|---|---|---|
+| GAP-A | AI 提取功能点 | `/cost <project_id>` |
+| GAP-B | 17+ 因子全部可配 | ParamManager 4 个 v2 tab + Wizard 5/6 步 |
+| GAP-C | AI 模块分摊 | `/cost-allocate <project_id>` |
+| GAP-D | 运维费率 / 生产率 | ParamManager 城市费率 ops 列 + 生产率 ops 表 |
+| GAP-E | alpha_dev / include_ops | Wizard 第 2 步 |
+| GAP-F | ProjectList 搜索 / 筛选 / 排序 / 分页 | ProjectList toolbar |
+| GAP-G | 客户 / 评估方填写 | Wizard 第 1 步 |
+| GAP-H | 参数快照 + restore | ParamManager 快照 tab |
+| GAP-I | 项目复制 | ProjectList 行 ⋯ 菜单 |
+| GAP-J | 项目审计日志 | `/projects/:id/audit` |
+| GAP-K | 阶段 CF 实时预览 | Wizard 第 3 步 |
+
+### 12.2 AI 工作流（GAP-A / GAP-C）
+
+v2.0 将 AI 提取从"前端按钮"调整为 **Claude Code Plugin 命令**，因为只有终端里的 Claude 才能读取本机文件并执行 SKILL.md 的提示词。
+
+#### 12.2.1 正向：从文档到 FP 草稿
+
+<!-- TODO: screenshot of /cost terminal invocation -->
+
+1. 在 Web 端新建项目（Wizard 7 步走完，参见 §12.3），状态停在 FP 编辑屏。
+2. 上传需求文档（PDF / DOCX / XLSX / MD / TXT，单文件 ≤50 MB）。
+3. 回到 Claude Code 终端，输入：
+   ```bash
+   /cost <project_id>
+   ```
+4. Claude 读取上传文件，按 SKILL.md 的 NESMA 计数规则生成 FP 草稿，写入 `source=claude_draft`。
+5. 切回 Web 端 FP 编辑屏，AI 提取行**琥珀底高亮**显示，用户可逐行微调。
+
+#### 12.2.2 反向：从预算到模块清单
+
+<!-- TODO: screenshot of /cost-allocate result -->
+
+1. 创建反向模式项目（Wizard 第 4 步选 reverse + 填 target_total）。
+2. 系统自动反推出 P10 / P50 / P90 三档 FP 规模。
+3. 终端运行：
+   ```bash
+   /cost-allocate <project_id>
+   ```
+4. Claude 把三档 FP 按子系统 / 一级模块 / 二级模块分摊，写回 FP 表（`source=allocator`，红色加粗）。
+5. ResultView 显示三档卡片 + 反算误差（应 ≤1%）。
+
+### 12.3 Wizard 7 步指南（GAP-E / GAP-G / GAP-K）
+
+<!-- TODO: screenshot of Wizard step 1 -->
+
+v2.0 把"新建项目"从 5 步骨架扩展到 7 步，覆盖客户元数据、α 滑块、阶段 CF 实时预览、因子链式选择。
+
+| 步骤 | 内容 | 说明 |
+|---|---|---|
+| **Step 1** | 客户 / 评估方 | 可选字段，将写入 Excel 报告封面（GAP-G） |
+| **Step 2** | 项目类型 + α + include_ops | dev / dev_and_ops 滑块；选 dev_and_ops 启用 alpha_dev 与 include_ops（GAP-E） |
+| **Step 3** | 城市 + 行业 + 阶段 | 选阶段后实时显示 CF 调整因子值（GAP-K） |
+| **Step 4** | 模式 + target_total | forward / reverse；reverse 模式额外要求填目标总造价 |
+| **Step 5** | 开发因子 | 5 项 dropdown 选级别，右侧实时显示链式相乘结果（GAP-B） |
+| **Step 6** | 运维因子 | 11 项 dropdown，仅 include_ops=true 时显示 |
+| **Step 7** | 确认 | JSON 摘要 + factors 写进 create payload |
+
+每步底部有"上一步 / 下一步"，未通过校验的字段标红 + 焦点跳转。
+
+### 12.4 ParamManager 6 Tab（GAP-B / GAP-D / GAP-H）
+
+<!-- TODO: screenshot of ParamManager tab bar -->
+
+v1.0 的 ParamManager 只实装了费率与生产率两个 tab；v2.0 把剩下 4 个 stub tab 全部实装：
+
+| Tab | v2.0 改动 |
+|---|---|
+| **费率（rate）** | 新增 ops 列，每个城市同时显示开发 / 运维元/人月（GAP-D） |
+| **生产率（productivity）** | 新增"运维行业"子表，行业 × 三档 PDR（GAP-D） |
+| **开发因子（factors_dev）** | 5 项 dropdown 编辑 + 默认值"恢复"按钮（GAP-B） |
+| **运维因子（factors_ops）** | 11 项编辑面板（GAP-B） |
+| **规模变更（scale_change）** | 阶段 CF + 重用率 / 修改率（GAP-B） |
+| **快照（snapshots）** | 创建 / 恢复 / 删除项目级参数快照（GAP-H） |
+
+#### 快照工作流（GAP-H）
+
+<!-- TODO: screenshot of snapshot tab -->
+
+1. 调好一组参数后，在快照 tab 点 **"创建快照"**，命名（如"投标版-2026Q2"）。
+2. 后续覆盖 / 重置 / 误改后，回到快照 tab 选历史条目点 **"恢复"** → 项目级 overrides 整体回滚。
+3. 不再需要的快照可直接 **删除**（操作进入审计日志）。
+
+### 12.5 ProjectList 搜索 + ⋯ 菜单（GAP-F / GAP-I）
+
+<!-- TODO: screenshot of ProjectList toolbar -->
+
+ProjectList toolbar 上新增 5 维筛选：
+
+- **q**：项目名实时搜索（≥200ms 防抖）
+- **city / industry / phase / mode**：四个 dropdown 多维过滤
+- **sort / order**：按 created_at / updated_at / total_cost 排序，asc / desc
+- **page / size**：cursor 分页，默认 size=20
+
+每行末尾 **⋯ 菜单** 三项：
+- **打开** → FP 编辑屏
+- **复制** → 一键复制项目，包含 FP 数据与参数 override（GAP-I）；复制后新项目名自动加后缀 `(copy)`
+- **审计日志** → 跳 `/projects/:id/audit`
+- **删除** → 二次确认（输入项目名）
+
+### 12.6 审计日志查看（GAP-J）
+
+<!-- TODO: screenshot of AuditView timeline -->
+
+每个项目维护独立审计时间线，所有 mutating 操作（创建 / 更新 / 删除 / FP 修改 / 参数覆盖 / 快照恢复 / 复制 / 导出）自动写入 `audit_log` 表。
+
+- 入口：项目行 ⋯ 菜单 → **"审计日志"**，或直接访问 `/projects/:id/audit`
+- 字段：时间戳 / 操作类型 / 操作者 / before-after diff（JSON）
+- 分页：cursor 分页，每页 50 条
+- 用途：对账、回溯误操作、向第三方造价审计单位提供操作证据
+
+### 12.7 数据迁移（v1.1 → v2.0）
+
+升级到 v2.0 不会丢失任何 v1.1 数据，但需要跑 3 个新 migration：
+
+```bash
+cd server
+alembic upgrade head
+```
+
+应用的 migration：
+- 给 `projects` 表加 `factors_dev_json` / `factors_ops_json` 列
+- 新建 `param_snapshots` 表
+- 新建 `audit_log` 表
+
+#### 兼容性
+
+| 老数据 | v2.0 行为 |
+|---|---|
+| `factors_dev_json` / `factors_ops_json` 为 NULL | calc 用 1.0 兜底，`Result.warning_messages` 提示 "项目无因子配置，按 1.0 计算" |
+| 已有 FP / 参数 override / 上传文件 | 全部保留，不受 schema 变更影响 |
+| 老 Excel 报告 | 仍可重新生成；客户 / 评估方字段在封面留空 |
+| `/api/projects` 旧客户端 | 新版返回 envelope `{ data: [...], total, page }`，前端 v2 已切换；v1 客户端需更新 |
+
+> 建议：升级前用 `sqlite3 ~/.claude/projects/cost-estimation/data.db .dump > backup.sql` 备份；migration 失败可 `alembic downgrade -1` 回滚。
+
+### 12.8 新 API endpoint 速查
+
+| Method | Path | 说明 |
+|---|---|---|
+| POST | `/api/projects/{id}/copy` | 项目复制（GAP-I） |
+| GET | `/api/projects/{id}/audit` | 项目审计日志，cursor 分页（GAP-J） |
+| GET | `/api/params/snapshots` | 快照列表（GAP-H） |
+| POST | `/api/params/snapshots` | 创建快照 |
+| POST | `/api/params/snapshots/{id}/restore` | 恢复快照 |
+| DELETE | `/api/params/snapshots/{id}` | 删除快照 |
+| GET | `/api/projects` | 升级查询参数 q / city / industry / phase / mode / sort / order / page / size（GAP-F） |
+| GET | `/api/params/effective` | 全局 effective 视图（无项目作用域） |
+
+详见 [dev-guide.md](dev-guide.md) §API 参考。
+
+---
+
 ## 附录 A 公式速查
 
 ### A.1 NESMA UFP 权重表（估算法默认 = 中复杂度）
@@ -1612,5 +1777,6 @@ F_ops = 业务重要性 × 网络安全 × 支持方式 × 更新频率 × 响�
 
 ---
 
-> **文档版本**：v1.0.0 · 最后更新 2026-05  
-> **下一版本计划**：v1.1（补充 COSMIC 方法、Excel 批量导入示例、移动端适配）
+> **文档版本**：v2.0.0 · 最后更新 2026-05-11  
+> **本版本变更**：v2.0 闭环 11 项 v1.1 后审计 gap（GAP-A 到 GAP-K），详见第 12 章  
+> **下一版本计划**：v2.1（补充 COSMIC 方法、Excel 批量导入示例、移动端适配）
