@@ -32,12 +32,10 @@ export interface Project {
 }
 
 // v2.0 T8 — query/copy go through the new {success,data,meta} envelope.
-//
-// The legacy projectsApi.list() still uses api.get + unwrap() (which only
-// understands {ok, data}); after T6 the backend now returns {success, data,
-// meta} for GET /api/projects, so .list() will be migrated to .query() in
-// T20 (ProjectList toolbar). Keeping list() intact for now to scope this
-// task to the API surface only.
+// v2.0 T20 — list() now delegates to query() so both speak the new envelope.
+// Callers that only care about the array (e.g. store.fetchAll) keep their
+// existing Promise<Project[]> contract; callers that need meta/filter/sort
+// (e.g. ProjectList toolbar) call query() directly.
 export interface ProjectQuery {
   q?: string;
   city?: string;
@@ -87,7 +85,12 @@ function buildQueryString(opts: ProjectQuery): string {
 }
 
 export const projectsApi = {
-  list: () => api.get<Project[]>("/api/projects"),
+  // list() returns just the array for backwards compatibility with the
+  // projects store; full meta/filter/sort go through query().
+  async list(): Promise<Project[]> {
+    const { data } = await projectsApi.query();
+    return data;
+  },
   get: (id: string) => api.get<Project>(`/api/projects/${id}`),
   create: (body: Partial<Project>) => api.post<Project>("/api/projects", body),
   patch: (id: string, body: Partial<Project>) =>
