@@ -1,9 +1,10 @@
 import secrets
 
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api.health import router as health_router
+from .api.projects import router as projects_router
 from .config import Settings, settings
 from .deps import auth_middleware, origin_middleware
 
@@ -36,19 +37,7 @@ def create_app() -> FastAPI:
     app.middleware("http")(auth_middleware)
 
     app.include_router(health_router)
-
-    # 占位 /api/projects，避免 404/405 干扰 token + origin 测试
-    api = APIRouter(prefix="/api")
-
-    @api.get("/projects")
-    async def _stub_projects():
-        return {"ok": True, "data": []}
-
-    @api.post("/projects")
-    async def _stub_create(payload: dict):
-        return {"ok": True, "data": payload}
-
-    app.include_router(api)
+    app.include_router(projects_router)
     return app
 
 
