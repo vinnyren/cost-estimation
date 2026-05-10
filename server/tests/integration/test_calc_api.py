@@ -60,3 +60,17 @@ async def test_reverse_endpoint_three_bands(client_with_project):
     assert data["scale_adjusted_bands"]["P10"] > data["scale_adjusted_bands"]["P50"]
     assert data["scale_adjusted_bands"]["P50"] > data["scale_adjusted_bands"]["P90"]
     assert data["recommended_band"] == "P50"
+
+
+async def test_allocator_endpoint(client_with_project):
+    c, pid = client_with_project
+    r = await c.post("/api/calc/allocate",
+                     headers={**H, "Content-Type": "application/json"},
+                     json={"project_id": pid, "target_us": 180, "cf": 1.21,
+                           "drafts": [{"name": "A", "weight": 4},
+                                      {"name": "B", "weight": 10},
+                                      {"name": "C", "weight": 4}]})
+    assert r.status_code == 200
+    items = r.json()["data"]
+    assert len(items) == 3
+    assert all(i["audit_tag"] == "budget_derived" for i in items)

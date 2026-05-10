@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from ..core.context import EvaluationContext, ProjectInputs
 from ..core.forward import calculate_forward, ForwardInput, FpItem
 from ..core.reverse import calculate_reverse, ReverseInput
+from ..core.allocator import allocate, AllocatorInput, FpDraft
 from ..db.models import Project
 from . import params as ps
 
@@ -46,3 +47,12 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
     )
     r = calculate_reverse(ctx, inp)
     return r.__dict__
+
+
+def run_allocate(payload: dict) -> list[dict]:
+    drafts = [FpDraft(name=d["name"], weight=d["weight"],
+                      locked=d.get("locked", False), locked_us=d.get("locked_us", 0.0))
+              for d in payload["drafts"]]
+    out = allocate(AllocatorInput(
+        target_us=payload["target_us"], drafts=drafts, cf=payload.get("cf", 1.21)))
+    return [o.__dict__ for o in out]

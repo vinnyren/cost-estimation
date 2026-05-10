@@ -23,3 +23,17 @@ class CalcReverseRequest(BaseModel):
     alpha_dev: float = 1.0
     dev_factor: float = 1.0
     ops_factor: float = 1.0
+
+
+class FpDraftIn(BaseModel):
+    name: str
+    weight: float
+    locked: bool = False
+    locked_us: float = 0.0
+
+
+class AllocateRequest(BaseModel):
+    project_id: str
+    target_us: float
+    cf: float = 1.21
+    drafts: list[FpDraftIn]
