@@ -15,8 +15,10 @@ from .api.uploads import router as uploads_router
 from .api.functions import router as functions_router
 from .api.reports import router as reports_router
 from .api.snapshots import router as snapshots_router
+from .api.audit import router as audit_router
 from .config import Settings, settings
 from .deps import auth_middleware, origin_middleware
+from .middleware.audit import AuditMiddleware
 
 
 def _mount_web_dist(app: FastAPI, dist_path: str) -> None:
@@ -97,6 +99,11 @@ def create_app() -> FastAPI:
     )
     app.middleware("http")(origin_middleware)
     app.middleware("http")(auth_middleware)
+    # AuditMiddleware 注册顺序：放在 auth/origin 之后（即在最外层、最后注册）。
+    # Starlette 的执行顺序是「后注册先处理」，所以 audit 会在 auth/origin 之前
+    # 拿到 request。但 audit 仅在 response 阶段写库，且对 2xx 之外的响应短路，
+    # 因此即使未通过 auth 的请求也不会污染 audit_log。
+    app.add_middleware(AuditMiddleware)
 
     app.include_router(health_router)
     app.include_router(projects_router)
@@ -106,6 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(functions_router)
     app.include_router(reports_router)
     app.include_router(snapshots_router)
+    app.include_router(audit_router)
 
     # 生产期：若配置了 web_dist_dir 则挂载静态资源 + SPA fallback。
     # 必须在所有 API 路由之后挂载，避免通配符路径吞掉真实路由。
