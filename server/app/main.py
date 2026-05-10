@@ -1,4 +1,5 @@
 import secrets
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -48,6 +49,21 @@ def _mount_web_dist(app: FastAPI, dist_path: str) -> None:
         return FileResponse(str(index))
 
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    """FastAPI lifespan: 启动时建表 + seed CSBMK 默认参数；关闭时无显式清理。
+
+    替代已弃用的 @app.on_event("startup")（FastAPI 0.93+ 提示迁移到
+    lifespan context manager，统一启动/关闭语义）。
+    """
+    from .db.session import Base, engine
+    from .services.params import seed_from_csbmk
+    Base.metadata.create_all(bind=engine)
+    seed_from_csbmk()
+    yield
+    # 关闭逻辑（目前无需）— SQLAlchemy engine 由进程退出时回收。
+
+
 def create_app() -> FastAPI:
     fresh = Settings()
     settings.auth_token = fresh.auth_token
@@ -56,7 +72,7 @@ def create_app() -> FastAPI:
     # 生产期静态托管目录从环境同步（reload 友好）
     settings.web_dist_dir = fresh.web_dist_dir
 
-    app = FastAPI(title="软件造价制作系统", version="1.0.0")
+    app = FastAPI(title="软件造价制作系统", version="1.0.0", lifespan=_lifespan)
 
     app.add_middleware(
         CORSMiddleware,
@@ -76,13 +92,6 @@ def create_app() -> FastAPI:
     app.include_router(uploads_router)
     app.include_router(functions_router)
     app.include_router(reports_router)
-
-    @app.on_event("startup")
-    async def _bootstrap() -> None:
-        from .db.session import Base, engine
-        from .services.params import seed_from_csbmk
-        Base.metadata.create_all(bind=engine)
-        seed_from_csbmk()
 
     # 生产期：若配置了 web_dist_dir 则挂载静态资源 + SPA fallback。
     # 必须在所有 API 路由之后挂载，避免通配符路径吞掉真实路由。

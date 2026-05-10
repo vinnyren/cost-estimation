@@ -11,13 +11,17 @@ from ..parsers.xlsx import parse_xlsx
 
 
 def _uploads_dir(project_id: str) -> Path:
-    p = settings.data_dir / "uploads" / project_id
+    # settings.upload_dir 在 Settings._derive_paths 中派生为 data_dir/uploads
+    # （除非 COST_UPLOAD_DIR 显式设置）。
+    assert settings.upload_dir is not None
+    p = settings.upload_dir / project_id
     p.mkdir(parents=True, exist_ok=True)
     return p
 
 
 def _parsed_dir(project_id: str) -> Path:
-    p = settings.data_dir / "parsed" / project_id
+    assert settings.parsed_dir is not None
+    p = settings.parsed_dir / project_id
     p.mkdir(parents=True, exist_ok=True)
     return p
 
