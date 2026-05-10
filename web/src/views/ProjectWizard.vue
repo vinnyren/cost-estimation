@@ -9,6 +9,14 @@ import type {
   ProjectPhase,
   ProjectType,
 } from "@/api/projects";
+import AlphaSlider from "@/components/AlphaSlider.vue";
+
+const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
+  dev_only: "仅开发",
+  ops_only: "仅运维",
+  dev_and_ops: "开发 + 运维",
+};
+const PROJECT_TYPES = ["dev_only", "ops_only", "dev_and_ops"] as const;
 
 const BASIS_DATA_VER = "CSBMK®-202510";
 
@@ -85,6 +93,17 @@ function next(): void {
 
 function back(): void {
   if (currentStep.value > 1) currentStep.value -= 1;
+}
+
+function onProjectTypeChange(): void {
+  if (form.project_type === "ops_only") {
+    form.include_ops = true;
+  } else if (form.project_type === "dev_and_ops") {
+    form.include_ops = true;
+  } else if (form.project_type === "dev_only") {
+    form.include_ops = false;
+    form.alpha = 1.0;
+  }
 }
 
 // 拉取 effective 参数（用于后续 T15 PhaseCfPreview / T17 因子默认值展示）。
@@ -210,9 +229,42 @@ async function submit(): Promise<void> {
 
       <fieldset v-else-if="currentStep === 2">
         <legend>项目类型</legend>
-        <p class="placeholder">
-          将在 T14 填充：dev_only / ops_only / dev_and_ops 选择
-        </p>
+        <div
+          class="radio-group"
+          role="radiogroup"
+          aria-label="项目类型"
+        >
+          <label
+            v-for="t in PROJECT_TYPES"
+            :key="t"
+            class="radio"
+          >
+            <input
+              type="radio"
+              name="project_type"
+              :value="t"
+              :checked="form.project_type === t"
+              @change="(form.project_type = t), onProjectTypeChange()"
+            >
+            <span>{{ PROJECT_TYPE_LABELS[t] }}</span>
+          </label>
+        </div>
+        <label
+          v-if="form.project_type !== 'ops_only'"
+          class="checkbox"
+        >
+          <input
+            v-model="form.include_ops"
+            type="checkbox"
+            name="include_ops"
+            :disabled="form.project_type === 'dev_and_ops'"
+          >
+          <span>包含运维成本</span>
+        </label>
+        <AlphaSlider
+          v-if="form.project_type === 'dev_and_ops'"
+          v-model="form.alpha"
+        />
       </fieldset>
 
       <fieldset v-else-if="currentStep === 3">
@@ -393,6 +445,23 @@ legend {
   padding: var(--space-3);
   border-radius: var(--radius-md);
   margin: 0;
+}
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.radio,
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+.checkbox input[type="checkbox"]:disabled + span {
+  color: var(--color-text-muted);
 }
 .confirm-summary {
   background: var(--color-bg);

@@ -185,6 +185,130 @@ describe("ProjectWizard skeleton (T13)", () => {
     expect(payload.target_cost).toBeUndefined();
   });
 
-  // TODO(T14-T18): mode 选择 UI 落地后再补 reverse 模式 target_total → target_cost
-  // 映射、α 输入、project_type 等端到端用例。
+  // TODO(T15-T18): mode 选择 UI 落地后再补 reverse 模式 target_total → target_cost
+  // 映射、α 输入等端到端用例。
+});
+
+/**
+ * NOTE (T14 — Wizard step 2 项目类型 + alpha + include_ops):
+ *   Step 2 落地：project_type radio 三选一 / include_ops checkbox 联动 /
+ *   AlphaSlider 仅在 dev_and_ops 时显示。
+ */
+
+describe("Wizard step 2 — project_type / alpha / include_ops (T14)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p-99",
+      name: "new",
+      project_type: "dev_only",
+      mode: "forward",
+      city: "北京",
+      industry: "电子政务",
+      phase: "bidding",
+      basis_data_ver: "CSBMK®-202510",
+      created_at: "",
+      updated_at: "",
+    });
+  });
+
+  async function gotoStep2() {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("项目甲");
+    await w.find("[data-test='wizard-next']").trigger("click");
+    return w;
+  }
+
+  it("初始进入 step 2：项目类型 radio 三选一可见", async () => {
+    const w = await gotoStep2();
+    const radios = w.findAll('input[type="radio"][name="project_type"]');
+    expect(radios.length).toBe(3);
+    expect(w.text()).toContain("仅开发");
+    expect(w.text()).toContain("仅运维");
+    expect(w.text()).toContain("开发 + 运维");
+  });
+
+  it("dev_only 默认：AlphaSlider 不显示，include_ops checkbox 显示且未选中", async () => {
+    const w = await gotoStep2();
+    expect(w.findComponent({ name: "AlphaSlider" }).exists()).toBe(false);
+    const cb = w.find('input[type="checkbox"][name="include_ops"]');
+    expect(cb.exists()).toBe(true);
+    expect((cb.element as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("选择 dev_and_ops：AlphaSlider 出现，include_ops 被强制为 true 且 disabled", async () => {
+    const w = await gotoStep2();
+    const radios = w.findAll('input[type="radio"][name="project_type"]');
+    const devOps = radios.find((r) => (r.element as HTMLInputElement).value === "dev_and_ops")!;
+    await devOps.setValue();
+    await flushPromises();
+
+    expect(w.findComponent({ name: "AlphaSlider" }).exists()).toBe(true);
+    const cb = w.find('input[type="checkbox"][name="include_ops"]');
+    expect((cb.element as HTMLInputElement).checked).toBe(true);
+    expect((cb.element as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it("dev_and_ops → 切回 dev_only：AlphaSlider 消失，alpha 重置 1.0，include_ops 重置 false", async () => {
+    const w = await gotoStep2();
+    const radios = w.findAll('input[type="radio"][name="project_type"]');
+    const devOps = radios.find((r) => (r.element as HTMLInputElement).value === "dev_and_ops")!;
+    await devOps.setValue();
+    await flushPromises();
+    expect(w.findComponent({ name: "AlphaSlider" }).exists()).toBe(true);
+
+    const devOnly = radios.find((r) => (r.element as HTMLInputElement).value === "dev_only")!;
+    await devOnly.setValue();
+    await flushPromises();
+
+    expect(w.findComponent({ name: "AlphaSlider" }).exists()).toBe(false);
+    const cb = w.find('input[type="checkbox"][name="include_ops"]');
+    expect((cb.element as HTMLInputElement).checked).toBe(false);
+
+    // 走到 step 7 查 alpha 是否回到 1.0
+    for (let i = 0; i < 5; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+    }
+    expect(w.text()).toContain("\"alpha\": 1");
+  });
+
+  it("选择 ops_only：include_ops checkbox 隐藏（强制为 true 但不展示），AlphaSlider 不显示", async () => {
+    const w = await gotoStep2();
+    const radios = w.findAll('input[type="radio"][name="project_type"]');
+    const opsOnly = radios.find((r) => (r.element as HTMLInputElement).value === "ops_only")!;
+    await opsOnly.setValue();
+    await flushPromises();
+
+    expect(w.findComponent({ name: "AlphaSlider" }).exists()).toBe(false);
+    expect(w.find('input[type="checkbox"][name="include_ops"]').exists()).toBe(false);
+  });
+
+  it("AlphaSlider 滑块 v-model 双向：拖动后 form.alpha 更新，提交 payload 携带 alpha_dev", async () => {
+    const w = await gotoStep2();
+    const radios = w.findAll('input[type="radio"][name="project_type"]');
+    const devOps = radios.find((r) => (r.element as HTMLInputElement).value === "dev_and_ops")!;
+    await devOps.setValue();
+    await flushPromises();
+
+    const range = w.find('input[type="range"]');
+    expect(range.exists()).toBe(true);
+    await range.setValue(0.8);
+    await flushPromises();
+
+    // 进入 step 7 提交，检查 payload
+    for (let i = 0; i < 5; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+    }
+    const submitBtn = w.findAll("button").find((b) => b.text().includes("创建项目"));
+    await submitBtn!.trigger("click");
+    await flushPromises();
+    await flushPromises();
+
+    const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(payload.alpha_dev).toBeCloseTo(0.8, 5);
+    expect(payload.project_type).toBe("dev_and_ops");
+  });
 });
