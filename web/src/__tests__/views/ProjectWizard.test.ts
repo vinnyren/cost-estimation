@@ -528,3 +528,142 @@ describe("Wizard step 3 — phase + CF preview (T15)", () => {
     expect(biddingCard.text()).toContain("CF = 1.00");
   });
 });
+
+/**
+ * NOTE (T17 — Wizard step 5/6 factor dropdowns + 实时 chain 预览):
+ *   Step 5：渲染 effective.factors_dev 中的每个因子为 FactorDropdown，
+ *           底部展示 devFactorPreview（链式乘积，默认 1.00）。
+ *   Step 6：当 include_ops 为 true 渲染 factors_ops，否则展示 skip 提示。
+ *   切换 dropdown → 预览即时更新。
+ */
+
+describe("Wizard step 5/6 — factor dropdowns (T17)", () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const { paramsApi } = await import("@/api/params");
+    (paramsApi.global as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      cf: { budget: 1.5, bidding: 1.21, planning: 1.1, change: 1.05, settled: 1.0 },
+      factors_dev: {
+        app_type: { OLTP: 1.0, OLAP: 1.1 },
+        platform: { web: 1.0, mobile: 1.2 },
+      },
+      factors_ops: {
+        update_freq: { low: 0.8, high: 1.3 },
+      },
+    });
+    (projectsApi.create as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "p-99",
+      name: "new",
+      project_type: "dev_only",
+      mode: "forward",
+      city: "北京",
+      industry: "电子政务",
+      phase: "bidding",
+      basis_data_ver: "CSBMK®-202510",
+      created_at: "",
+      updated_at: "",
+    });
+  });
+
+  async function gotoStep5() {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("项目甲");
+    await flushPromises();
+    // step 1 → 2 → 3 → 4 → 5
+    for (let i = 0; i < 4; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+    }
+    await flushPromises();
+    return w;
+  }
+
+  it("step 5：每个 factors_dev 因子渲染一个 dropdown", async () => {
+    const w = await gotoStep5();
+    expect(w.text()).toContain("开发调整因子");
+    const selects = w.findAll("select");
+    // 城市 / 行业（step 1 已隐藏 — 现在 currentStep=5）
+    // step 5 中只剩下 factor dropdown
+    expect(selects.length).toBeGreaterThanOrEqual(2);
+    // 两个因子键 app_type / platform 都应该出现在 data-factor 属性
+    expect(w.find('[data-factor="app_type"]').exists()).toBe(true);
+    expect(w.find('[data-factor="platform"]').exists()).toBe(true);
+  });
+
+  it("step 5：初始 dev_factor preview 为 1.00", async () => {
+    const w = await gotoStep5();
+    const preview = w.find('[data-testid="dev-factor-preview"]');
+    expect(preview.exists()).toBe(true);
+    expect(preview.text()).toContain("1.00");
+  });
+
+  it("step 5：选择 OLAP → preview 更新为 1.10", async () => {
+    const w = await gotoStep5();
+    const appTypeSelect = w.find('[data-factor="app_type"] select');
+    await appTypeSelect.setValue("OLAP");
+    await flushPromises();
+    const preview = w.find('[data-testid="dev-factor-preview"]');
+    expect(preview.text()).toContain("1.10");
+  });
+
+  it("step 5：多因子链相乘（OLAP × mobile = 1.32）", async () => {
+    const w = await gotoStep5();
+    await w.find('[data-factor="app_type"] select').setValue("OLAP");
+    await w.find('[data-factor="platform"] select').setValue("mobile");
+    await flushPromises();
+    const preview = w.find('[data-testid="dev-factor-preview"]');
+    // 1.1 * 1.2 = 1.32
+    expect(preview.text()).toContain("1.32");
+  });
+
+  it("step 6 with include_ops=false：显示跳过提示", async () => {
+    const w = await gotoStep5();
+    // 默认 dev_only → include_ops=false
+    await w.find("[data-test='wizard-next']").trigger("click");
+    await flushPromises();
+    const skip = w.find('[data-testid="ops-skip"]');
+    expect(skip.exists()).toBe(true);
+    expect(skip.text()).toContain("未启用运维");
+  });
+
+  it("step 6 with include_ops=true：渲染 ops 因子 dropdown 与预览", async () => {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await w.find('input[name="name"]').setValue("混合项目");
+    await w.find("[data-test='wizard-next']").trigger("click"); // → step 2
+    // 切到 dev_and_ops → include_ops=true
+    const radios = w.findAll('input[type="radio"][name="project_type"]');
+    const devOps = radios.find(
+      (r) => (r.element as HTMLInputElement).value === "dev_and_ops",
+    )!;
+    await devOps.setValue();
+    await flushPromises();
+    // step 2 → 3 → 4 → 5 → 6
+    for (let i = 0; i < 4; i++) {
+      await w.find("[data-test='wizard-next']").trigger("click");
+    }
+    await flushPromises();
+
+    expect(w.text()).toContain("运维调整因子");
+    expect(w.find('[data-factor="update_freq"]').exists()).toBe(true);
+    const opsPreview = w.find('[data-testid="ops-factor-preview"]');
+    expect(opsPreview.exists()).toBe(true);
+    expect(opsPreview.text()).toContain("1.00");
+
+    // 选 low (0.8) → preview 0.80
+    await w.find('[data-factor="update_freq"] select').setValue("low");
+    await flushPromises();
+    expect(w.find('[data-testid="ops-factor-preview"]').text()).toContain("0.80");
+  });
+
+  it("step 5：dropdown 选项展示 ×multiplier 格式", async () => {
+    const w = await gotoStep5();
+    const appTypeSelect = w.find('[data-factor="app_type"] select');
+    const html = appTypeSelect.html();
+    expect(html).toContain("×1.00");
+    expect(html).toContain("×1.10");
+  });
+});

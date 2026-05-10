@@ -11,6 +11,84 @@ import type {
 } from "@/api/projects";
 import AlphaSlider from "@/components/AlphaSlider.vue";
 import PhaseCfPreview from "@/components/PhaseCfPreview.vue";
+import FactorDropdown from "@/components/FactorDropdown.vue";
+
+// 因子展示标签 — 与 ParamManager.vue 中的 FACTOR_LABELS 保持一致。
+// 重复定义而非共享是有意为之：T17 完成时这两处独立演进；后续若有第三个使用方
+// 再统一抽到 src/lib/factor-labels.ts。
+const FACTOR_LABELS: Record<string, string> = {
+  // factors_dev
+  app_type: "应用类型",
+  integrity_level: "完整性等级",
+  non_func: "非功能性要求",
+  platform: "运行平台",
+  team_bg: "团队背景",
+  // factors_ops
+  update_freq: "更新频率",
+  support: "支持方式",
+  security_level: "安全等级",
+  business_importance: "业务重要性",
+  response_time: "响应时间",
+  team_exp: "团队经验",
+  automation: "自动化程度",
+  deployment: "部署方式",
+  user_scale: "用户规模",
+  system_relevance: "关联系统数",
+};
+
+interface NormalizedLevel {
+  multiplier: number;
+  description?: string;
+}
+
+/**
+ * CSBMK®-202510 中 factors_dev / factors_ops 的 level value 是直接数字
+ * (e.g. { app_type: { "业务处理": 1.0 } })。FactorDropdown 期望
+ * { multiplier: number } 形态 — 这里做适配，与 ParamManager.normalizeLevels 一致。
+ */
+function normalizeLevels(
+  rawLevels: Record<string, unknown>,
+): Record<string, NormalizedLevel> {
+  const out: Record<string, NormalizedLevel> = {};
+  for (const [k, v] of Object.entries(rawLevels)) {
+    if (typeof v === "number") {
+      out[k] = { multiplier: v };
+    } else if (
+      v &&
+      typeof v === "object" &&
+      typeof (v as { multiplier?: unknown }).multiplier === "number"
+    ) {
+      out[k] = {
+        multiplier: (v as { multiplier: number }).multiplier,
+        description: (v as { description?: string }).description,
+      };
+    }
+  }
+  return out;
+}
+
+/**
+ * 给定一组用户选择（factor → levelKey）与 effective 中对应组的原始定义，
+ * 按链相乘得到总因子。空选 / 未匹配的因子按 ×1.00 计算。
+ */
+function chainMultiply(
+  selections: Record<string, string>,
+  defs: Record<string, Record<string, unknown>>,
+): number {
+  let f = 1.0;
+  for (const [factorName, levelKey] of Object.entries(selections)) {
+    if (!levelKey) continue;
+    const raw = defs?.[factorName]?.[levelKey];
+    const m =
+      typeof raw === "number"
+        ? raw
+        : raw && typeof raw === "object"
+          ? (raw as { multiplier?: number }).multiplier
+          : undefined;
+    if (typeof m === "number") f *= m;
+  }
+  return f;
+}
 
 const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   dev_only: "仅开发",
@@ -119,6 +197,20 @@ onMounted(async () => {
     // 静默兜底
   }
 });
+
+// 实时 chain 预览：用户在 step 5 / 6 选 dropdown 时即时显示乘积。
+const devFactorPreview = computed<number>(() =>
+  chainMultiply(
+    form.factors_dev,
+    (effectiveParams.value?.factors_dev ?? {}) as Record<string, Record<string, unknown>>,
+  ),
+);
+const opsFactorPreview = computed<number>(() =>
+  chainMultiply(
+    form.factors_ops,
+    (effectiveParams.value?.factors_ops ?? {}) as Record<string, Record<string, unknown>>,
+  ),
+);
 
 async function submit(): Promise<void> {
   submitting.value = true;
@@ -319,16 +411,60 @@ async function submit(): Promise<void> {
       </fieldset>
 
       <fieldset v-else-if="currentStep === 5">
-        <legend>开发因子</legend>
-        <p class="placeholder">
-          将在 T17 填充：factors_dev 选择
+        <legend>开发调整因子</legend>
+        <p class="hint">
+          不填的因子按 ×1.00 计算（不影响成本）。
         </p>
+        <FactorDropdown
+          v-for="(levels, key) in (effectiveParams?.factors_dev ?? {})"
+          :key="String(key)"
+          :factor="{
+            name: String(key),
+            label: FACTOR_LABELS[String(key)] ?? String(key),
+            levels: normalizeLevels(levels as Record<string, unknown>),
+          }"
+          :model-value="form.factors_dev[String(key)]"
+          @update:model-value="(v: string) => (form.factors_dev[String(key)] = v)"
+        />
+        <div
+          class="factor-chain-preview"
+          data-testid="dev-factor-preview"
+        >
+          实时 dev_factor 链 = <strong>{{ devFactorPreview.toFixed(2) }}</strong>
+        </div>
       </fieldset>
 
-      <fieldset v-else-if="currentStep === 6">
-        <legend>运维因子</legend>
-        <p class="placeholder">
-          将在 T17 填充：factors_ops 选择（仅 include_ops 时显示）
+      <fieldset v-else-if="currentStep === 6 && form.include_ops">
+        <legend>运维调整因子</legend>
+        <p class="hint">
+          不填的因子按 ×1.00 计算（不影响成本）。
+        </p>
+        <FactorDropdown
+          v-for="(levels, key) in (effectiveParams?.factors_ops ?? {})"
+          :key="String(key)"
+          :factor="{
+            name: String(key),
+            label: FACTOR_LABELS[String(key)] ?? String(key),
+            levels: normalizeLevels(levels as Record<string, unknown>),
+          }"
+          :model-value="form.factors_ops[String(key)]"
+          @update:model-value="(v: string) => (form.factors_ops[String(key)] = v)"
+        />
+        <div
+          class="factor-chain-preview"
+          data-testid="ops-factor-preview"
+        >
+          实时 ops_factor 链 = <strong>{{ opsFactorPreview.toFixed(2) }}</strong>
+        </div>
+      </fieldset>
+
+      <fieldset v-else-if="currentStep === 6 && !form.include_ops">
+        <legend>运维调整因子</legend>
+        <p
+          class="placeholder"
+          data-testid="ops-skip"
+        >
+          本项目未启用运维，跳过运维因子。
         </p>
       </fieldset>
 
@@ -482,6 +618,25 @@ legend {
   padding: var(--space-3);
   border-radius: var(--radius-md);
   margin: 0;
+}
+.hint {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.factor-chain-preview {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-primary-bg, var(--color-bg));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-body);
+}
+.factor-chain-preview strong {
+  color: var(--color-primary);
+  font-weight: 600;
+  margin-left: var(--space-1);
 }
 .radio-group {
   display: flex;
