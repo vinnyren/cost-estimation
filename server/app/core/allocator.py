@@ -40,3 +40,22 @@ def allocate(inp: AllocatorInput) -> list[AllocatorOutput]:
             us = round(s_free / inp.cf * d.weight / weight_sum, 2)
             out.append(AllocatorOutput(name=d.name, us=us, locked=False, audit_tag="budget_derived"))
     return out
+
+
+def allocate_with_validation(inp: AllocatorInput) -> dict:
+    """v2.3 — 返回 {items, validation} envelope；items 同 allocate() 输出，
+    validation.error_pct 是反算 forward 重算总规模与 target_us 的误差比例（%）。
+    """
+    items = allocate(inp)
+    total_us = sum(o.us for o in items)
+    recalc_total_adjusted = total_us * inp.cf
+    error_abs = abs(recalc_total_adjusted - inp.target_us)
+    error_pct = (error_abs / inp.target_us * 100) if inp.target_us > 0 else 0.0
+    return {
+        "items": items,
+        "validation": {
+            "recalc_total_us": total_us,
+            "recalc_total_adjusted": recalc_total_adjusted,
+            "error_pct": round(error_pct, 3),
+        },
+    }
