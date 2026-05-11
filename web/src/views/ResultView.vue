@@ -49,6 +49,31 @@ const downloading = ref(false);
 const targetTotal = ref(0);
 const otherCost = ref(0);
 
+const availableBudget = computed(() => {
+  const avail = Math.max(0, targetTotal.value - otherCost.value);
+  return avail.toLocaleString("zh-CN");
+});
+
+const reverseTiers = computed(() => {
+  if (!reverseResult.value) return [];
+  const r = reverseResult.value;
+  return (["P10", "P50", "P90"] as const).map((k) => ({
+    key: k,
+    label: k === "P10"
+      ? "乐观 · 最大可承载"
+      : k === "P50"
+      ? "中位 · 推荐采纳"
+      : "保守 · 最少可保证",
+    cost: 0,
+    fp: r.scale_adjusted_bands[k],
+    recommended: r.recommended_band === k,
+    unit: "fp" as const,
+    extras: [
+      ["未调整规模 US", `${r.scale_unadjusted_bands[k].toFixed(2)} FP`],
+    ] as Array<[string, string]>,
+  }));
+});
+
 // allocResult stores the latest AllocateResult emitted by AllocatorPanel
 const allocResult = ref<AllocateResult | null>(null);
 
@@ -264,25 +289,67 @@ function fmtWan(n: number): string {
       v-else-if="project?.mode === 'reverse'"
       class="reverse"
     >
-      <fieldset class="card reverse-card">
-        <legend>反算输入</legend>
-        <label class="field">
-          <span class="field-label">目标总造价（元）</span>
-          <input
-            v-model.number="targetTotal"
-            type="number"
-            min="0"
+      <div
+        class="card"
+        style="padding: 20px; margin-bottom: 16px"
+      >
+        <div
+          class="section-title"
+          style="margin-bottom: 14px"
+        >
+          反算输入
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px">
+          <div
+            class="field"
+            style="margin-bottom: 0"
           >
-        </label>
-        <label class="field">
-          <span class="field-label">其他费用（元）</span>
-          <input
-            v-model.number="otherCost"
-            type="number"
-            min="0"
+            <label class="field-label">目标总造价 (元)</label>
+            <input
+              v-model.number="targetTotal"
+              class="field-input mono"
+              type="number"
+              min="0"
+            >
+          </div>
+          <div
+            class="field"
+            style="margin-bottom: 0"
           >
-        </label>
-        <div class="reverse-actions">
+            <label class="field-label">其他费用 (元)</label>
+            <input
+              v-model.number="otherCost"
+              class="field-input mono"
+              type="number"
+              min="0"
+            >
+          </div>
+          <div
+            class="field"
+            style="margin-bottom: 0"
+          >
+            <label class="field-label">可用预算 (元)</label>
+            <input
+              class="field-input mono"
+              :value="availableBudget"
+              disabled
+              style="background: var(--surface-sunken)"
+            >
+          </div>
+          <div
+            class="field"
+            style="margin-bottom: 0"
+          >
+            <label class="field-label">α 开发占比</label>
+            <input
+              class="field-input mono"
+              :value="(project?.alpha_dev ?? 1.0).toFixed(3)"
+              disabled
+              style="background: var(--surface-sunken)"
+            >
+          </div>
+        </div>
+        <div style="margin-top: 14px; display: flex; gap: 8px">
           <button
             type="button"
             class="btn btn-primary"
@@ -291,34 +358,12 @@ function fmtWan(n: number): string {
             反算
           </button>
         </div>
-      </fieldset>
-
-      <div
-        v-if="hasReverse"
-        class="cards"
-      >
-        <ResultCard
-          :band="'P10'"
-          :value="reverseResult!.scale_adjusted_bands.P10"
-          :unit="'FP'"
-          :recommended="reverseResult!.recommended_band === 'P10'"
-          :description="'乐观（高生产率假设 → FP 较大）'"
-        />
-        <ResultCard
-          :band="'P50'"
-          :value="reverseResult!.scale_adjusted_bands.P50"
-          :unit="'FP'"
-          :recommended="reverseResult!.recommended_band === 'P50'"
-          :description="'中位（建议采纳）'"
-        />
-        <ResultCard
-          :band="'P90'"
-          :value="reverseResult!.scale_adjusted_bands.P90"
-          :unit="'FP'"
-          :recommended="reverseResult!.recommended_band === 'P90'"
-          :description="'保守（低生产率假设 → FP 较小）'"
-        />
       </div>
+
+      <ResultTrio
+        v-if="hasReverse"
+        :tiers="reverseTiers"
+      />
 
       <AllocatorPanel
         v-if="reverseResult && project"
@@ -418,21 +463,6 @@ function fmtWan(n: number): string {
   flex-direction: column;
   gap: var(--space-5);
 }
-.reverse-card {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-5);
-}
-.reverse-card legend {
-  font-weight: 600;
-  font-size: var(--font-size-md);
-  color: var(--color-text-title);
-  padding: 0 var(--space-2);
-}
 .field {
   display: flex;
   flex-direction: column;
@@ -442,11 +472,6 @@ function fmtWan(n: number): string {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   font-weight: 500;
-}
-.reverse-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-2);
 }
 .dl-bar {
   margin-top: var(--space-4);
