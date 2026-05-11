@@ -109,6 +109,32 @@ pnpm test:e2e
 
 详见 [docs/dev-guide.md](docs/dev-guide.md)。
 
+## 覆盖率验证（v2.1+）
+
+项目维护 `coverage-baseline.json` 防止覆盖率退化。本地验证：
+
+```bash
+# 跑全套测试 + 与 baseline 比对（>0.5% 退化时退出 1）
+./scripts/check-coverage.sh
+
+# 覆盖率上升时锁定新 baseline
+./scripts/update-coverage-baseline.sh
+```
+
+可选 pre-commit hook（自决）：
+
+```bash
+ln -sf ../../scripts/check-coverage.sh .git/hooks/pre-commit
+```
+
+测试基线（v2.1）：
+
+| 项 | 数量 | line coverage |
+|---|---:|---:|
+| Backend pytest | 173 | 91.9% |
+| Frontend vitest | 220 | 97.8% |
+| Playwright e2e | 13 | n/a |
+
 ## 标准合规
 
 - GB/T 36964-2018 软件工程 软件开发成本度量规范
