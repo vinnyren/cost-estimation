@@ -23,7 +23,7 @@ import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import { snapshotsApi, type ParamSnapshot } from "@/api/snapshots";
 
-const props = defineProps<{ projectId: string }>();
+const props = defineProps<{ projectId: string | null }>();
 
 const store = useParamsStore();
 const results = useResultsStore();
@@ -69,7 +69,11 @@ async function onRestoreSnapshot(id: number): Promise<void> {
   try {
     await snapshotsApi.restore(id);
     // 恢复后重新拉 effective，让其他 tab 同步刷新
-    await store.loadFor(props.projectId);
+    if (props.projectId) {
+      await store.loadFor(props.projectId);
+    } else {
+      await store.loadGlobal();
+    }
     results.markParamsChanged();
     await reloadSnapshots();
   } catch (e: unknown) {
@@ -109,7 +113,11 @@ async function load(): Promise<void> {
   loading.value = true;
   error.value = null;
   try {
-    await store.loadFor(props.projectId);
+    if (props.projectId) {
+      await store.loadFor(props.projectId);
+    } else {
+      await store.loadGlobal();
+    }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : "加载失败";
   } finally {
@@ -131,7 +139,9 @@ const TABS = [
 const eff = computed(() => store.effective);
 
 // 每次 override 都触发 markParamsChanged，确保结果页的 StaleBanner 能提示重算
+// 全局模式（projectId = null）不支持 override 写操作
 async function patchOverride(key: string, value: unknown): Promise<void> {
+  if (!props.projectId) return;
   await store.applyOverride(props.projectId, { [key]: value });
   results.markParamsChanged();
 }
@@ -214,9 +224,21 @@ async function onFactorEdit(
     aria-labelledby="title"
   >
     <header class="page-header">
-      <h1 id="title">
-        参数管理
+      <h1
+        id="title"
+        class="page-title tight"
+      >
+        <template v-if="projectId">
+          参数管理
+        </template>
+        <template v-else>
+          全局参数库
+        </template>
       </h1>
+      <div class="page-sub">
+        <template v-if="projectId">项目级覆盖优先于全局参数 · 当前数据基准 CSBMK®-202510</template>
+        <template v-else>全局参数库（影响所有项目） · 当前基准 CSBMK®-202510</template>
+      </div>
     </header>
 
     <LoadingSkeleton

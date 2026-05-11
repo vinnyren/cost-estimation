@@ -14,6 +14,13 @@ export const useParamsStore = defineStore("params", () => {
     loadedFor.value = projectId;
   }
 
+  async function loadGlobal(): Promise<void> {
+    const resp = await paramsApi.global();
+    effective.value = resp;
+    overrides.value = ((resp?.overrides ?? {}) as Record<string, unknown>);
+    loadedFor.value = null; // global mode marker
+  }
+
   async function applyOverride(
     projectId: string,
     patch: Record<string, unknown>,
@@ -40,5 +47,5 @@ export const useParamsStore = defineStore("params", () => {
     return true;
   }
 
-  return { effective, overrides, loadedFor, loadFor, applyOverride, isOverridden };
+  return { effective, overrides, loadedFor, loadFor, loadGlobal, applyOverride, isOverridden };
 });
