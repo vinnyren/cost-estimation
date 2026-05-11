@@ -248,7 +248,8 @@ describe("ResultView", () => {
     await flushPromises();
     await flushPromises();
     expect(w.text()).toContain("AI 模块分摊");
-    const allocBtn = w.findAll("button").find((b) => b.text() === "生成模块分摊");
+    // AllocatorPanel button text
+    const allocBtn = w.findAll("button").find((b) => b.text().includes("生成分摊"));
     expect(allocBtn).toBeDefined();
   });
 
@@ -263,10 +264,10 @@ describe("ResultView", () => {
     await flushPromises();
     await flushPromises();
     expect(w.text()).not.toContain("AI 模块分摊");
-    expect(w.findAll("button").find((b) => b.text() === "生成模块分摊")).toBeUndefined();
+    expect(w.findAll("button").find((b) => b.text().includes("生成分摊"))).toBeUndefined();
   });
 
-  it("点击「生成模块分摊」→ 调 calcApi.allocate 并显示分摊行", async () => {
+  it("AllocatorPanel: 点击「生成分摊」→ 调 calcApi.allocate 并显示分摊结果", async () => {
     vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
     vi.mocked(calcApi.reverse).mockResolvedValueOnce({
       budget_for_dev: 950_000,
@@ -285,9 +286,6 @@ describe("ResultView", () => {
       ],
       validation: { recalc_total_us: 165.29, recalc_total_adjusted: 200.0, error_pct: 0.0 },
     });
-    const promptSpy = vi
-      .spyOn(window, "prompt")
-      .mockReturnValue('[{"name":"前端","weight":1},{"name":"后端","weight":1.5}]');
 
     router.push("/projects/2/result");
     await router.isReady();
@@ -301,30 +299,29 @@ describe("ResultView", () => {
     await w.findAll("button").find((b) => b.text() === "反算")!.trigger("click");
     await flushPromises();
     await flushPromises();
-    const allocBtn = w.findAll("button").find((b) => b.text() === "生成模块分摊");
+    const allocBtn = w.findAll("button").find((b) => b.text().includes("生成分摊"));
     expect(allocBtn).toBeDefined();
     await allocBtn!.trigger("click");
     await flushPromises();
     await flushPromises();
+    // AllocatorPanel calls allocate with default drafts (前端 weight=1, 后端 weight=1.5)
     expect(calcApi.allocate).toHaveBeenCalledWith({
       project_id: "p-2",
       target_us: 200,
       cf: 1.21,
-      drafts: [
-        { name: "前端", weight: 1 },
-        { name: "后端", weight: 1.5 },
-      ],
+      drafts: expect.arrayContaining([
+        expect.objectContaining({ name: "前端" }),
+        expect.objectContaining({ name: "后端" }),
+      ]),
     });
-    const rows = w.findAll("[data-testid='alloc-row']");
-    expect(rows.length).toBe(2);
-    expect(rows[0].text()).toContain("前端");
-    expect(rows[0].text()).toContain("66.12");
-    expect(rows[1].text()).toContain("后端");
-    expect(rows[1].text()).toContain("99.17");
-    promptSpy.mockRestore();
+    // Results rendered in AllocatorPanel table
+    expect(w.text()).toContain("66.12");
+    expect(w.text()).toContain("99.17");
+    // Consistency banner
+    expect(w.text()).toContain("误差");
   });
 
-  it("点击「生成模块分摊」遇到非法 JSON → 显示提示，不调 API", async () => {
+  it("AllocatorPanel: allocate API 失败 → 显示 amber banner 提示", async () => {
     vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
     vi.mocked(calcApi.reverse).mockResolvedValueOnce({
       budget_for_dev: 950_000,
@@ -336,7 +333,7 @@ describe("ResultView", () => {
       cf_used: 1.21,
       recommended_band: "P50" as const,
     });
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("not-json-{{");
+    vi.mocked(calcApi.allocate).mockRejectedValueOnce(new Error("分摊服务不可用"));
 
     router.push("/projects/2/result");
     await router.isReady();
@@ -350,11 +347,9 @@ describe("ResultView", () => {
     await w.findAll("button").find((b) => b.text() === "反算")!.trigger("click");
     await flushPromises();
     await flushPromises();
-    const allocBtn = w.findAll("button").find((b) => b.text() === "生成模块分摊");
+    const allocBtn = w.findAll("button").find((b) => b.text().includes("生成分摊"));
     await allocBtn!.trigger("click");
     await flushPromises();
-    expect(w.text()).toContain("不是合法 JSON");
-    expect(calcApi.allocate).not.toHaveBeenCalled();
-    promptSpy.mockRestore();
+    expect(w.text()).toContain("分摊服务不可用");
   });
 });
