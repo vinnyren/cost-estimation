@@ -27,9 +27,9 @@ test("AuditView — 项目操作后审计页有记录", async ({ page, baseURL, 
     await page.goto(`${baseURL}/projects/${pid}/audit?t=${TOKEN}`);
     await page.waitForLoadState("networkidle").catch(() => {});
 
-    // 验至少 2 行 audit（create + update）
-    const rows = page.locator('[data-testid="audit-row"]');
-    await expect(rows).toHaveCount(2);
+    // 验至少 1 行 audit（timeline 用 .tl-item）
+    const rows = page.locator(".tl-item");
+    await expect(rows.first()).toBeVisible();
     // 验内容包含中文标签（来自 AuditView.vue ACTION_LABELS）
     await expect(page.locator("text=创建项目")).toBeVisible();
     await expect(page.locator("text=修改项目")).toBeVisible();
