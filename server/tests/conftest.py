@@ -33,11 +33,19 @@ def db_engine() -> Iterator[Any]:
     所以建在内存里的表对所有 session 可见。check_same_thread=False
     让 FastAPI 的异步 endpoint 在不同 thread 上访问也行。
 
+    PRAGMA foreign_keys=ON — 让 ON DELETE CASCADE 真的工作；
+    SQLite 默认 FK off，production engine 通过 session.py 的 event
+    listener 启用，in-memory 测试 engine 这里复刻同样的行为。
+
     yield 后 dispose — 内存表跟着 GC，零 disk 残留。
     """
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, event
     from sqlalchemy.pool import StaticPool
 
+    # 必须先 import models 让 ORM 类注册到 Base.metadata；
+    # 单文件隔离运行时，没有上游导入触发 model 模块加载，
+    # `create_all` 会建一张空 schema。
+    import app.db.models  # noqa: F401
     from app.db.session import Base
 
     engine = create_engine(
@@ -45,6 +53,13 @@ def db_engine() -> Iterator[Any]:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(conn, _):
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(bind=engine)
     yield engine
     engine.dispose()
@@ -66,7 +81,7 @@ def db_session(db_engine) -> Iterator[Any]:
 
 
 @pytest.fixture
-def client_factory(db_session, monkeypatch):
+def client_factory(db_engine, db_session, monkeypatch):
     """工厂 fixture — 返回 async callable 用来构造 AsyncClient。
 
     用法（async test）::
@@ -75,10 +90,35 @@ def client_factory(db_session, monkeypatch):
             async with await client_factory() as c:
                 r = await c.get('/api/...')
 
-    fixture 内部：注入 db_session 替代 FastAPI 的 get_db；按需 seed CSBMK；
-    auth token 用 'test-secret-token-xyz'。
+    fixture 内部：
+      1) monkeypatch app.db.session.SessionLocal 绑到 in-memory engine —
+         覆盖那些不走 get_db 依赖、直接 `SessionLocal()` 的代码路径
+         （比如 audit middleware）。
+      2) 注入 db_session 替代 FastAPI 的 get_db。
+      3) 按需 seed CSBMK；auth token 用 'test-secret-token-xyz'。
     """
     monkeypatch.setenv("COST_AUTH_TOKEN", "test-secret-token-xyz")
+
+    # 把 module-level SessionLocal 重绑到测试 in-memory engine。
+    # 直接拿 SessionLocal() 的代码（如 app/middleware/audit.py）会拿到
+    # 绑到 in-memory engine 的 session，写入对 test 的 db_session 也可见
+    # （StaticPool 共享同一连接）。
+    # 注意：用 `from ..db.session import SessionLocal` 直接 import 的模块
+    # 会保留旧绑定，所以也要 patch 这些模块的 SessionLocal 引用。
+    from sqlalchemy.orm import sessionmaker
+
+    import app.db.session as session_module
+
+    test_session_local = sessionmaker(
+        bind=db_engine, autoflush=False, autocommit=False,
+    )
+    monkeypatch.setattr(session_module, "SessionLocal", test_session_local)
+    # 已用 `from ..db.session import SessionLocal` 的模块需要单独 patch
+    try:
+        import app.middleware.audit as audit_module
+        monkeypatch.setattr(audit_module, "SessionLocal", test_session_local)
+    except ImportError:
+        pass
 
     async def _make(seed_csbmk: bool = True):
         from httpx import ASGITransport, AsyncClient
