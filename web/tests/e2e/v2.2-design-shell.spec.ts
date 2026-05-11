@@ -21,8 +21,8 @@ test.describe("v2.2 Design Shell", () => {
     // Inject token via URL param (same pattern as other e2e specs)
     await page.goto(`${baseURL}/?t=${TOKEN}`);
 
-    // Sidebar should be visible
-    const sidebar = page.locator(".sidebar");
+    // Sidebar should be visible (first .sidebar = main nav shell)
+    const sidebar = page.locator(".sidebar").first();
     await expect(sidebar).toBeVisible();
 
     // 5 main nav items (项目工作台, 全局参数库, 模板与场景, 报告中心, 审计日志)
@@ -40,18 +40,14 @@ test.describe("v2.2 Design Shell", () => {
     const subItems = sidebar.locator(".nav-item.sub");
     await expect(subItems).toHaveCount(0);
 
-    // Navigate to a project if one exists; otherwise skip sub-nav assertions
-    const firstRow = page.locator("tr.row-link, tr[data-project-id], tbody tr").first();
-    const firstRowCount = await firstRow.count();
-    if (firstRowCount > 0) {
-      // Try clicking "打开" button in first project row
-      const openBtn = page.getByRole("button", { name: "打开" }).first();
-      if (await openBtn.count() > 0) {
-        await openBtn.click();
-        // After navigating to a project page, sub-nav section should show 4 items
-        await expect(sidebar.locator(".nav-item.sub")).toHaveCount(4);
-        await expect(sidebar).toContainText("FP 编辑");
-      }
+    // Navigate to a project if one exists; otherwise skip sub-nav assertions.
+    // T14 redesign replaced "打开" button with row-link click navigation.
+    const firstRow = page.locator("tr.row-link").first();
+    if (await firstRow.count() > 0) {
+      await firstRow.click();
+      // After navigating to a project page, sub-nav section should show 4 items
+      await expect(sidebar.locator(".nav-item.sub")).toHaveCount(4);
+      await expect(sidebar).toContainText("FP 编辑");
     }
   });
 

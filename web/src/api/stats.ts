@@ -17,7 +17,10 @@ export interface ProjectStats {
 
 export const statsApi = {
   async getProjectStats(month?: string): Promise<ProjectStats> {
+    // The stats endpoint returns raw ProjectStats (not the ok/data envelope),
+    // so use api.raw to bypass the unwrap wrapper.
     const qs = month ? `?month=${encodeURIComponent(month)}` : "";
-    return api.get<ProjectStats>(`/api/projects/stats${qs}`);
+    const resp = await api.raw.get<ProjectStats>(`/api/projects/stats${qs}`);
+    return resp.data;
   },
 };
