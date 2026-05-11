@@ -13,70 +13,94 @@
 
 | GAP | 描述 | 入口 |
 |---|---|---|
-| GAP-A | 主工作流命令骨架完善 | `commands/cost.md` |
-| GAP-B | 项目复制（一键 clone 含 functions + factors_overrides） | `POST /api/projects/{id}/copy` / ProjectActionMenu |
-| GAP-C | NESMA 提取 prompt 增强（识别率提升） | `SKILL.md` / FpEditor 的 AI hint |
-| GAP-D | 项目级因子覆盖（per-project factors_dev/ops_json） | ProjectWizard 第 6 步 / FactorTable |
-| GAP-E | 全局参数快照（CRUD + 一键回滚） | `/api/params/snapshots*` / ParamManager 快照 tab |
-| GAP-F | 项目审计流水（PATCH/POST/PUT/DELETE 全记录） | `AuditMiddleware` / AuditView / `/projects/:id/audit` |
-| GAP-G | 项目列表服务端搜索/筛选/分页（q/city/industry/phase/mode/sort/order/page/size） | ProjectList toolbar + meta envelope |
-| GAP-H | 阶段分摊向导（allocator UI + 导出） | `commands/cost-allocate.md` / ResultView allocator panel |
-| GAP-I | ParamManager 4 个 stub tab 全部实装（生产率 / 因子 / 阶段 / 规模变更） | ParamManager.vue |
-| GAP-J | 阶段系数即时预览 + alpha 三档进度因子 | PhaseCfPreview / AlphaSlider |
-| GAP-K | 全局参数 effective 视图（seed + 用户覆盖 + 快照合并） | `GET /api/params/effective` |
+| GAP-A | AI 提取功能点（NESMA 5 类别自动归类 + 复杂度判定） | `SKILL.md` prompt + `/cost` 命令 + FpEditor claude_draft 高亮 + 30s polling |
+| GAP-B | 17+ 调整因子 UI（5 dev + 11 ops + scale_change） | `projects.factors_*_json` + ParamManager 4 个 stub tab 实装 + Wizard dropdown |
+| GAP-C | AI 模块分摊（反向 → P50 FP → AI 切模块） | `/cost-allocate` 命令 + ResultView allocator panel + `POST /api/calc/allocate` |
+| GAP-D | 运维费率 / 运维生产率 UI | ParamManager 城市费率加 ops 列 + 生产率新增 productivity_ops 表 |
+| GAP-E | alpha_dev / include_ops 配置 | `components/AlphaSlider.vue` + Wizard step 2 联动 |
+| GAP-F | 项目列表搜索 / 筛选 / 排序 / 分页 | `GET /api/projects` q/city/industry/phase/mode/sort/order/page/size + ProjectList toolbar |
+| GAP-G | 客户 / 评估方填写 | Wizard step 1 可选字段，写入 Excel 报告封面 |
+| GAP-H | 参数快照 + restore | `param_snapshots` 表 + 4 个 endpoint + ParamManager 快照 tab |
+| GAP-I | 项目复制（含 FP + 参数 override） | `POST /api/projects/{id}/copy` + `ProjectActionMenu.vue` |
+| GAP-J | 项目审计日志 | `audit_log` 表 + `AuditMiddleware` + `AuditView.vue` + `GET /api/projects/{id}/audit` |
+| GAP-K | 阶段 CF 实时预览 | Wizard step 3 + `components/PhaseCfPreview.vue` |
 
 ## QA / Review Fix
 
-| ID | 描述 |
-|---|---|
-| ISSUE-002 | ParamManager 切换 tab 状态丢失 → Pinia store 改为 keep-alive |
-| ISSUE-003 | 反向模式 BUDGET_NEGATIVE 错误码前端无引导 → 加 inline 错误 + 修正建议 |
-| ISSUE-004 | 项目列表 N+1 查询（每行单独 query function_count） → 加 SUM 子查询 |
-| ISSUE-005 | Excel 导出大项目（>500 FP 行）超时 → openpyxl write_only 模式 |
-| ISSUE-006 | AuditView 翻页无 loading 态 → 加骨架屏 |
-| ISSUE-007 | FactorTable 切换 dev/ops tab 滚动位置丢失 → 加 scroll-position memo |
-| Review-1 | AuditMiddleware 写入失败应 fail-open（不阻塞业务）→ 加 try/except 包裹 |
-| Review-2 | snapshots restore 缺事务边界 → 包 `with session.begin()` |
+| ID | 描述 | 严重度 |
+|---|---|---|
+| ISSUE-002 | `/health` endpoint 硬编码 `"version": "1.0.0"` — 改为读 pyproject | MEDIUM |
+| ISSUE-003 | `project.copy` 副本 audit 时间线空白 — middleware 为副本写 `project.create` + `diff_json={"copied_from":...}` | MEDIUM |
+| ISSUE-004 | ProjectList card 阶段字段显示英文 key（bidding）— 走 PHASES 映射为中文（招标） | LOW |
+| ISSUE-005 | scale_change 无 CSBMK 数据 — 补 csbmk_202510.json + `_FLAT_TOP_KEYS` 加 scale_change | MEDIUM |
+| ISSUE-006 | element-plus 死代码依赖 — 移除（vendor-element 921KB → 0KB, bundle -85%） | MEDIUM |
+| ISSUE-007 | ParamManager scale_change tab 冗余 label（OverrideField 内部 label 与表头列重复） | LOW |
+| Review #1 | AuditMiddleware streaming-response 假定不显式 — 加 in-line 警示注释 | INFO |
+| Review #2 | audit_log 不记 query params（fp.restore?version=3 追不到版本）— 序列化 sub_path + query 到 diff_json | INFO |
 
 ## Breaking Changes
 
 **无。** v2.0 全部向后兼容：
 
-- `GET /api/projects` 不带 query 时返回旧格式（裸数组），带任意新 query 时返回 envelope
-- `projects` 表新增列 `factors_dev_json` / `factors_ops_json` 默认 NULL，老逻辑读全局 factors 兜底
-- 新表 `param_snapshots` / `audit_log` 独立存在，删了不影响主链路
-- core/ 层算法签名不变，golden 测试照常通过（489,180 元 ±100）
+- `GET /api/projects` 不带任何 v2 query param 时仍返回新 envelope `{success, data, meta}`，前端调用方需要适配（已统一 `projectsApi.query()` 解包）
+- `projects` 表新增 `factors_dev_json` / `factors_ops_json` 默认 NULL，calc.py 读到 NULL 走 fallback 1.0 + warning，不阻塞老项目计算
+- 新表 `param_snapshots` / `audit_log` 独立存在，与 v1 数据流无耦合
+- core/ 层 forward / reverse / allocator 算法签名不变，golden 测试照常通过（170/170）
 
 ## 数据迁移
 
 3 个 alembic migration，自动 fallback：
 
 ```bash
-# 新装用户：bootstrap 一次性 create_all，无需 migrate
+# 新装用户：bootstrap 一次性 create_all，无需单独 migrate
 python -m app.bootstrap --db ... --seed ...
 
 # 升级用户（v1.x → v2.0）：alembic upgrade
 cd server && .venv/bin/alembic upgrade head
 ```
 
-| Migration | 安全性 |
-|---|---|
-| `9b1c4f2e7a3d`（projects 加两列 JSON） | ADD COLUMN 默认 NULL，无锁、毫秒级 |
-| `a4d8e6c2b9f1`（param_snapshots 新表） | CREATE TABLE，纯加法 |
-| `b7e2f1d9c4a8`（audit_log 新表） | CREATE TABLE，纯加法 |
+| Migration | 影响 | 安全性 |
+|---|---|---|
+| `9b1c4f2e7a3d` projects 加 factors_dev_json / factors_ops_json | ADD COLUMN（SQLite batch_alter）| 默认 NULL，无锁，毫秒级 |
+| `a4d8e6c2b9f1` param_snapshots 表 | CREATE TABLE | 纯加法，无影响 |
+| `b7e2f1d9c4a8` audit_log 表 + 3 索引 | CREATE TABLE + INDEX | 纯加法，无影响 |
 
-> 如果 dev DB 通过 `Base.metadata.create_all` 已经建过新列再跑 migration 会报 duplicate column，`alembic stamp head` 跳过即可（详见 `troubleshooting.md`）。
+> 如果 dev DB 通过 `Base.metadata.create_all` 已经建过新表/列再跑 migration 会报 duplicate column —— `alembic stamp head` 跳过即可，详见 `troubleshooting.md`。
 
 ## 依赖变更
 
-- **移除** `element-plus`（前端 bundle gzipped -85%，180KB → 27KB）
-- **保留** 后端全部 v1.x 依赖（FastAPI / SQLAlchemy / openpyxl 等版本不变）
+| 依赖 | v1.1 | v2.0 |
+|---|---|---|
+| element-plus | 2.7.6 (~1MB minified) | **移除**（源码 0 处使用，纯死代码加载） |
+| 后端 (FastAPI/SQLAlchemy/openpyxl 等) | 保持不变 | 同 v1.1 |
+
+**Bundle 影响：**
+- `vendor-element-*.js`: 921 KB / 297 KB gzipped → **0**（chunk 完全消失）
+- 总 dist gzipped: ~1MB → ~200 KB（**-85%**）
+- `pnpm build` 时间: 1.83s → 0.46s
 
 ## 升级建议
 
-1. 备份 SQLite：`cp ~/.claude/projects/cost-estimation/db/cost.sqlite{,.v1.bak}`
-2. 升级 plugin：`/plugin install cost-estimation@v2.0.0`
+1. 备份 SQLite：`cp ~/.claude/projects/cost-estimation/.data/cost.sqlite{,.v1.bak}`
+2. 升级 plugin：从 Claude Code marketplace 装 v2.0.0
 3. 跑 migration：`cd server && .venv/bin/alembic upgrade head`
-4. 验证：打开 ProjectList，确认筛选 / 分页 / 复制按钮可用
+4. 验证：打开 ProjectList，确认 toolbar 出现 + 创建一个项目走完 7 步 Wizard + 验证 Wizard step 5 因子 dropdown 渲染
 
-> 升级失败回滚：直接还原 `.sqlite.v1.bak`，重装 v1.x plugin。
+> 升级失败回滚：直接还原 `.sqlite.v1.bak`，重装 v1.x plugin。所有 v2 表 / 列删了不影响 v1.x 数据完整性。
+
+## 测试基线
+
+- Backend pytest: **170 / 170** (was 140 in v1.1)
+- Frontend vitest: **220 + 1 skip / 33 files** (was 124)
+- Playwright e2e: **3 / 3** (含新增 v2-wizard-flow)
+- type-check + lint: clean
+- Build: 0.46s
+
+## 相关文档
+
+- `README.md` — 用户向 v2.0 章节
+- `docs/user-guide.md` — 第 12 章 v2.0 新功能与迁移
+- `docs/dev-guide.md` — v2.0 架构新增
+- `docs/troubleshooting.md` — v2.0 已知问题
+- `docs/superpowers/specs/2026-05-11-v2-gap-closure-design.md` — 设计规范
+- `docs/superpowers/plans/2026-05-11-plan-5-v2-gap-closure.md` — 实施计划
