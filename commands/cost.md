@@ -126,6 +126,19 @@ X-Auth-Token: $TOKEN
 Content-Type: application/json
 ```
 
+**T0 — 创建 AI 任务（让前端 polling 看到进度）**
+
+```bash
+PROJECT_ID="<project_id>"   # 替换为用户传入的实际 project_id
+TASK_ID=$(curl -fsS -X POST "$BASE/api/ai-tasks" \
+  -H "X-Auth-Token: $TOKEN" \
+  -H "content-type: application/json" \
+  -d "{\"project_id\":\"$PROJECT_ID\",\"kind\":\"extract\"}" | jq -r .id)
+echo "AiTask created: $TASK_ID"
+```
+
+`$TASK_ID` 在后续 5 次 PATCH 中使用。PATCH 失败不阻断主流程（用 `|| true` 兜底）。
+
 ### Step 2：拉取项目的 upload 列表
 
 ```http
@@ -141,9 +154,27 @@ GET /api/projects/{project_id}/uploads/{upload_id}/parsed
 
 拿到 `parsed_text`（纯文本，已由后端预解析）。把所有 upload 的文本拼起来作为后续分析的素材。
 
+**T1 — 文档已解析**
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"status":"running","progress_pct":10,"stage_log_append":"✓ 文档解析"}' \
+  > /dev/null || true
+```
+
 ### Step 3：按 NESMA 5 类别生成 FP 列表
 
 按 SKILL.md "AI 功能点提取 — Step 2/3" 的 prompt 把文本里描述的功能逐条归类为：
+
+**T2 — 章节切分完成**
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"progress_pct":30,"stage_log_append":"✓ 章节切分"}' \
+  > /dev/null || true
+```
 
 - **EI**（External Input）：增/改/删事件，例 "提交订单"
 - **EO**（External Output）：派生 / 计算输出，例 "生成报表"
@@ -165,6 +196,15 @@ GET /api/projects/{project_id}/uploads/{upload_id}/parsed
 - EI/EO/EQ：low if DET<5 ∨ FTR<2；high if DET≥10 ∧ FTR≥3；else average
 - ILF/EIF：low if DET<20 ∧ RET<2；high if DET≥50 ∨ RET≥6；else average
 - 信息不足时**默认 average**
+
+**T3 — 类别归类完成**
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"progress_pct":55,"stage_log_append":"✓ EI/EO/EQ/ILF/EIF 类别归类"}' \
+  > /dev/null || true
+```
 
 ### Step 4：批量写入
 
@@ -196,9 +236,41 @@ X-Auth-Token: $TOKEN
 - `replace=false` 走追加模式，不覆盖用户已手填的 FP
 - 一次性提交完整 FP 清单（覆盖文档里全部业务流程），避免多次半成品调用
 
+**T4 — FP 表写入完成**
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"progress_pct":85,"stage_log_append":"✓ 写入 FP 表"}' \
+  > /dev/null || true
+```
+
 ### Step 5：完成后回复用户
 
 > "已根据文档生成 N 条 FP 草稿，写入项目 {id}。请在浏览器审核 / 调整：$BASE/projects/{id}/functions"
+
+**T5 — 任务完成**
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d "{\"status\":\"done\",\"progress_pct\":100,\"stage_log_append\":\"✓ 完成\",\"output_json\":\"{\\\"task_id\\\":\\\"$TASK_ID\\\"}\"}" \
+  > /dev/null || true
+echo "✅ AiTask $TASK_ID marked done"
+```
+
+---
+
+## 错误兜底：标记任务 failed
+
+如果上述任何步骤失败，在退出前调用：
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"status":"failed","error_message":"提取流程中断"}' \
+  > /dev/null || true
+```
 
 ---
 
