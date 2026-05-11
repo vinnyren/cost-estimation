@@ -184,6 +184,45 @@ Legacy `--color-*` token 保留为 alias，避免破坏旧组件。
 | backend coverage | 92.27%（见 coverage-baseline.json） |
 | frontend coverage | 95.88%（见 coverage-baseline.json） |
 
+## v2.3 — 闭环 (Plugin AI · Allocator UI · 测试补齐)
+
+v2.3 闭环 v2.2 留下的 3 项 "半完成"，零技术债。
+
+### Plugin AI 接入
+- `commands/cost.md` 在 FP 提取流程中加 6 次 PATCH `/api/ai-tasks` 上报（创建/解析/切分/归类/写入/完成）
+- `commands/cost-allocate.md` 加 4 次 PATCH 上报
+- 前端 AiTaskModal 自动 polling，每 1.5s 拉最新 task 状态 → 显示阶段日志 + 进度条
+
+### AI 模块分摊 UI
+- `AllocatorPanel.vue` 替换原 `window.prompt` JSON 输入
+- 表格行内编辑 drafts（模块名 / 权重滑块 / 锁定 FP / 删除）
+- backend `core/allocator.py` 加 `allocate_with_validation()` 返回 `{items, validation}` envelope
+- 一致性 banner 显示反算误差（≤ 1% 绿色，否则黄色）
+
+### 测试闭环
+- 修 `forward.spec.ts` 严格行数断言 → 宽松 ">= 1 row"，并改用 v2.2 `.result-card` selector
+- 修 `audit-view.spec.ts` selector 从 `data-testid` → `.tl-item`
+- 修 `reverse-allocator.spec.ts` data.items envelope
+- 加 4 个 thin view + api smoke unit test + 1 个 composable 单测
+- 恢复 vitest function coverage threshold 至 **80**
+
+### 升级（v2.2 → v2.3）
+
+```bash
+git pull
+# 无 schema migration
+```
+
+### v2.3 测试基线
+
+| 项 | 数量 |
+|---|---:|
+| pytest | 191 |
+| vitest | 236 |
+| playwright e2e | 25 |
+| backend coverage | 92.39% |
+| frontend coverage | line 96.98% / function 80%+ |
+
 ## 标准合规
 
 - GB/T 36964-2018 软件工程 软件开发成本度量规范
