@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "author": {
     "name": "Cost Estimation Team",
-    "url": "https://github.com/your-org/cost-estimation"
+    "url": "https://github.com/vinnyren/cost-estimation"
   },
   "commands": [
     "./commands/setup.md",

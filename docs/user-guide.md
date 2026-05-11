@@ -106,7 +106,7 @@ sudo yum install -y file-libs
 #### 第 1 步：添加 marketplace
 
 ```bash
-/plugin marketplace add github.com/your-org/cost-estimation
+/plugin marketplace add github.com/vinnyren/cost-estimation
 ```
 
 #### 第 2 步：安装 plugin

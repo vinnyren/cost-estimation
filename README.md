@@ -55,7 +55,7 @@ v1.1 老项目自动兼容：
 
 ```bash
 # 在 Claude Code 中：
-/plugin marketplace add github.com/your-org/cost-estimation
+/plugin marketplace add github.com/vinnyren/cost-estimation
 /plugin install cost-estimation
 /cost-estimation:setup
 /cost
