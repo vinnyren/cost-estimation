@@ -135,6 +135,55 @@ ln -sf ../../scripts/check-coverage.sh .git/hooks/pre-commit
 | Frontend vitest | 220 | 97.8% |
 | Playwright e2e | 13 | n/a |
 
+## v2.2 — 设计 import 全屏重做
+
+v2.2 把 claude.ai/design import 的 6 屏以**像素级复刻**落到前端，并补齐后端 4 个 endpoint。
+
+### 前端
+
+- 暗色 sidebar + topbar 双区布局 + ⌘K 命令面板
+- ProjectList KPI cards + 城市/行业/阶段 filter + table/card 视图切换
+- ResultView 9 步 Pipeline 详解 + 4 段 CostBar + 合规说明卡
+- AuditView 时间轴重做（替换 v2.0 的表格视图）
+- FpEditor AI 提取模态对话框（CLI 触发 + polling 进度）
+- 全局参数库 `/params/global` + 报告中心 `/reports` 入口
+
+### 后端
+
+- `GET /api/projects/stats` — KPI 汇总（counts + 本月聚合）
+- forward calc 返回 `trace`（9 步详解）+ `composition`（4 段拆分）
+- `/api/ai-tasks` CRUD endpoints — AI 任务状态轮询（plugin 接入留 v2.3）
+
+### 新表
+
+- `ai_tasks`（alembic migration 自动应用）
+
+### 升级（v2.1 → v2.2）
+
+```bash
+git pull && cd server && .venv/bin/alembic upgrade head
+```
+
+### 设计 token 变化
+
+v2.2 全套换 design import 自带 token（详见 `web/src/styles/tokens.css`）：
+- 字号基线 13px（v1.x 是 14px）
+- 配色 `--accent: #1E5EFF`（v1.x 是 `#165DFF`）
+- 字体 Noto Sans SC + JetBrains Mono
+- Sidebar 深色 `#0F1626`
+
+Legacy `--color-*` token 保留为 alias，避免破坏旧组件。
+
+### v2.2 测试基线
+
+| 项 | 数量 |
+|---|---:|
+| pytest | 185 |
+| vitest | 221 |
+| playwright e2e | 21 |
+| backend coverage | 92.27%（见 coverage-baseline.json） |
+| frontend coverage | 95.88%（见 coverage-baseline.json） |
+
 ## 标准合规
 
 - GB/T 36964-2018 软件工程 软件开发成本度量规范
