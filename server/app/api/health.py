@@ -1,3 +1,13 @@
+"""Liveness/version endpoint.
+
+路径是 GET /health（**不带** /api 前缀）— 这样 K8s / 反代健康检查无需
+配置 API 路由白名单即可直连。同样原因，全局 X-Auth-Token 中间件对该
+路径放行。
+
+version 字段优先从已安装包元数据读取（pip install -e 之后），失败时
+回退到读取仓库根 pyproject.toml；最终兜底 "unknown"，避免 release 时
+漏改 hard-coded 字符串。
+"""
 from importlib.metadata import PackageNotFoundError, version as _pkg_version
 
 from fastapi import APIRouter

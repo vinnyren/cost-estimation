@@ -1,8 +1,14 @@
 """GET /api/projects/{project_id}/audit (v2.0 GAP-J, Task T5).
 
-Writes happen implicitly via app/middleware/audit.py — this router only
-exposes read access. Auth is enforced by the global X-Auth-Token middleware
-(see deps.py), so no per-route Depends is required.
+只读查询接口。审计写入由 app/middleware/audit.py 在响应阶段隐式完成 —
+本路由不负责写。
+
+游标分页约定：客户端首次请求不带 before_id，拿到本页最小 id 后下次以
+该 id 作 before_id 传入，服务端返回 id < before_id 的更早记录。limit
+默认 100，上限 500。详见 services/audit.py:list_for_project。
+
+鉴权由全局 X-Auth-Token 中间件（deps.py）统一拦截，本路由无需逐路由
+Depends。
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session

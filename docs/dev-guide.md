@@ -129,6 +129,104 @@ cd server && bash scripts/run_mutmut.sh
 
 > 重要：因 plugin 通过 git clone 分发，**dist 必须随源码一起 commit**，否则用户 `/cost` 启动后浏览器空白。如忘记 build/commit dist，`commands/setup.md` 会尝试本地构建作为 fallback，但要求用户机器上有 Node.js 20+ 与 pnpm 9。
 
+## v2.0 架构新增
+
+v2.0 围绕 11 个 GAP 闭环做了横向扩展（向后兼容，无 breaking change）。下文聚焦给开发者看的架构、调试、扩展点；用户向文档见 `README.md` 与 `user-guide.md`。
+
+### 后端：3 张新表 + 3 个 migration
+
+| Migration | 改动 | 涉及表 |
+|---|---|---|
+| `9b1c4f2e7a3d` | 在 `projects` 加两列 JSON | `projects.factors_dev_json` / `factors_ops_json`（项目级因子覆盖，NULL 时回落全局） |
+| `a4d8e6c2b9f1` | 新表 `param_snapshots` | 全局参数快照（name / payload_json / created_at），用于 ParamManager 一键回滚 |
+| `b7e2f1d9c4a8` | 新表 `audit_log` | 项目操作流水（project_id / action / actor / before_json / after_json / created_at），cursor 分页 |
+
+> Schema 物理由 `app/db/models.py` 描述；migration 在 `app/db/migrations/versions/`。**bootstrap.py 仍走 `Base.metadata.create_all`，对新装用户透明；老库走 alembic upgrade head。**
+
+### 后端：新 endpoint 簇
+
+| 路由 | 功能 | 文件 |
+|---|---|---|
+| `POST /api/projects/{id}/copy` | 一键复制项目（含 functions / factors_overrides），返回新 id | `app/api/projects.py` |
+| `GET /api/projects/{id}/audit?before_id=&limit=` | 审计列表，cursor 分页（before_id 比 offset 稳定） | `app/api/audit.py` |
+| `GET/POST/PUT/DELETE /api/params/snapshots`、`POST /api/params/snapshots/{id}/restore` | 快照 CRUD + 还原 | `app/api/snapshots.py` |
+| `GET /api/params/effective` | 全局参数视图（合并 seed + 用户覆盖 + 当前快照） | `app/api/params.py` |
+
+`GET /api/projects` **查询参数升级**：新增 `q` / `city` / `industry` / `phase` / `mode` / `sort` / `order` / `page` / `size`，响应改为 envelope：
+
+```json
+{
+  "items": [...],
+  "meta": { "total": 137, "page": 1, "size": 20, "has_next": true }
+}
+```
+
+> 老 client 传不带任何 query 时回退到旧行为（兼容）。
+
+### 后端：关键中间件 / 服务层
+
+**AuditMiddleware**（`app/middleware/audit.py`）
+- 拦截 `PATCH/POST/PUT/DELETE /api/projects/*`
+- 写 `audit_log`，actor 取自 `COST_AUTH_TOKEN` 哈希前 8 位（单租户系统）
+- before/after diff 走 JSON Patch（仅保留变更字段，体积小）
+- 失败 fail-open（不阻塞业务）
+
+**Factors 组装层**（`services/factors.py`）
+- `assemble_factors(project) -> (dev_factor, ops_factor)`
+- 把 `project.factors_dev_json`（项目级）merge 进 `effective.factors_dev`（全局）
+- 项目级覆盖项目，全局兜底，传给 `core/forward.py` / `core/reverse.py`
+- **关键不变量**：core/ 层只接受 plain dict，不感知 db model；factors 组装是 services 的事
+
+### 前端新增
+
+**5 个新组件**（`web/src/components/`）：
+
+| 组件 | 用途 |
+|---|---|
+| `AlphaSlider.vue` | 0/0.5/1 三档进度因子滑杆（含 keyboard a11y） |
+| `FactorTable.vue` | 因子矩阵表格，dev/ops 双 tab |
+| `FactorDropdown.vue` | 单因子下拉（带 tooltip 显示 CSBMK 默认） |
+| `PhaseCfPreview.vue` | 阶段系数即时预览 |
+| `ProjectActionMenu.vue` | 项目卡操作菜单（复制 / 审计 / 删除） |
+
+**1 个新 view**：`AuditView.vue`（`/projects/:id/audit`），cursor 分页（before_id）+ 时间线展示。
+
+**3 个新 api client**（`web/src/api/`）：`snapshots.ts` / `audit.ts` / `projects.ts` 扩展（list 接 meta envelope、copy 方法）。
+
+**大改 view**：
+
+| View | 改动 |
+|---|---|
+| `ProjectWizard.vue` | 5 步 → 7 步骨架（加 factors 配置 + 复核） |
+| `ParamManager.vue` | 4 个 stub tab 全部实装（生产率 / 因子 / 阶段 / 快照 / 规模变更） |
+| `ProjectList.vue` | 顶部 toolbar（搜索 + 行业/阶段/模式筛选） + 服务端分页 |
+| `FpEditor.vue` | AI 提取 hint + polling 进度 |
+| `ResultView.vue` | allocator panel（阶段分摊预览 + 导出） |
+
+> **依赖瘦身**：v2.0 移除 element-plus（4.2MB），改为原生 HTML + scoped CSS，gzipped bundle -85%（≈ 180KB → 27KB）。
+
+### Plugin 链路（GAP-A/C）
+
+| 文件 | 用途 |
+|---|---|
+| `commands/cost.md` | 主工作流（启动 + 引导） |
+| `commands/cost-allocate.md` | **新增**，阶段分摊向导，配合 ResultView 的 allocator |
+| `SKILL.md` | NESMA 提取 prompt 增强（GAP-C 提升识别精度） |
+
+### 调试 v2 新功能
+
+```bash
+# 看审计流水
+sqlite3 ~/.claude/projects/cost-estimation/db/cost.sqlite \
+  "SELECT created_at, action, project_id FROM audit_log ORDER BY id DESC LIMIT 20;"
+
+# 看快照列表
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8788/api/params/snapshots
+
+# 复算 effective params
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8788/api/params/effective | jq .
+```
+
 ## 关键设计决策
 
 详见 `docs/superpowers/specs/2026-05-10-cost-estimation-design.md` 与 §16 /autoplan 评审报告。

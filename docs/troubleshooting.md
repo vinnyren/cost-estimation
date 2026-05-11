@@ -103,6 +103,34 @@ PLUGIN_DIR="$HOME/.claude/plugins/cache/cost-estimation"
 - FP 清单需重新上传或手动录入
 - 历史快照（fp_snapshots）会丢失（v1.0 累积的版本历史）
 
+## v2.0 已知问题
+
+### 单文件运行 v2 integration test 时第一个用例报 `Table 'projects' is already defined`
+
+→ 现象：`pytest tests/integration/test_projects_copy.py` 单跑时第一个测试失败；但全套 `pytest` 正常通过。
+→ 原因：fixture 在 module 级别用 `Base.metadata.create_all`，单文件隔离场景下 SQLAlchemy registry 被复用导致表重定义。
+→ 临时绕过：用全套 `pytest` 或加 `-p no:cacheprovider` 跑。
+→ 永久修复：fixture 重构为 `Base.metadata.clear()` 在 setup 前调用（**列入 v2.1 todo**，不影响 CI/发布）。
+
+### Alembic `9b1c4f2e7a3d` 报 `duplicate column factors_dev_json`
+
+→ 现象：某些从 v1.x dev DB 升级的库执行 `alembic upgrade head` 时报 duplicate column。
+→ 原因：初始 schema 用 `Base.metadata.create_all`（已经按最新 model 建表，含 `factors_dev_json` 列），alembic 不知道这两列已存在，再 ADD 一次就冲突。
+→ 解决：手动 stamp 跳过：
+
+```bash
+cd server
+.venv/bin/alembic stamp head   # 把 alembic_version 表标记为 head，不执行 DDL
+```
+
+> 生产场景下用户走 bootstrap 路径不会遇到，仅影响开发者 dev DB。
+
+### CSBMK 第三方版本 JSON 不含 scale_change 字段
+
+→ 现象：ParamManager 的 "规模变更" tab 显示 stub 文案（"暂未配置规模变更系数"）。
+→ 原因：v2 round 2 在官方 `csbmk_202510.json` 已补全 scale_change，但如果使用第三方/历史版本 JSON 不含此键，前端会 graceful degrade。
+→ 解决：替换为最新版 `app/data/csbmk_202510.json`，重启服务即可。Schema 已经向后兼容 — 缺字段不会 500，只是 UI 降级。
+
 ## 卸载
 
 ```bash

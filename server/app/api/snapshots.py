@@ -20,6 +20,11 @@ def _wrap(data):
 
 @router.post("", status_code=201)
 def create(payload: SnapshotCreate, db: Session = Depends(get_db)) -> dict:
+    """冻结当前 effective_params 为一份快照。
+
+    scope="global" 时快照全局参数；scope=<project_id> 时快照该项目的
+    effective params（含 override 层）。返回 201 + SnapshotOut。
+    """
     snap = svc.create_snapshot(db, payload.scope, payload.label)
     return _wrap(SnapshotOut.model_validate(snap).model_dump(mode="json"))
 
@@ -28,6 +33,11 @@ def create(payload: SnapshotCreate, db: Session = Depends(get_db)) -> dict:
 def list_(
     scope: str | None = None, db: Session = Depends(get_db)
 ) -> dict:
+    """列出快照（可选按 scope 过滤）。
+
+    未传 scope 时返回所有 scope 的快照；用于"全局快照"+"项目快照"
+    管理面统一拉取。结果按 created_at desc，由 service 层保证。
+    """
     rows = svc.list_snapshots(db, scope)
     return _wrap(
         [SnapshotOut.model_validate(r).model_dump(mode="json") for r in rows]
@@ -36,6 +46,12 @@ def list_(
 
 @router.post("/{snap_id}/restore")
 def restore(snap_id: int, db: Session = Depends(get_db)) -> dict:
+    """把指定快照回灌为当前 effective params，返回回灌后的 effective。
+
+    错误码：
+    - SNAPSHOT_NOT_FOUND：快照 id 不存在。
+    - PROJECT_NOT_FOUND：快照 scope 指向的项目已被删除（孤儿快照）。
+    """
     try:
         eff = svc.restore_snapshot(db, snap_id)
     except ValueError as e:
@@ -54,6 +70,7 @@ def restore(snap_id: int, db: Session = Depends(get_db)) -> dict:
 
 @router.delete("/{snap_id}", status_code=204)
 def delete(snap_id: int, db: Session = Depends(get_db)) -> Response:
+    """删除一份快照。成功返回 204（无 body）；不存在返回 SNAPSHOT_NOT_FOUND。"""
     try:
         svc.delete_snapshot(db, snap_id)
     except ValueError as e:

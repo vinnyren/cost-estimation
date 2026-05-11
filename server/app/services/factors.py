@@ -87,7 +87,18 @@ def _dev_non_func_multiplier(
 def _compute_dev_factor(
     selections: dict[str, Any], factor_table: dict[str, Any]
 ) -> float:
-    """5 维乘子链：app_type × integrity_level × non_func × platform × team_bg."""
+    """开发调整因子 5 维乘子链。
+
+    维度按 CSBMK 规范的固定顺序参与 dev_factor_chain：
+        1. app_type         应用类型
+        2. integrity_level  完整性级别
+        3. non_func         非功能性需求（混合维度，见 _dev_non_func_multiplier）
+        4. platform         平台
+        5. team_bg          团队背景
+
+    selections 中任何维度缺失/标签不在 factor_table → 该维度回退 1.0
+    （不抛错、不发 warning），允许向导只填部分维度。
+    """
     app_type_m = _lookup_multiplier(
         factor_table, "app_type", selections.get("app_type")
     )
@@ -132,10 +143,15 @@ _OPS_DIMENSIONS: tuple[tuple[str, str], ...] = (
 def _compute_ops_factor(
     selections: dict[str, Any], factor_table: dict[str, Any]
 ) -> float:
-    """11 维 ops 乘子链。每一维查表，缺失回退 1.0。
+    """运维调整因子 11 维乘子链。
 
-    selections 用 factor_table 中的字段名作 key（如 "security_level"），
-    我们映射回 ops_factor_chain 的形参名（如 "security"）。
+    维度顺序由 _OPS_DIMENSIONS 元组固定（见上）：business_importance、
+    security、support、update_freq、response、integrity、platform、
+    team_exp、deployment、user_scale、relevance。
+
+    selections 用 factor_table 字段名作 key（如 "security_level"），需映射
+    回 ops_factor_chain 形参名（如 "security"），故有 (kwarg, selection_key)
+    两列。每一维缺失/标签查不到 → 该维度回退 1.0，整体不报错。
     """
     kwargs: dict[str, float] = {}
     for kwarg_name, selection_key in _OPS_DIMENSIONS:
