@@ -27,13 +27,11 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // 把重量级 vendor 拆出独立 chunk，避免初始 index.js 一坨 1.6MB。
-        // 顺序按 weight 排：先匹配 vxe-table（最大），再 element-plus，最后
-        // vue 三件套。其它依赖落入默认 vendor chunk。
+        // 把 vue 三件套拆出独立 chunk，避免初始 index.js 加载放大。
+        // element-plus 与 vxe-table 在 v2.0 已移除（项目使用原生 HTML + scoped
+        // CSS，不需要 UI 组件库），相应 chunk 也一并移除。
         manualChunks(id: string) {
           if (!id.includes("node_modules")) return;
-          if (id.includes("element-plus") || id.includes("@element-plus"))
-            return "vendor-element";
           if (
             id.includes("/vue/") ||
             id.includes("vue-router") ||

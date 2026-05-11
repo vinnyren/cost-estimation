@@ -105,6 +105,13 @@
     "user_scale": {"<=1k": 0.90, "<=10k": 1.00, ">10k": 1.10},
     "system_relevance": {"none": 0.97, "1-5": 1.00, "6+": 1.14}
   },
+  "scale_change": {
+    "add": 1.00,
+    "modify": 0.70,
+    "remove": 0.40,
+    "convert": 0.60,
+    "threshold": 0.05
+  },
   "hours_per_pm": 174,
   "ops_cost_ratio": {"P50": 0.0902}
 }

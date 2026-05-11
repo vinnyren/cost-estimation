@@ -4,6 +4,7 @@ from ..core.forward import calculate_forward, ForwardInput, FpItem
 from ..core.reverse import calculate_reverse, ReverseInput
 from ..core.allocator import allocate, AllocatorInput, FpDraft
 from ..db.models import Project
+from . import factors as fsvc
 from . import params as ps
 from . import functions as fs
 
@@ -33,6 +34,34 @@ def _resolve_items(
     return [FpItem(us=fp.us) for fp in db_items]
 
 
+def _resolve_factors(
+    proj: Project, eff: dict, payload: dict
+) -> tuple[float, float, list[str]]:
+    """If caller explicitly passes dev_factor/ops_factor in the payload, honor
+    those (legacy API tests + direct overrides). Otherwise derive from the
+    project's factors_dev_json / factors_ops_json via the factors service.
+
+    Returns (dev_factor, ops_factor, warning_messages).
+    """
+    explicit_dev = "dev_factor" in payload
+    explicit_ops = "ops_factor" in payload
+    if explicit_dev and explicit_ops:
+        return payload["dev_factor"], payload["ops_factor"], []
+
+    dev_f, ops_f, warnings = fsvc.project_factors(proj, eff)
+    if explicit_dev:
+        dev_f = payload["dev_factor"]
+        warnings = [
+            w for w in warnings if "开发调整因子" not in w
+        ]
+    if explicit_ops:
+        ops_f = payload["ops_factor"]
+        warnings = [
+            w for w in warnings if "运维调整因子" not in w
+        ]
+    return dev_f, ops_f, warnings
+
+
 def run_forward(db: Session, project_id: str, payload: dict) -> dict:
     proj = db.query(Project).filter_by(id=project_id).first()
     if not proj:
@@ -42,16 +71,19 @@ def run_forward(db: Session, project_id: str, payload: dict) -> dict:
         ps.effective_to_calc_dict(eff),
         ProjectInputs(industry=proj.industry, city=proj.city, phase=proj.phase),
     )
+    dev_factor, ops_factor, warnings = _resolve_factors(proj, eff, payload)
     inp = ForwardInput(
         items=_resolve_items(db, project_id, payload, mode="forward"),
-        dev_factor=payload.get("dev_factor", 1.0),
-        ops_factor=payload.get("ops_factor", 1.0),
+        dev_factor=dev_factor,
+        ops_factor=ops_factor,
         include_dev=payload.get("include_dev", True),
-        include_ops=payload.get("include_ops", False),
-        other_cost=payload.get("other_cost", 0.0),
+        include_ops=payload.get("include_ops", proj.include_ops or False),
+        other_cost=payload.get("other_cost", proj.other_cost or 0.0),
     )
     r = calculate_forward(ctx, inp)
-    return r.__dict__
+    out = r.__dict__.copy()
+    out["warning_messages"] = list(out.get("warning_messages") or []) + warnings
+    return out
 
 
 def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
@@ -63,16 +95,19 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
         ps.effective_to_calc_dict(eff),
         ProjectInputs(industry=proj.industry, city=proj.city, phase=proj.phase),
     )
+    dev_factor, ops_factor, warnings = _resolve_factors(proj, eff, payload)
     inp = ReverseInput(
         target_total=payload["target_total"],
-        other_cost=payload.get("other_cost", 0.0),
-        include_ops=payload.get("include_ops", False),
-        alpha_dev=payload.get("alpha_dev", 1.0),
-        dev_factor=payload.get("dev_factor", 1.0),
-        ops_factor=payload.get("ops_factor", 1.0),
+        other_cost=payload.get("other_cost", proj.other_cost or 0.0),
+        include_ops=payload.get("include_ops", proj.include_ops or False),
+        alpha_dev=payload.get("alpha_dev", proj.alpha_dev or 1.0),
+        dev_factor=dev_factor,
+        ops_factor=ops_factor,
     )
     r = calculate_reverse(ctx, inp)
-    return r.__dict__
+    out = r.__dict__.copy()
+    out["warning_messages"] = list(out.get("warning_messages") or []) + warnings
+    return out
 
 
 def run_allocate(db: Session, project_id: str, payload: dict) -> list[dict]:

@@ -11,7 +11,11 @@ router = APIRouter(prefix="/api/calc")
 @router.post("/forward")
 def forward(payload: CalcForwardRequest, db: Session = Depends(get_db)):
     try:
-        result = svc.run_forward(db, payload.project_id, payload.model_dump())
+        # exclude_unset：让 service 能区分"用户没传 dev_factor"（→ 走 project
+        # factors_dev_json 派生）vs "用户显式传了 1.0"（→ 不派生，直接用）。
+        result = svc.run_forward(
+            db, payload.project_id, payload.model_dump(exclude_unset=True)
+        )
     except ValueError as e:
         msg = str(e)
         code = msg.split(":")[0]
@@ -34,7 +38,14 @@ def forward(payload: CalcForwardRequest, db: Session = Depends(get_db)):
 @router.post("/reverse")
 def reverse(payload: CalcReverseRequest, db: Session = Depends(get_db)):
     try:
-        return {"ok": True, "data": svc.run_reverse(db, payload.project_id, payload.model_dump())}
+        return {
+            "ok": True,
+            "data": svc.run_reverse(
+                db,
+                payload.project_id,
+                payload.model_dump(exclude_unset=True),
+            ),
+        }
     except ValueError as e:
         code = str(e).split(":")[0]
         raise HTTPException(400, detail={"error": {"code": code, "problem": str(e),

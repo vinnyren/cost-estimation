@@ -1,5 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from "vue";
+/**
+ * FpEditor — 功能点编辑视图（v2.0 接入 AI Plugin）。
+ *
+ * v1 已有：上传文档、手工添加 FP、模块树、历史版本快照（functionsApi.snapshots）。
+ * v2.0 GAP-A 新增：
+ *   - 上传后告知用户去 Claude Code 跑 `/cost` 命令让 AI 抽取 FP 草稿
+ *   - 30s 轮询 FP 列表，发现新增立即刷新并提示用户审核（5 分钟上限自动停）
+ *   - source="claude_draft" 的 FP 行用浅黄底色 + AI 徽标，与 allocator 橙色拉开层级
+ *
+ * 不在前端跑 AI 抽取（同步阻塞 + 超时风险），转 Plugin 模式：上传只落文档，
+ * 实际抽取由 Claude Code 终端发起，前端轮询拿结果。
+ */
+import { onMounted, onBeforeUnmount, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { functionsApi, type FunctionPoint, type FpSnapshotMeta } from "@/api/functions";
 import { uploadsApi } from "@/api/uploads";
@@ -23,6 +35,16 @@ const uploading = ref(false);
 const historyOpen = ref(false);
 const snapshots = ref<FpSnapshotMeta[]>([]);
 const restoring = ref<number | null>(null);
+
+// GAP-A: AI Plugin polling state. 上传完成后告诉用户去 Claude Code 跑 /cost；
+// 同时每 30s 轮询一次 FP 列表，发现 claude_draft 行数增加就停止并提示审核。
+const aiPollHint = ref<string>("");
+const aiPolling = ref(false);
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollStopTimer: ReturnType<typeof setTimeout> | null = null;
+const POLL_INTERVAL_MS = 30_000;
+const POLL_MAX_MS = 5 * 60 * 1000; // 5 分钟自动停
+const lastFpCount = ref(0);
 
 const isEmpty = computed(() => !loading.value && error.value === null && functions.value.length === 0);
 const isError = computed(() => !loading.value && error.value !== null);
@@ -53,7 +75,14 @@ async function onFileChange(e: Event): Promise<void> {
   uploading.value = true;
   try {
     await uploadsApi.upload(props.projectId, file);
-    window.alert("上传完成。AI 提取功能将在 Phase 5 接入；请先手动添加功能点。");
+    // GAP-A: AI 提取走 Plugin 模式（Claude Code /cost），不再阻塞用户。
+    // 弹窗保留以兼容现有 e2e 与 vitest 断言；同时开启 polling，等 AI 写入。
+    window.alert(
+      "已上传。在 Claude Code 终端运行 /cost 让 AI 提取 FP 草稿；或继续手动添加。",
+    );
+    aiPollHint.value =
+      "已上传。在 Claude Code 终端运行 /cost 让 AI 提取 FP 草稿；或继续手动添加。";
+    startAiPolling();
   } catch (err: unknown) {
     error.value = err instanceof Error ? err.message : "上传失败";
   } finally {
@@ -61,6 +90,51 @@ async function onFileChange(e: Event): Promise<void> {
     input.value = "";
   }
 }
+
+// pollTimer 守卫确保重复点上传不会启动多个 interval；
+// POLL_MAX_MS 上限避免用户离开页面后无限轮询消耗后端
+function startAiPolling(): void {
+  if (pollTimer) return;
+  aiPolling.value = true;
+  lastFpCount.value = functions.value.length;
+  pollTimer = setInterval(() => {
+    void pollOnce();
+  }, POLL_INTERVAL_MS);
+  pollStopTimer = setTimeout(() => {
+    stopAiPolling();
+    if (aiPollHint.value && !aiPollHint.value.includes("条 FP 草稿")) {
+      aiPollHint.value = "已停止轮询。如已运行 /cost 但未看到草稿，请手动刷新页面。";
+    }
+  }, POLL_MAX_MS);
+}
+
+async function pollOnce(): Promise<void> {
+  try {
+    const resp = await functionsApi.list(props.projectId);
+    functions.value = resp;
+    const delta = functions.value.length - lastFpCount.value;
+    if (delta > 0) {
+      stopAiPolling();
+      aiPollHint.value = `AI 写入了 ${delta} 条 FP 草稿，请审核。`;
+    }
+  } catch {
+    // 轮询失败不打断用户，下次再试；超过 POLL_MAX_MS 会自动停。
+  }
+}
+
+function stopAiPolling(): void {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (pollStopTimer) {
+    clearTimeout(pollStopTimer);
+    pollStopTimer = null;
+  }
+  aiPolling.value = false;
+}
+
+onBeforeUnmount(stopAiPolling);
 
 async function calcAndGo(): Promise<void> {
   router.push({ name: "result-view", params: { id: props.projectId } });
@@ -112,13 +186,19 @@ function formatSnapTime(iso: string | null): string {
 function sourceLabel(source: FunctionPoint["source"] | undefined): string {
   if (source === "allocator") return "预算倒推";
   if (source === "ai_extracted") return "AI 提取";
+  if (source === "claude_draft") return "AI 草稿";
   return "手工";
 }
 
 function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
   if (source === "allocator") return "badge badge-warning";
   if (source === "ai_extracted") return "badge badge-data";
+  if (source === "claude_draft") return "badge badge-ai";
   return "badge badge-muted";
+}
+
+async function reloadFps(): Promise<void> {
+  await load();
 }
 </script>
 
@@ -199,6 +279,22 @@ function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
       </div>
     </header>
 
+    <p
+      v-if="aiPollHint && (isEmpty || isError)"
+      class="ai-poll-hint"
+      role="status"
+    >
+      <span>{{ aiPollHint }}</span>
+      <button
+        v-if="aiPolling"
+        type="button"
+        class="btn-link"
+        @click="reloadFps"
+      >
+        立即刷新
+      </button>
+    </p>
+
     <LoadingSkeleton
       v-if="loading"
       :rows="8"
@@ -229,6 +325,21 @@ function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
         <ModuleTree :functions="functions" />
       </aside>
       <main class="grid-body">
+        <p
+          v-if="aiPollHint"
+          class="ai-poll-hint"
+          role="status"
+        >
+          <span>{{ aiPollHint }}</span>
+          <button
+            v-if="aiPolling"
+            type="button"
+            class="btn-link"
+            @click="reloadFps"
+          >
+            立即刷新
+          </button>
+        </p>
         <table class="data-table">
           <thead>
             <tr>
@@ -260,7 +371,10 @@ function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
               v-for="(fp, i) in functions"
               :key="fp.id"
               :data-source="fp.source"
-              :class="{ 'row-allocator': fp.source === 'allocator' }"
+              :class="{
+                'row-allocator': fp.source === 'allocator',
+                'ai-draft': fp.source === 'claude_draft',
+              }"
             >
               <td>{{ i + 1 }}</td>
               <td>{{ fp.subsystem }}</td>
@@ -356,6 +470,42 @@ function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
 .row-allocator:hover {
   background: var(--color-warning-bg) !important;
   filter: brightness(0.98);
+}
+/* GAP-A: claude_draft 行用浅黄底色 + AI 徽标，与 allocator 的橙色背景拉开层次。 */
+.ai-draft {
+  background: oklch(96% 0.06 95);
+}
+.ai-draft:hover {
+  background: oklch(96% 0.06 95) !important;
+  filter: brightness(0.98);
+}
+:deep(.badge-ai) {
+  background: var(--color-warning, #ea580c);
+  color: white;
+}
+.ai-poll-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: rgba(22, 101, 255, 0.06);
+  border: 1px solid rgba(22, 101, 255, 0.18);
+  border-radius: var(--radius-md);
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--color-primary, #165dff);
+  padding: 0;
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.btn-link:hover {
+  filter: brightness(0.9);
 }
 .history-wrap {
   position: relative;

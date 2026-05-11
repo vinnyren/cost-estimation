@@ -41,13 +41,17 @@ function reset(): void {
     :data-overridden="isOverridden"
   >
     <label class="field-row">
-      <span class="label">{{ label }}</span>
+      <span
+        v-if="label"
+        class="label"
+      >{{ label }}</span>
       <input
         :value="modelValue"
         type="number"
         :step="step ?? 0.01"
         :min="min"
         :max="max"
+        :aria-label="label || undefined"
         :aria-describedby="isOverridden ? `${label}-override-note` : undefined"
         @input="onInput"
       >

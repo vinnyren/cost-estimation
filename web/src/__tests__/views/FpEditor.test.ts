@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createRouter, createMemoryHistory } from "vue-router";
-import ElementPlus from "element-plus";
 import FpEditor from "@/views/FpEditor.vue";
 import { functionsApi } from "@/api/functions";
 import { uploadsApi } from "@/api/uploads";
@@ -53,7 +52,7 @@ describe("FpEditor", () => {
   it("空表态显示 hero CTA：上传文档让 AI 写第一稿", async () => {
     const w = mount(FpEditor, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     expect(w.text()).toContain("上传文档让 AI 写第一稿");
@@ -65,7 +64,7 @@ describe("FpEditor", () => {
     );
     const w = mount(FpEditor, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     expect(w.find("[role='alert']").exists()).toBe(true);
@@ -122,7 +121,7 @@ describe("FpEditor", () => {
     ]);
     const w = mount(FpEditor, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     expect(w.text()).toContain("手工");
@@ -133,7 +132,7 @@ describe("FpEditor", () => {
   it("点击「参数管理」→ 路由跳 param-manager", async () => {
     const w = mount(FpEditor, {
       props: { projectId: "p-7" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const paramBtn = w.findAll("button").find((b) => b.text() === "参数管理");
@@ -146,7 +145,7 @@ describe("FpEditor", () => {
   it("点击「计算 → 结果页」→ 路由跳 result-view", async () => {
     const w = mount(FpEditor, {
       props: { projectId: "p-9" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const calcBtn = w.findAll("button").find((b) => b.text().includes("计算"));
@@ -159,7 +158,7 @@ describe("FpEditor", () => {
   it("点击 hero CTA → 触发 file input click（pickFile）", async () => {
     const w = mount(FpEditor, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
       attachTo: document.body,
     });
     await flushPromises();
@@ -191,7 +190,7 @@ describe("FpEditor", () => {
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
     const w = mount(FpEditor, {
       props: { projectId: "p-5" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
       attachTo: document.body,
     });
     await flushPromises();
@@ -212,7 +211,7 @@ describe("FpEditor", () => {
     ]);
     const w = mount(FpEditor, {
       props: { projectId: "p-h1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const histBtn = w.findAll("button").find((b) => b.text().includes("历史版本"))!;
@@ -239,7 +238,7 @@ describe("FpEditor", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const w = mount(FpEditor, {
       props: { projectId: "p-h2" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const histBtn = w.findAll("button").find((b) => b.text().includes("历史版本"))!;
@@ -262,7 +261,7 @@ describe("FpEditor", () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     const w = mount(FpEditor, {
       props: { projectId: "p-h3" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await w.findAll("button").find((b) => b.text().includes("历史版本"))!.trigger("click");

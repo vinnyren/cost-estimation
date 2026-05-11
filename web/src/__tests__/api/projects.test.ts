@@ -6,6 +6,11 @@ vi.mock("@/api/client", () => ({
     post: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
+    raw: {
+      get: vi.fn(),
+      post: vi.fn(),
+      delete: vi.fn(),
+    },
   },
   ApiError: class ApiError extends Error {},
 }));
@@ -18,11 +23,19 @@ describe("projectsApi", () => {
     vi.clearAllMocks();
   });
 
-  it("list 调 GET /api/projects", async () => {
-    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+  it("list 通过 query 调 GET /api/projects 并返回 data 数组（新 envelope）", async () => {
+    // T20: list() now delegates to query() which speaks the new {success,data,meta}
+    // envelope through api.raw.get, not the legacy api.get + unwrap path.
+    (api.raw.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: {
+        success: true,
+        data: [{ id: "p-1", name: "p1" }],
+        meta: { total: 1, page: 1, size: 50 },
+      },
+    });
     const result = await projectsApi.list();
-    expect(api.get).toHaveBeenCalledWith("/api/projects");
-    expect(result).toEqual([]);
+    expect(api.raw.get).toHaveBeenCalledWith("/api/projects");
+    expect(result).toEqual([{ id: "p-1", name: "p1" }]);
   });
 
   it("get 调 GET /api/projects/:id", async () => {

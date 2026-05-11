@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from .context import EvaluationContext
 from .forward import BANDS
 
@@ -28,6 +28,8 @@ class ReverseResult:
     scale_unadjusted_ops_bands: dict
     cf_used: float
     recommended_band: str = "P50"
+    # v2.0 T7：同 forward — 因子缺失等提示。
+    warning_messages: list[str] = field(default_factory=list)
 
 
 def calculate_reverse(ctx: EvaluationContext, inp: ReverseInput) -> ReverseResult:

@@ -8,9 +8,48 @@
 - ✅ **反向模式**（目标成本 → 功能点）：输入预算 → 反推三档 FP → AI 分摊到模块
 - ✅ **NESMA 估算法**（默认）：EI/EO/EQ/ILF/EIF 5 类、低中高复杂度
 - ✅ **6 行业 + 37 城**生产率与费率（CSBMK®-202510 内置）
-- ✅ **17+ 调整因子**：开发因子 5 项 + 运维因子 11 项 + CF 阶段因子
+- ✅ **17+ 调整因子全部可配**：开发因子 5 项 + 运维因子 11 项 + CF 阶段因子（v2.0 ParamManager 实装）
+- ✅ **AI 提取功能点**（v2.0）：`/cost <project_id>` 让 Claude Code 读上传文档生成 NESMA FP 草稿
+- ✅ **AI 模块分摊**（v2.0）：`/cost-allocate <project_id>` 反向模式三档 FP → 模块清单
+- ✅ **7 步 Wizard 创建项目**（v2.0）：客户/评估方 + 项目类型 + 阶段 + 因子选择 + 实时 CF 预览
+- ✅ **参数快照 + 项目复制 + 审计日志**（v2.0）
 - ✅ **Excel 报告**：7 Sheet 模板（封面 / 摘要 / 报告书 / 调整因子 / FP 表 / 详细计算 / 参数附录）
 - ✅ **本地隔离**：只绑 127.0.0.1，token + Origin + CORS 三层防护
+
+## v2.0 新功能（2026-05-11）
+
+### 11 项 v1.1 后审计 gap 全部闭环
+
+- ✅ **AI 提取功能点**（GAP-A）：在 Claude Code 终端运行 `/cost <project_id>`，AI 读取上传文档自动生成 NESMA FP 草稿
+- ✅ **AI 模块分摊**（GAP-C）：反向模式下 `/cost-allocate <project_id>` 让 AI 把三档 FP 拆成模块清单
+- ✅ **17+ 调整因子全部可配**（GAP-B）：ParamManager 4 个 v2 stub tab 实装；Wizard 第 5/6 步用 dropdown 选因子级别，实时显示链式相乘
+- ✅ **运维费率 / 生产率**（GAP-D）：城市费率表新增 ops 列；生产率 tab 新增运维行业表
+- ✅ **alpha_dev / include_ops**（GAP-E）：dev_and_ops 项目类型显式滑块 + 联动开关
+- ✅ **客户 / 评估方填写**（GAP-G）：Wizard 第 1 步可选字段，写入 Excel 报告封面
+- ✅ **项目列表搜索 / 筛选 / 排序 / 分页**（GAP-F）：toolbar 实时搜索，5 个筛选维度
+- ✅ **参数快照 + restore**（GAP-H）：ParamManager 快照 tab 可创建 / 恢复 / 删除
+- ✅ **项目复制**（GAP-I）：行 ⋯ 菜单一键复制项目（含 FP + 参数 override）
+- ✅ **项目审计日志**（GAP-J）：所有 mutating 操作自动记录，AuditView 可查
+- ✅ **阶段 CF 实时预览**（GAP-K）：Wizard 第 3 步显示选定阶段的 CF 调整因子值
+
+### 数据迁移
+
+v1.1 老项目自动兼容：
+- `factors_dev_json` / `factors_ops_json` 为 NULL → calc 用 1.0 + Result.warning_messages 提示
+- 已有参数 / FP / 上传 不受影响
+- 跑 `cd server && alembic upgrade head` 应用 3 个新 migration（factors 列、param_snapshots 表、audit_log 表）
+
+### 新 API endpoint
+
+- `POST /api/projects/{id}/copy` — 项目复制
+- `GET /api/projects/{id}/audit` — 项目审计日志（cursor 分页）
+- `GET /api/params/snapshots` / `POST` / `POST /{id}/restore` / `DELETE /{id}` — 参数快照 CRUD
+- `GET /api/projects` 升级查询参数 — q / city / industry / phase / mode / sort / order / page / size
+- `GET /api/params/effective` — 全局 effective 视图（无项目作用域）
+
+### 新前端 view
+
+- `/projects/:id/audit` — 项目审计时间线
 
 ## 一键安装
 

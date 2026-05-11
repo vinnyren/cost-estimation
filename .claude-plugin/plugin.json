@@ -1,7 +1,7 @@
 {
   "name": "cost-estimation",
   "description": "软件造价评估 · NESMA 估算 · 双向（FP↔成本）",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "author": {
     "name": "Cost Estimation Team",
     "url": "https://github.com/your-org/cost-estimation"
@@ -9,6 +9,7 @@
   "commands": [
     "./commands/setup.md",
     "./commands/cost.md",
+    "./commands/cost-allocate.md",
     "./commands/cost-stop.md"
   ],
   "license": "MIT",

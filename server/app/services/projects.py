@@ -1,34 +1,164 @@
+import json
 import shutil
 import uuid
+from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..db.models import Project as ProjectORM
+from ..db.models import FunctionPoint, ParamOverride, Project as ProjectORM
 from ..schemas.project import ProjectCreate, ProjectPatch
 
+
+def _dump_factors(payload_dict: dict) -> dict:
+    """Pop factors_dev / factors_ops dicts and remap to JSON-string columns.
+
+    v2.0: payload 字段是 dict，落盘是 TEXT (json.dumps)；NULL = 未配置。
+    """
+    out = dict(payload_dict)
+    if "factors_dev" in out:
+        v = out.pop("factors_dev")
+        out["factors_dev_json"] = json.dumps(v) if v is not None else None
+    if "factors_ops" in out:
+        v = out.pop("factors_ops")
+        out["factors_ops_json"] = json.dumps(v) if v is not None else None
+    return out
+
+
 def create(db: Session, payload: ProjectCreate) -> ProjectORM:
-    project = ProjectORM(id=f"prj-{uuid.uuid4().hex[:12]}", **payload.model_dump())
+    data = _dump_factors(payload.model_dump())
+    project = ProjectORM(id=f"prj-{uuid.uuid4().hex[:12]}", **data)
     db.add(project)
     db.commit()
     db.refresh(project)
     return project
 
+
 def list_all(db: Session) -> list[ProjectORM]:
     return db.query(ProjectORM).order_by(ProjectORM.updated_at.desc()).all()
 
+
+# v2.0 GAP-F — 列表筛选/排序/分页。
+# 白名单 sort 列由 router 层做正则校验，service 层再 getattr 兜底 created_at。
+_SORT_COLUMNS = {"created_at", "updated_at", "name", "target_cost"}
+
+
+def list_with_query(
+    db: Session,
+    *,
+    q: Optional[str] = None,
+    city: Optional[str] = None,
+    industry: Optional[str] = None,
+    phase: Optional[str] = None,
+    mode: Optional[str] = None,
+    sort: str = "created_at",
+    order: str = "desc",
+    page: int = 1,
+    size: int = 50,
+) -> tuple[list[ProjectORM], int]:
+    """Return (rows, total). Total ignores pagination."""
+    qs = db.query(ProjectORM)
+    if q:
+        qs = qs.filter(ProjectORM.name.ilike(f"%{q}%"))
+    if city:
+        qs = qs.filter_by(city=city)
+    if industry:
+        qs = qs.filter_by(industry=industry)
+    if phase:
+        qs = qs.filter_by(phase=phase)
+    if mode:
+        qs = qs.filter_by(mode=mode)
+
+    total = qs.count()
+    sort_col_name = sort if sort in _SORT_COLUMNS else "created_at"
+    sort_col = getattr(ProjectORM, sort_col_name)
+    qs = qs.order_by(sort_col.desc() if order == "desc" else sort_col.asc())
+    qs = qs.offset((page - 1) * size).limit(size)
+    return qs.all(), total
+
+
+def copy_project(db: Session, src_id: str, new_name: str) -> ProjectORM:
+    """GAP-I — clone project metadata + function points + param overrides.
+
+    Results 和 fp_snapshots 不复制（语义：副本是一个干净的工作起点，不继承历史
+    计算结果，避免误导用户以为新项目已经算过）。
+    """
+    src = db.query(ProjectORM).filter_by(id=src_id).first()
+    if not src:
+        raise ValueError("PROJECT_NOT_FOUND")
+
+    new_id = f"prj-{uuid.uuid4().hex[:12]}"
+    new = ProjectORM(
+        id=new_id,
+        name=new_name,
+        project_type=src.project_type,
+        phase=src.phase,
+        city=src.city,
+        industry=src.industry,
+        client=src.client,
+        evaluator=src.evaluator,
+        mode=src.mode,
+        target_cost=src.target_cost,
+        other_cost=src.other_cost,
+        include_ops=src.include_ops,
+        alpha_dev=src.alpha_dev,
+        fp_method=src.fp_method,
+        basis_data_ver=src.basis_data_ver,
+        factors_dev_json=src.factors_dev_json,
+        factors_ops_json=src.factors_ops_json,
+    )
+    db.add(new)
+
+    for fp in src.function_points:
+        db.add(FunctionPoint(
+            id=f"fp-{uuid.uuid4().hex[:12]}",
+            project_id=new_id,
+            version=1,
+            subsystem=fp.subsystem,
+            l1_module=fp.l1_module,
+            l2_module=fp.l2_module,
+            description=fp.description,
+            name=fp.name,
+            category=fp.category,
+            complexity=fp.complexity,
+            ufp=fp.ufp,
+            reuse_level=fp.reuse_level,
+            modify_type=fp.modify_type,
+            us=fp.us,
+            source="copied",
+            locked=fp.locked,
+            notes=fp.notes,
+            ord=fp.ord,
+        ))
+
+    for po in src.param_overrides:
+        db.add(ParamOverride(
+            project_id=new_id,
+            key=po.key,
+            value=po.value,
+            reason=f"(copied from {src_id})",
+        ))
+
+    db.commit()
+    db.refresh(new)
+    return new
+
+
 def get(db: Session, project_id: str) -> ProjectORM | None:
     return db.query(ProjectORM).filter_by(id=project_id).first()
+
 
 def patch(db: Session, project_id: str, payload: ProjectPatch) -> ProjectORM | None:
     p = get(db, project_id)
     if not p:
         return None
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    data = _dump_factors(payload.model_dump(exclude_unset=True))
+    for k, v in data.items():
         setattr(p, k, v)
     db.commit()
     db.refresh(p)
     return p
+
 
 def delete(db: Session, project_id: str) -> bool:
     p = get(db, project_id)

@@ -114,6 +114,7 @@ _FLAT_TOP_KEYS = (
     "factors_ops",
     "hours_per_pm",
     "ops_cost_ratio",
+    "scale_change",  # v2.0 — 规模变更因子（QA round 2: 补 CSBMK 数据）
 )
 
 
@@ -264,3 +265,21 @@ def effective_to_calc_dict(eff: dict) -> dict:
         "hours_per_pm": eff.get("hours_per_pm", 174),
         "ops_cost_ratio": eff.get("ops_cost_ratio", {}),
     }
+
+
+def _leaf_paths(d: dict, prefix: str = "") -> list[tuple[str, Any]]:
+    """Walk a nested dict and return [(dotted.path, leaf_value), ...].
+
+    Used by services.snapshots.restore_snapshot to replay a captured params
+    payload back into ParamGlobal / ParamOverride one leaf at a time so the
+    existing patch_global / apply_overrides validation paths catch any leaf
+    that no longer maps onto the canonical tree (e.g. a stale CSBMK version).
+    """
+    out: list[tuple[str, Any]] = []
+    for k, v in d.items():
+        path = f"{prefix}.{k}" if prefix else str(k)
+        if isinstance(v, dict):
+            out.extend(_leaf_paths(v, path))
+        else:
+            out.append((path, v))
+    return out
