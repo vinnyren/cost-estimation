@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createRouter, createMemoryHistory } from "vue-router";
-import ElementPlus from "element-plus";
 import ParamManager from "@/views/ParamManager.vue";
 import { paramsApi } from "@/api/params";
 
@@ -52,7 +51,7 @@ describe("ParamManager", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
@@ -64,7 +63,7 @@ describe("ParamManager", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
@@ -83,7 +82,7 @@ describe("ParamManager", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     expect(w.find("[role='alert']").exists()).toBe(true);
@@ -95,7 +94,7 @@ describe("ParamManager", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
@@ -127,7 +126,7 @@ describe("ParamManager", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
@@ -166,7 +165,7 @@ describe("ParamManager", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
@@ -196,7 +195,7 @@ describe("ParamManager", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
@@ -241,7 +240,7 @@ describe("ParamManager", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     const tabs = w.findAll("[role='tab']");
@@ -275,7 +274,7 @@ describe("ParamManager", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     // 改第一个 OverrideField 数字输入

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createRouter, createMemoryHistory } from "vue-router";
-import ElementPlus from "element-plus";
 import ResultView from "@/views/ResultView.vue";
 import { projectsApi } from "@/api/projects";
 import { calcApi } from "@/api/calc";
@@ -82,7 +81,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -98,7 +97,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-2" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -117,7 +116,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -138,7 +137,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -154,7 +153,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -172,7 +171,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-2" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -199,7 +198,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-2" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -224,7 +223,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-2" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -257,7 +256,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -289,7 +288,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-2" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();
@@ -338,7 +337,7 @@ describe("ResultView", () => {
     await router.isReady();
     const w = mount(ResultView, {
       props: { projectId: "p-2" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     await flushPromises();

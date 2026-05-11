@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createRouter, createMemoryHistory } from "vue-router";
-import ElementPlus from "element-plus";
 import ProjectWizard from "@/views/ProjectWizard.vue";
 
 vi.mock("@/api/projects", () => ({
@@ -30,7 +29,7 @@ const router = createRouter({
 
 const mountWizard = () =>
   mount(ProjectWizard, {
-    global: { plugins: [createPinia(), router, ElementPlus] },
+    global: { plugins: [createPinia(), router] },
   });
 
 describe("ProjectWizard 7 steps", () => {

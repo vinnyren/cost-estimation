@@ -7,7 +7,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createRouter, createMemoryHistory } from "vue-router";
-import ElementPlus from "element-plus";
 import FpEditor from "@/views/FpEditor.vue";
 import { functionsApi } from "@/api/functions";
 
@@ -79,7 +78,7 @@ describe("FpEditor — claude_draft 高亮 (GAP-A)", () => {
     ]);
     const w = mount(FpEditor, {
       props: { projectId: "p-ai" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
@@ -111,7 +110,7 @@ describe("FpEditor — claude_draft 高亮 (GAP-A)", () => {
     ]);
     const w = mount(FpEditor, {
       props: { projectId: "p-ai" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
     expect(w.text()).toContain("AI 草稿");

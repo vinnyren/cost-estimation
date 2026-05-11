@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createRouter, createMemoryHistory } from "vue-router";
-import ElementPlus from "element-plus";
 import ParamManager from "@/views/ParamManager.vue";
 import { paramsApi } from "@/api/params";
 import { snapshotsApi } from "@/api/snapshots";
@@ -72,7 +71,7 @@ describe("ParamManager — 快照 tab (GAP-H)", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
@@ -92,7 +91,7 @@ describe("ParamManager — 快照 tab (GAP-H)", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
@@ -122,7 +121,7 @@ describe("ParamManager — 快照 tab (GAP-H)", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
@@ -149,7 +148,7 @@ describe("ParamManager — 快照 tab (GAP-H)", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
@@ -175,7 +174,7 @@ describe("ParamManager — 快照 tab (GAP-H)", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
@@ -198,7 +197,7 @@ describe("ParamManager — 快照 tab (GAP-H)", () => {
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 

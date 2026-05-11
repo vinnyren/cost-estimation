@@ -3,7 +3,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createRouter, createMemoryHistory } from "vue-router";
 import ProjectList from "@/views/ProjectList.vue";
-import ElementPlus from "element-plus";
 
 // v2.0 T20 — ProjectList drives projectsApi.query() directly. The store is no
 // longer in the listing path, so tests mock query() (returning the new
@@ -63,7 +62,7 @@ const router = createRouter({
 const mountList = () =>
   mount(ProjectList, {
     global: {
-      plugins: [createPinia(), router, ElementPlus],
+      plugins: [createPinia(), router],
     },
   });
 

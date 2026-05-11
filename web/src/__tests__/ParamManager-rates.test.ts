@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createRouter, createMemoryHistory } from "vue-router";
-import ElementPlus from "element-plus";
 import ParamManager from "@/views/ParamManager.vue";
 import { paramsApi } from "@/api/params";
 
@@ -50,7 +49,7 @@ describe("ParamManager — 城市费率 ops 列 + 运维生产率 ops 表 (GAP-D
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
@@ -72,7 +71,7 @@ describe("ParamManager — 城市费率 ops 列 + 运维生产率 ops 表 (GAP-D
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
@@ -104,7 +103,7 @@ describe("ParamManager — 城市费率 ops 列 + 运维生产率 ops 表 (GAP-D
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
@@ -135,7 +134,7 @@ describe("ParamManager — 城市费率 ops 列 + 运维生产率 ops 表 (GAP-D
     await router.isReady();
     const w = mount(ParamManager, {
       props: { projectId: "p-1" },
-      global: { plugins: [createPinia(), router, ElementPlus] },
+      global: { plugins: [createPinia(), router] },
     });
     await flushPromises();
 
