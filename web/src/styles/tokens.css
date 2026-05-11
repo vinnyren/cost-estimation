@@ -1,43 +1,44 @@
 :root {
-  /* === 色彩 === */
-  /* 品牌主色（深蓝） */
-  --color-primary: #165DFF;
-  --color-primary-hover: #4080FF;
-  --color-primary-active: #0E42D2;
-  --color-primary-bg: #E8F3FF;
+  /* === v2.2 主层 — 来自 design import (styles.css L2-L40) === */
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --surface-2: #FAFBFC;
+  --surface-sunken: #F0F2F5;
+  --border: #E4E7EB;
+  --border-strong: #CBD2D9;
+  --text: #0F172A;
+  --text-2: #475569;
+  --text-3: #7B8794;
+  --text-4: #A8B0BB;
 
-  /* 状态色 */
-  --color-success: #00B42A;
-  --color-success-bg: #E8FFEA;
-  --color-warning: #FF7D00;
-  --color-warning-bg: #FFF7E8;
-  --color-danger: #F53F3F;
-  --color-danger-bg: #FFECE8;
-  --color-data: #722ED1;
-  --color-data-bg: #F5E8FF;
+  --accent: #1E5EFF;
+  --accent-hover: #1849D6;
+  --accent-soft: #EAF0FF;
+  --accent-soft-strong: #D6E0FF;
 
-  /* 中性色 */
-  --color-text-title: #1D2129;
-  --color-text-body: #4E5969;
-  --color-text-muted: #86909C;
-  --color-text-disabled: #C9CDD4;
-  --color-border: #E5E6EB;
-  --color-border-strong: #C9CDD4;
-  --color-bg: #F2F3F5;
-  --color-bg-elevated: #FFFFFF;
-  --color-bg-hover: #F7F8FA;
+  --red: #DC2626;
+  --red-soft: #FEE2E2;
+  --amber: #B45309;
+  --amber-soft: #FEF3C7;
+  --amber-strong: #FBBF24;
+  --green: #047857;
+  --green-soft: #D1FAE5;
+  --purple: #7C3AED;
+  --purple-soft: #EDE9FE;
+  --teal: #0E7490;
+  --teal-soft: #CFFAFE;
 
-  /* === 字号 === */
-  --font-family: Inter, "Microsoft YaHei", "PingFang SC", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-size-xs: 12px;
-  --font-size-sm: 14px;
-  --font-size-md: 16px;
-  --font-size-lg: 18px;
-  --font-size-xl: 20px;
-  --line-height-base: 1.55;
-  --line-height-tight: 1.4;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 20px 40px -12px rgba(15, 23, 42, 0.14), 0 8px 16px -8px rgba(15, 23, 42, 0.08);
 
-  /* === 间距 === */
+  --font-sans: "Noto Sans SC", -apple-system, BlinkMacSystemFont, "PingFang SC",
+               "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* === 间距（与 v1.1 兼容） === */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -47,15 +48,15 @@
   --space-8: 32px;
   --space-10: 40px;
 
-  /* === 圆角 === */
-  --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 8px;
-
-  /* === 阴影 === */
-  --shadow-sm: 0 1px 2px rgba(29, 33, 41, 0.04);
-  --shadow-md: 0 2px 8px rgba(29, 33, 41, 0.08);
-  --shadow-lg: 0 4px 12px rgba(29, 33, 41, 0.12);
+  /* === 字号 — 13px 基线（design） === */
+  --font-family: var(--font-sans);
+  --font-size-xs: 11px;
+  --font-size-sm: 13px;
+  --font-size-md: 15px;
+  --font-size-lg: 18px;
+  --font-size-xl: 22px;
+  --line-height-base: 1.5;
+  --line-height-tight: 1.35;
 
   /* === 动效 === */
   --duration-fast: 150ms;
@@ -64,16 +65,48 @@
 
   /* === Layout === */
   --layout-max-width: 1280px;
-  --layout-sidebar-width: 240px;
-  --layout-header-height: 56px;
-  --touch-target: 36px;
-  --touch-target-comfortable: 44px;
+  --layout-sidebar-width: 232px;
+  --layout-topbar-height: 56px;
+  --touch-target: 32px;
+  --touch-target-comfortable: 36px;
 
-  /* === Legacy 兼容（保留旧 token 名以避免组件样式断裂） === */
-  --color-surface: var(--color-bg);
-  --color-text: var(--color-text-body);
-  --color-accent: var(--color-primary);
-  --color-warn-bg: var(--color-warning-bg);
-  --color-warn-stripe: var(--color-warning);
-  --color-error: var(--color-danger);
+  /* === Sidebar 深色（design 独有） === */
+  --sidebar-bg: #0F1626;
+  --sidebar-text: #CBD5E1;
+  --sidebar-text-muted: #64748B;
+  --sidebar-active-bg: rgba(30, 94, 255, 0.16);
+  --sidebar-active-text: #FFFFFF;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+
+  /* === Legacy alias — 旧 token 名向新主层映射，避免组件样式断裂 === */
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--surface);
+  --color-bg-hover: var(--surface-2);
+  --color-surface: var(--bg);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text-2);
+  --color-text-title: var(--text);
+  --color-text-body: var(--text-2);
+  --color-text-muted: var(--text-3);
+  --color-text-disabled: var(--text-4);
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
+  --color-primary-active: var(--accent-hover);
+  --color-primary-bg: var(--accent-soft);
+  --color-accent: var(--accent);
+  --color-success: var(--green);
+  --color-success-bg: var(--green-soft);
+  --color-warning: var(--amber);
+  --color-warning-bg: var(--amber-soft);
+  --color-danger: var(--red);
+  --color-danger-bg: var(--red-soft);
+  --color-data: var(--purple);
+  --color-data-bg: var(--purple-soft);
+  --color-warn-bg: var(--amber-soft);
+  --color-warn-stripe: var(--amber);
+  --color-error: var(--red);
+  --radius-sm: 2px;
+  --radius-md: var(--radius);
+  --layout-header-height: var(--layout-topbar-height);
 }
