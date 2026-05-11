@@ -224,13 +224,24 @@ rm -rf ~/.claude/plugins/cache/cost-estimation
 
 ---
 
-## 第 3 章 主屏导览（5 屏）
+## 第 3 章 主屏导览（v2.0 共 6 屏）
 
-系统共 5 个主屏，按使用顺序：项目列表 → 项目向导 → FP 编辑 → 参数管理 → 结果页。
+系统共 6 个主屏，按典型使用顺序：
+
+| # | 屏 | 路由 | 用途 |
+|---|---|---|---|
+| 1 | 项目列表 | `/` | 总览 + 搜索 / 筛选 / 排序 / 复制（GAP-F/I） |
+| 2 | 项目向导 | `/projects/new` | 7 步新建（GAP-E/G/K） |
+| 3 | FP 编辑 | `/projects/:id/functions` | 功能点录入 + AI 提取入口（GAP-A） |
+| 4 | 参数管理 | `/projects/:id/parameters` | 6 tab：费率 / 生产率 / 因子 / 规模变更 / 快照（GAP-B/D/H） |
+| 5 | 结果页 | `/projects/:id/result` | 三档造价 + 反向 allocator（GAP-C） |
+| 6 | **审计日志** | `/projects/:id/audit` | 项目操作时间线（GAP-J，v2.0 新增） |
+
+各屏深度教程见第 12 章。
 
 ### 3.1 项目列表（`/`）
 
-> 📷 [图 3-1] 项目列表屏首次进入空状态（中央 hero CTA "新建第一个项目"）
+![项目列表（含 toolbar + 卡片）](screenshots/01-project-list.png)
 
 #### 字段表（项目卡片）
 
@@ -262,45 +273,38 @@ rm -rf ~/.claude/plugins/cache/cost-estimation
 
 ### 3.2 项目向导（`/projects/new`）
 
-5 步进度条，每步独立 fieldset。
+v2.0 — **7 步进度条**，每步独立 fieldset（v1.1 是 5 步）：
 
-> 📷 [图 3-2] 项目向导第 1 步（评估模式选择，两个 radio 卡片：正向 / 反向）
+![项目向导第 1 步](screenshots/03-wizard-step1.png)
 
-#### 第 1 步 · 评估模式
-
-| 选项 | 说明 |
+| 步骤 | 内容 |
 |---|---|
-| **正向** (forward) | 已知功能点 → 估算造价。适用于：需求文档已成型、招标人编制控制价 |
-| **反向** (reverse) | 已知目标造价 → 反推功能点。适用于：预算上限已定、需要拆解到模块 |
+| Step 1 | 基础信息：名称 + 城市 + 行业 + **客户 / 评估方**（可选） |
+| Step 2 | 项目类型 + α 滑块（dev_and_ops 时） + include_ops 联动 |
+| Step 3 | 阶段 + **CF 实时预览** |
+| Step 4 | 正向 / 反向；反向时填目标总造价 |
+| Step 5 | 开发因子 5 项 dropdown + 实时 dev_factor 链 |
+| Step 6 | 运维因子 11 项（仅 include_ops 时显示） |
+| Step 7 | 确认 + "创建项目" |
 
-#### 第 2 步 · 项目名称
+完整每步说明 + 截图见 [§12.3 Wizard 7 步指南](#123-wizard-7-步指南gap-e--gap-g--gap-k)。
 
-文本框，必填，字符串去空白后非空。
+37 个城市与 7 个行业的完整列表：
 
-#### 第 3 步 · 城市与行业
+- **城市**：北京 / 上海 / 深圳 / 杭州 / 苏州 / 南京 / 广州 / 西安 / 成都 / 厦门 / 福州 / 宁波 / 武汉 / 合肥 / 长沙 / 重庆 / 沈阳 / 大连 / 青岛 / 济南 / 哈尔滨 / 昆明 / 太原 / 南昌 / 南宁 / 海口 / 拉萨 / 贵阳 / 天津 / 长春 / 郑州 / 兰州 / 西宁 / 乌鲁木齐 / 石家庄 / 呼和浩特 / 银川
+- **行业**：全行业 / 电子政务 / 金融 / 电信 / 制造 / 能源 / 交通
 
-| 字段 | 选项 |
-|---|---|
-| **城市** | 北京 / 上海 / 深圳 / 杭州 / 苏州 / 南京 / 广州 / 西安 / 成都 / 厦门 / 福州 / 宁波 / 武汉 / 合肥 / 长沙 / 重庆 / 沈阳 / 大连 / 青岛 / 济南 / 哈尔滨 / 昆明 / 太原 / 南昌 / 南宁 / 海口 / 拉萨 / 贵阳 / 天津 / 长春 / 郑州 / 兰州 / 西宁 / 乌鲁木齐 / 石家庄 / 呼和浩特 / 银川（共 37 城） |
-| **行业** | 全行业 / 电子政务 / 金融 / 电信 / 制造 / 能源 / 交通（共 7 类） |
-
-> 💡 城市与行业决定生产率 PDR 与人月费率，影响最终金额；不在列表的城市/行业可在创建后到"参数管理"添加自定义键。
-
-#### 第 4 步 · 评估阶段
-
-5 个 radio：预算 / 招投标 / 立项 / 变更 / 结算（CF 值见 [§7.4](#74-阶段调整因子-cf)）。
-
-#### 第 5 步 · 确认
-
-- 正向模式：显示 JSON 摘要供 review
-- 反向模式：补充 **目标总造价（元）** + **α 调整系数**（默认 1.0 仅开发；勾选含运维则可改）
-
-点 **"创建项目"** 后跳转 FP 编辑屏。
+> 💡 城市与行业决定 PDR 生产率与人月费率，影响最终金额；不在列表的城市/行业可在创建后到"参数管理"添加自定义键。
 
 ### 3.3 FP 编辑（`/projects/{id}/functions`）
 
-> 📷 [图 3-3] FP 编辑屏空状态（中央 hero CTA "上传文档让 AI 写第一稿"）
-> 📷 [图 3-4] FP 编辑屏数据态（左侧模块树 240px + 右侧表格，AI 提取行高亮琥珀底）
+空状态（提示用户用 `/cost`）：
+
+![FP 编辑屏空状态](screenshots/09-fp-editor-empty.png)
+
+数据态（含 claude_draft 高亮）：
+
+![FP 编辑屏数据态](screenshots/15-fp-editor-with-fps.png)
 
 布局：左侧 240px 模块树 + 右侧主表格。
 
@@ -349,7 +353,9 @@ rm -rf ~/.claude/plugins/cache/cost-estimation
 
 ### 3.4 参数管理（`/projects/{id}/parameters`）
 
-> 📷 [图 3-5] 参数管理屏（顶部 6 Tab：费率 / 生产率 / 开发因子 / 运维因子 / 规模变更 / 快照；当前 Tab 蓝色下边框；自定义字段琥珀底 + 左侧 3px 实线 + "自定义"徽章）
+![参数管理屏 — 费率 Tab](screenshots/10-param-rate.png)
+
+6 Tab 全部 v2.0 实装（v1.1 时 4 个 stub）：
 
 #### 6 Tab 结构
 
@@ -376,8 +382,13 @@ rm -rf ~/.claude/plugins/cache/cost-estimation
 
 ### 3.5 结果页（`/projects/{id}/result`）
 
-> 📷 [图 3-6] 正向结果页（顶部三档卡片横排，P50 居中加 "推荐" 徽章；底部下载按钮）
-> 📷 [图 3-7] 反向结果页（反算输入区 + 三档 FP 卡片 + 反向水印）
+正向结果页（三档卡片 + 下载报告）：
+
+![正向结果页](screenshots/16-result-forward.png)
+
+反向结果页（三档 FP + AI 模块分摊 panel）：
+
+![反向结果页](screenshots/17-result-reverse.png)
 
 #### 正向模式
 
@@ -1436,98 +1447,160 @@ v2.0 将 AI 提取从"前端按钮"调整为 **Claude Code Plugin 命令**，因
 
 #### 12.2.1 正向：从文档到 FP 草稿
 
-<!-- TODO: screenshot of /cost terminal invocation -->
+1. 在 Web 端新建项目（Wizard 7 步走完，参见 §12.3），状态停在 FP 编辑屏（含空态提示用户用 `/cost`）：
 
-1. 在 Web 端新建项目（Wizard 7 步走完，参见 §12.3），状态停在 FP 编辑屏。
+   ![FP 编辑屏空态](screenshots/09-fp-editor-empty.png)
+
 2. 上传需求文档（PDF / DOCX / XLSX / MD / TXT，单文件 ≤50 MB）。
 3. 回到 Claude Code 终端，输入：
    ```bash
    /cost <project_id>
    ```
 4. Claude 读取上传文件，按 SKILL.md 的 NESMA 计数规则生成 FP 草稿，写入 `source=claude_draft`。
-5. 切回 Web 端 FP 编辑屏，AI 提取行**琥珀底高亮**显示，用户可逐行微调。
+5. 切回 Web 端 FP 编辑屏（30 秒自动 polling，或点"立即刷新"），AI 提取行**浅黄底色 + 「AI 草稿」徽标**显示，用户可逐行微调：
+
+   ![FP 编辑屏含 AI 草稿](screenshots/15-fp-editor-with-fps.png)
 
 #### 12.2.2 反向：从预算到模块清单
 
-<!-- TODO: screenshot of /cost-allocate result -->
-
 1. 创建反向模式项目（Wizard 第 4 步选 reverse + 填 target_total）。
-2. 系统自动反推出 P10 / P50 / P90 三档 FP 规模。
-3. 终端运行：
-   ```bash
-   /cost-allocate <project_id>
-   ```
-4. Claude 把三档 FP 按子系统 / 一级模块 / 二级模块分摊，写回 FP 表（`source=allocator`，红色加粗）。
-5. ResultView 显示三档卡片 + 反算误差（应 ≤1%）。
+2. 系统自动反推出 P10 / P50 / P90 三档 FP 规模 + 显示推荐档（默认 P50）：
+
+   ![反向结果页 + allocator panel](screenshots/17-result-reverse.png)
+
+3. 在 ResultView 反向页底部 **"AI 模块分摊"** 面板：
+   - 简单场景：直接点"生成模块分摊"按钮，输入 JSON 数组 `[{name, weight}, ...]`
+   - AI 场景：在终端运行 `/cost-allocate <project_id>`，Claude 根据项目名/行业推断模块清单
+4. 调 `/api/calc/allocate` 把推荐档 `scale_us` 按权重切到各模块，写回 FP 表 `source=allocator`
+5. ResultView 显示三档卡片 + 反算误差（应 ≤1%）
 
 ### 12.3 Wizard 7 步指南（GAP-E / GAP-G / GAP-K）
-
-<!-- TODO: screenshot of Wizard step 1 -->
 
 v2.0 把"新建项目"从 5 步骨架扩展到 7 步，覆盖客户元数据、α 滑块、阶段 CF 实时预览、因子链式选择。
 
 | 步骤 | 内容 | 说明 |
 |---|---|---|
-| **Step 1** | 客户 / 评估方 | 可选字段，将写入 Excel 报告封面（GAP-G） |
-| **Step 2** | 项目类型 + α + include_ops | dev / dev_and_ops 滑块；选 dev_and_ops 启用 alpha_dev 与 include_ops（GAP-E） |
-| **Step 3** | 城市 + 行业 + 阶段 | 选阶段后实时显示 CF 调整因子值（GAP-K） |
-| **Step 4** | 模式 + target_total | forward / reverse；reverse 模式额外要求填目标总造价 |
-| **Step 5** | 开发因子 | 5 项 dropdown 选级别，右侧实时显示链式相乘结果（GAP-B） |
-| **Step 6** | 运维因子 | 11 项 dropdown，仅 include_ops=true 时显示 |
-| **Step 7** | 确认 | JSON 摘要 + factors 写进 create payload |
+| **Step 1** | 基础信息：名称 + 城市 + 行业 + **客户 / 评估方** | 客户/评估方为可选字段，写入 Excel 报告封面（GAP-G） |
+| **Step 2** | 项目类型 + α + include_ops | dev_only / ops_only / dev_and_ops 三选一；选 dev_and_ops 出现 α 滑块（默认 0.7，范围 0.5–1.0）+ include_ops 强制 true（GAP-E） |
+| **Step 3** | 阶段 + CF 实时预览 | 5 phase card 横排，选定阶段后底部显示 CF 调整因子值（GAP-K） |
+| **Step 4** | 计算模式 + target_total | forward / reverse；reverse 模式额外要求填目标总造价（元） |
+| **Step 5** | 开发因子（5 项 dropdown） | app_type / integrity_level / non_func / platform / team_bg；底部实时显示 `dev_factor 链 = ...`（GAP-B） |
+| **Step 6** | 运维因子（11 项 dropdown） | 仅 include_ops=true 时显示；不启用运维时显示"跳过运维因子"提示 |
+| **Step 7** | 确认 | 全部字段摘要 + 因子选择清单；"创建项目"后跳到 FP 编辑屏 |
 
-每步底部有"上一步 / 下一步"，未通过校验的字段标红 + 焦点跳转。
+#### Step 1：基础信息
+
+![Wizard Step 1](screenshots/03-wizard-step1.png)
+
+#### Step 2：项目类型 + α 滑块
+
+dev_and_ops 时显示 α 滑块；α 是"开发占总成本比例"，1−α 自动算运维占比。
+
+![Wizard Step 2](screenshots/04-wizard-step2.png)
+
+#### Step 3：阶段 + CF 实时预览
+
+5 个阶段（预算 / 招标 / 立项 / 变更 / 结算）每张卡显示对应 CF 值，选定后底部 summary 高亮当前 CF。
+
+![Wizard Step 3](screenshots/05-wizard-step3-phase.png)
+
+#### Step 4：正向 / 反向
+
+reverse 模式时出现"目标总成本"输入框。
+
+![Wizard Step 4](screenshots/06-wizard-step4-mode.png)
+
+#### Step 5：开发因子链
+
+每个 dropdown 选项显示 `级别 — ×multiplier`，底部框内 **dev_factor 链 = 多个 multiplier 相乘**实时更新。
+
+![Wizard Step 5](screenshots/07-wizard-step5-factors-dev.png)
+
+#### Step 7：确认
+
+最后一步 review 全部选择 + 因子清单；客户/评估方为空时显示 `—`。
+
+![Wizard Step 7](screenshots/08-wizard-step7-confirm.png)
+
+每步底部有"上一步 / 下一步"按钮；未通过 `canAdvance` 校验时"下一步"按钮 disabled。
 
 ### 12.4 ParamManager 6 Tab（GAP-B / GAP-D / GAP-H）
 
-<!-- TODO: screenshot of ParamManager tab bar -->
-
-v1.0 的 ParamManager 只实装了费率与生产率两个 tab；v2.0 把剩下 4 个 stub tab 全部实装：
+v1.1 的 ParamManager 只实装了费率与生产率两个 tab，其余 4 个为 v2 占位；v2.0 全部实装：
 
 | Tab | v2.0 改动 |
 |---|---|
-| **费率（rate）** | 新增 ops 列，每个城市同时显示开发 / 运维元/人月（GAP-D） |
-| **生产率（productivity）** | 新增"运维行业"子表，行业 × 三档 PDR（GAP-D） |
-| **开发因子（factors_dev）** | 5 项 dropdown 编辑 + 默认值"恢复"按钮（GAP-B） |
-| **运维因子（factors_ops）** | 11 项编辑面板（GAP-B） |
-| **规模变更（scale_change）** | 阶段 CF + 重用率 / 修改率（GAP-B） |
-| **快照（snapshots）** | 创建 / 恢复 / 删除项目级参数快照（GAP-H） |
+| **费率** | 城市 × 两列：开发费率 + **运维费率**（元/人月）（GAP-D） |
+| **生产率** | 行业 × 三档 PDR，新增 **运维行业** 子表（GAP-D） |
+| **开发因子** | 5 个因子卡：每个 level 一行可编辑 multiplier（GAP-B） |
+| **运维因子** | 11 个因子卡，同上结构 |
+| **规模变更** | 新增 / 修改 / 删除 / 转换 / 变更率门槛 5 项（GAP-B） |
+| **快照** | 创建 / 恢复 / 删除全局参数快照（GAP-H） |
+
+#### 费率 tab
+
+每个城市一行，开发 / 运维两个输入框；覆写默认值后右侧出现"自定义"徽标 + reset 按钮。
+
+![ParamManager 费率 tab](screenshots/10-param-rate.png)
+
+#### 开发因子 tab
+
+5 个因子卡（应用类型 / 完整性等级 / 非功能性要求 / 运行平台 / 团队背景），每个因子内部一张表，级别 × multiplier 可编辑。CSBMK 默认 multiplier=1.00 — 自定义后行高亮。
+
+![ParamManager 开发因子 tab](screenshots/11-param-factors-dev.png)
+
+#### 规模变更 tab
+
+5 项变更类型的 factor 值；CSBMK®-202510 默认值：新增 1.0 / 修改 0.7 / 删除 0.4 / 转换 0.6 / 变更率门槛 0.05。
+
+![ParamManager 规模变更 tab](screenshots/12-param-scale-change.png)
+
+#### 快照 tab（GAP-H）
+
+工具栏：备注输入框 + "立即快照"按钮。下方列出已有快照（ID / 备注 / 时间 / 操作）。
+
+![ParamManager 快照 tab](screenshots/13-param-snapshots.png)
 
 #### 快照工作流（GAP-H）
 
-<!-- TODO: screenshot of snapshot tab -->
+1. 调好一组参数后，在快照 tab 输入备注（如 "投标版-2026Q2"）→ 点 **"立即快照"**
+2. 后续覆盖 / 重置 / 误改后，回到快照 tab 选历史条目点 **"恢复"** → 二次确认 → 全局 effective 参数整体回滚
+3. 不再需要的快照可直接 **"删除"**（二次确认）
 
-1. 调好一组参数后，在快照 tab 点 **"创建快照"**，命名（如"投标版-2026Q2"）。
-2. 后续覆盖 / 重置 / 误改后，回到快照 tab 选历史条目点 **"恢复"** → 项目级 overrides 整体回滚。
-3. 不再需要的快照可直接 **删除**（操作进入审计日志）。
+> 注意：快照存储 effective_params 完整序列化 JSON；restore 走 leaf-by-leaf patch_global，遇到 stale 字段（如 CSBMK 升级后删除的某 key）自动跳过。
 
 ### 12.5 ProjectList 搜索 + ⋯ 菜单（GAP-F / GAP-I）
 
-<!-- TODO: screenshot of ProjectList toolbar -->
+ProjectList toolbar 上新增搜索 + 4 维筛选 + 排序 + 分页：
 
-ProjectList toolbar 上新增 5 维筛选：
+![ProjectList toolbar](screenshots/01-project-list.png)
 
-- **q**：项目名实时搜索（≥200ms 防抖）
-- **city / industry / phase / mode**：四个 dropdown 多维过滤
-- **sort / order**：按 created_at / updated_at / total_cost 排序，asc / desc
-- **page / size**：cursor 分页，默认 size=20
+- **搜索框**：项目名子串实时匹配（250ms 防抖）
+- **城市 / 行业 / 阶段**：3 个 dropdown 筛选（mode 通过项目类型自然过滤）
+- **排序字段** / **升降序**：按 created_at / updated_at / name / target_cost；↑ 升 / ↓ 降
+- **分页**：每页 20 条，total > 20 时显示"上一页 / 下一页"
 
-每行末尾 **⋯ 菜单** 三项：
-- **打开** → FP 编辑屏
-- **复制** → 一键复制项目，包含 FP 数据与参数 override（GAP-I）；复制后新项目名自动加后缀 `(copy)`
-- **审计日志** → 跳 `/projects/:id/audit`
-- **删除** → 二次确认（输入项目名）
+每行 **⋯ 菜单**（点击 trigger 弹出）：
+
+![行 ⋯ 菜单](screenshots/02-project-list-menu.png)
+
+- **📋 复制项目** → 弹出 prompt 输入新名 → 调 `/api/projects/{id}/copy` → 跳到新项目的 FP 编辑屏（含 FP 行 + ParamOverride 行，不带 Result / FPSnapshot / Upload）
+- **🕒 审计日志** → 跳 `/projects/:id/audit`
+- **🗑️ 删除** → 二次 `confirm` 对话框（"确定删除「项目名」？该操作不可恢复。"）
+
+> 项目卡片上还有"打开"按钮（独立于 ⋯ 菜单，直接跳 FP 编辑屏）。
 
 ### 12.6 审计日志查看（GAP-J）
 
-<!-- TODO: screenshot of AuditView timeline -->
+每个项目维护独立审计时间线，所有 mutating 操作（创建 / 更新 / 删除 / FP 增改删 / FP 批量写入 / FP 快照恢复 / 参数覆盖 / 上传 / 计算运行 / 报告导出 / 复制）自动写入 `audit_log` 表。
 
-每个项目维护独立审计时间线，所有 mutating 操作（创建 / 更新 / 删除 / FP 修改 / 参数覆盖 / 快照恢复 / 复制 / 导出）自动写入 `audit_log` 表。
+![审计日志时间线](screenshots/14-audit-view.png)
 
-- 入口：项目行 ⋯ 菜单 → **"审计日志"**，或直接访问 `/projects/:id/audit`
-- 字段：时间戳 / 操作类型 / 操作者 / before-after diff（JSON）
-- 分页：cursor 分页，每页 50 条
-- 用途：对账、回溯误操作、向第三方造价审计单位提供操作证据
+- **入口**：项目行 ⋯ 菜单 → **"🕒 审计日志"**，或直接访问 `/projects/:id/audit`
+- **字段**：时间戳 / 操作中文标签（如"📦 批量写入 FP"）/ actor（v2 单用户始终为 `"user"`，v3 多用户时切换为登录用户 ID）
+- **`diff_json` 字段** 序列化 `{sub_path, query}` — 例如 `fp.restore?version=3` 会记录 `{"sub_path": "functions/restore", "query": {"version": "3"}}`，事后能精确还原是哪条具体操作；`project.copy` 副本入口额外含 `copied_from`
+- **分页**：cursor 分页（`before_id`），每页 50 条；超过 50 显示"加载更早记录"
+- **用途**：对账、回溯误操作、向第三方造价审计单位提供操作证据
 
 ### 12.7 数据迁移（v1.1 → v2.0）
 
@@ -1549,10 +1622,10 @@ alembic upgrade head
 |---|---|
 | `factors_dev_json` / `factors_ops_json` 为 NULL | calc 用 1.0 兜底，`Result.warning_messages` 提示 "项目无因子配置，按 1.0 计算" |
 | 已有 FP / 参数 override / 上传文件 | 全部保留，不受 schema 变更影响 |
-| 老 Excel 报告 | 仍可重新生成；客户 / 评估方字段在封面留空 |
-| `/api/projects` 旧客户端 | 新版返回 envelope `{ data: [...], total, page }`，前端 v2 已切换；v1 客户端需更新 |
+| 老 Excel 报告 | 仍可重新生成；客户 / 评估方字段在封面留空（显示 `—`） |
+| `/api/projects` 旧客户端 | 新版返回 envelope `{success, data, error, meta:{total, page, size}}`，前端 v2 `projectsApi.list()` 已透明兼容；外部 v1 客户端需解包 `data` 字段 |
 
-> 建议：升级前用 `sqlite3 ~/.claude/projects/cost-estimation/data.db .dump > backup.sql` 备份；migration 失败可 `alembic downgrade -1` 回滚。
+> **备份**：升级前用 `sqlite3 <COST_DB_PATH> .dump > backup.sql` 备份（`COST_DB_PATH` 在 server 启动时通过环境变量指定，默认 `~/.claude/projects/cost-estimation/.data/cost.sqlite`）。migration 失败可 `alembic downgrade -1` 单步回滚。
 
 ### 12.8 新 API endpoint 速查
 
