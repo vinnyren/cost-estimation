@@ -1,12 +1,30 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
+import { createMemoryHistory, createRouter } from "vue-router";
+import { createPinia } from "pinia";
 import App from "../App.vue";
 
 describe("App smoke", () => {
   it("挂载根组件且暴露 router-view", () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        {
+          path: "/",
+          component: { template: "<div data-test='rv'/>" },
+        },
+      ],
+    });
+
+    const pinia = createPinia();
+
     const wrapper = mount(App, {
       global: {
-        stubs: { "router-view": { template: "<div data-test='rv'/>" } },
+        plugins: [router, pinia],
+        stubs: {
+          "router-view": { template: "<div data-test='rv'/>" },
+          Topbar: { template: "<div />" },
+        },
       },
     });
     expect(wrapper.find("[data-test='rv']").exists()).toBe(true);

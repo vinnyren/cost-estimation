@@ -1,0 +1,14 @@
+{
+  "$schema": "本地 baseline — scripts/check-coverage.sh 用来防止 PR 让覆盖率退化超过 tolerance",
+  "captured_at": "2026-05-11",
+  "captured_at_commit": "c03f4d0",
+  "tolerance_pct": 0.5,
+  "backend": {
+    "line_coverage_pct": 92.39,
+    "source": "server/coverage.json -> totals.percent_covered"
+  },
+  "frontend": {
+    "line_coverage_pct": 96.98,
+    "source": "web/coverage/coverage-summary.json -> total.lines.pct"
+  }
+}

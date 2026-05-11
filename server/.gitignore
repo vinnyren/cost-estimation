@@ -1,0 +1,4 @@
+# pytest-cov 输出 (v2.1)
+htmlcov/
+coverage.json
+.coverage

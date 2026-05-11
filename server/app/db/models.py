@@ -253,3 +253,37 @@ class AuditLog(Base):
 
 
 Index("ix_audit_log_project_ts", AuditLog.project_id, AuditLog.ts)
+
+
+class AiTask(Base):
+    """v2.2 — AI 任务状态表，让前端 polling 查询提取/分摊进度。
+
+    Plugin 端（Claude Code /cost CLI）通过 POST /api/ai-tasks 创建任务，
+    然后 PATCH /api/ai-tasks/{id} 逐阶段上报 progress + stage_log。
+    前端 AiTaskModal 通过 polling 该 endpoint 获取最新状态。
+    """
+    __tablename__ = "ai_tasks"
+
+    id = Column(String(36), primary_key=True)
+    project_id = Column(
+        String,
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    kind = Column(String(32), nullable=False)  # "extract" | "allocate"
+    status = Column(String(16), nullable=False, default="queued")  # queued|running|done|failed
+    progress_pct = Column(Float, nullable=False, default=0.0)
+    stage_log = Column(Text, nullable=False, default="")
+    output_json = Column(Text)
+    error_message = Column(Text)
+    created_at = Column(DateTime, server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+Index("ix_ai_tasks_project_status", AiTask.project_id, AiTask.status)

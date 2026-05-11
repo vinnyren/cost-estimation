@@ -1,11 +1,11 @@
-// v2.0 T21 — AuditView (GAP-J 前端) test coverage.
+// v2.2 T28 — AuditView (timeline 重做) test coverage.
 //
 // Verifies that the audit timeline:
 //   - calls auditApi.list with the route's project id on mount;
-//   - translates action codes to human labels via ACTION_LABELS;
+//   - translates action codes to human labels via AuditTimeline ACTION_LABELS;
 //   - falls back to the raw code for unknown actions;
 //   - renders the empty state when the server returns no entries;
-//   - paginates via "加载更早记录" (passes beforeId = oldest visible id).
+//   - paginates via "加载更多" (passes beforeId = oldest visible id).
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createMemoryHistory } from "vue-router";
@@ -60,7 +60,8 @@ describe("AuditView", () => {
     listMock().mockResolvedValue([entry({ id: 1, action: "project.create" })]);
     const w = await mountAt();
     await flushPromises();
-    expect(w.findAll('[data-testid="audit-row"]').length).toBe(1);
+    // v2.2 timeline: each entry renders a .tl-item instead of audit-row
+    expect(w.findAll(".tl-item").length).toBe(1);
     expect(w.text()).toContain("创建项目");
   });
 
@@ -75,10 +76,11 @@ describe("AuditView", () => {
     listMock().mockResolvedValue([]);
     const w = await mountAt();
     await flushPromises();
-    expect(w.find('[data-testid="audit-empty"]').exists()).toBe(true);
+    // v2.2 timeline: empty state rendered as text in a card div
+    expect(w.text()).toContain("暂无审计事件");
   });
 
-  it("满页时显示「加载更早记录」按钮，点击后用最末 id 翻页", async () => {
+  it("满页时显示「加载更多」按钮，点击后用最末 id 翻页", async () => {
     const firstPage = Array.from({ length: 50 }, (_, i) =>
       entry({ id: 100 - i, action: "fp.update" }),
     );
@@ -89,7 +91,8 @@ describe("AuditView", () => {
 
     const w = await mountAt();
     await flushPromises();
-    const more = w.find('[data-testid="audit-load-more"]');
+    // v2.2 timeline: load-more button has class btn-ghost
+    const more = w.find("button.btn-ghost");
     expect(more.exists()).toBe(true);
     await more.trigger("click");
     await flushPromises();
@@ -97,13 +100,13 @@ describe("AuditView", () => {
     // Last row in firstPage has id 100 - 49 = 51 → beforeId should be 51.
     expect(auditApi.list).toHaveBeenLastCalledWith("p1", { limit: 50, beforeId: 51 });
     // Appends rather than replaces.
-    expect(w.findAll('[data-testid="audit-row"]').length).toBe(51);
+    expect(w.findAll(".tl-item").length).toBe(51);
   });
 
-  it("少于一页时不显示「加载更早记录」按钮", async () => {
+  it("少于一页时不显示「加载更多」按钮", async () => {
     listMock().mockResolvedValue([entry()]);
     const w = await mountAt();
     await flushPromises();
-    expect(w.find('[data-testid="audit-load-more"]').exists()).toBe(false);
+    expect(w.find("button.btn-ghost").exists()).toBe(false);
   });
 });

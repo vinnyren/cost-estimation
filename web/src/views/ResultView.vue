@@ -1,15 +1,12 @@
 <script setup lang="ts">
 /**
- * ResultView — 计算结果页（v2.0 反向路径加 allocator panel）。
+ * ResultView — 计算结果页（v2.2 forward 用 ResultTrio + PipelineGrid + CostBar + ComplianceCard）。
  *
  * 两个模式共用同一个 view：
- *   - 正向：onMounted 直接调 calcApi.forward 渲染 P10/P50/P90 三档总成本卡片
+ *   - 正向：onMounted 直接调 calcApi.forward 渲染 ResultTrio（三档）+ PipelineGrid + CostBar + ComplianceCard
  *   - 反向：用户输入目标总造价 + 其他费用 → calcApi.reverse 给出三档 FP →
- *           （v2.0 GAP-C 新增）allocator panel 让用户输入模块草稿，调
+ *           allocator panel 让用户输入模块草稿，调
  *           calcApi.allocate 把推荐档总 FP 按权重分摊到各模块
- *
- * 模块草稿支持锁定项 (locked_us)：先扣除锁定额度，剩余规模按 weight 分摊。
- * 用户也可在 Claude Code 跑 /cost-allocate 让 AI 生成 drafts 数组再贴回来。
  *
  * StaleBanner 监听 results.isStale — 参数页改了 override 后回到这里会提示重算。
  */
@@ -20,14 +17,19 @@ import {
   calcApi,
   type ForwardResult,
   type ReverseResult,
-  type AllocateOutput,
+  type AllocateResult,
 } from "@/api/calc";
 import { reportsApi } from "@/api/reports";
 import { useResultsStore } from "@/stores/results";
+import ResultTrio from "@/components/result/ResultTrio.vue";
+import PipelineGrid from "@/components/result/PipelineGrid.vue";
+import CostBar from "@/components/result/CostBar.vue";
+import ComplianceCard from "@/components/result/ComplianceCard.vue";
 import ResultCard from "@/components/ResultCard.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import StaleBanner from "@/components/status/StaleBanner.vue";
+import AllocatorPanel from "@/components/result/AllocatorPanel.vue";
 
 const props = defineProps<{ projectId: string }>();
 
@@ -47,61 +49,36 @@ const downloading = ref(false);
 const targetTotal = ref(0);
 const otherCost = ref(0);
 
-// GAP-C: 反向 allocator — 把反向结果 P50 总规模按模块草稿权重分摊。
-const allocating = ref(false);
-const allocateHint = ref<string>("");
-const allocResult = ref<AllocateOutput[]>([]);
-const DEFAULT_DRAFTS_JSON = JSON.stringify(
-  [
-    { name: "前端", weight: 1 },
-    { name: "后端", weight: 1.5 },
-  ],
-  null,
-  0,
-);
+const availableBudget = computed(() => {
+  const avail = Math.max(0, targetTotal.value - otherCost.value);
+  return avail.toLocaleString("zh-CN");
+});
 
-// 用反向计算的推荐档（默认 P50）作为分摊基数，与计算页其它地方的 band 语义保持一致
-async function onAllocate(): Promise<void> {
-  if (!reverseResult.value) {
-    allocateHint.value = "请先点击「反算」生成三档 FP 结果。";
-    return;
-  }
-  const band = reverseResult.value.recommended_band ?? "P50";
-  const targetUs = reverseResult.value.scale_adjusted_bands?.[band];
-  if (!targetUs || targetUs <= 0) {
-    allocateHint.value = "无可用推荐档 FP — 请确认反向结果完整。";
-    return;
-  }
-  const draftsInput = window.prompt(
-    '输入模块草稿（JSON 数组，如 [{"name":"前端","weight":1},{"name":"后端","weight":1.5}]）。\n或在 Claude Code 跑 /cost-allocate <project_id> 让 AI 生成。',
-    DEFAULT_DRAFTS_JSON,
-  );
-  if (!draftsInput) return;
-  let drafts: Array<{ name: string; weight: number; locked?: boolean; locked_us?: number }>;
-  try {
-    drafts = JSON.parse(draftsInput);
-    if (!Array.isArray(drafts) || drafts.length === 0) {
-      throw new Error("drafts must be a non-empty array");
-    }
-  } catch (e: unknown) {
-    allocateHint.value =
-      "输入不是合法 JSON 数组：" + (e instanceof Error ? e.message : String(e));
-    return;
-  }
-  allocating.value = true;
-  allocateHint.value = "";
-  try {
-    allocResult.value = await calcApi.allocate({
-      project_id: props.projectId,
-      target_us: targetUs,
-      cf: reverseResult.value.cf_used,
-      drafts,
-    });
-  } catch (e: unknown) {
-    allocateHint.value = e instanceof Error ? e.message : "分摊失败";
-  } finally {
-    allocating.value = false;
-  }
+const reverseTiers = computed(() => {
+  if (!reverseResult.value) return [];
+  const r = reverseResult.value;
+  return (["P10", "P50", "P90"] as const).map((k) => ({
+    key: k,
+    label: k === "P10"
+      ? "乐观 · 最大可承载"
+      : k === "P50"
+      ? "中位 · 推荐采纳"
+      : "保守 · 最少可保证",
+    cost: 0,
+    fp: r.scale_adjusted_bands[k],
+    recommended: r.recommended_band === k,
+    unit: "fp" as const,
+    extras: [
+      ["未调整规模 US", `${r.scale_unadjusted_bands[k].toFixed(2)} FP`],
+    ] as Array<[string, string]>,
+  }));
+});
+
+// allocResult stores the latest AllocateResult emitted by AllocatorPanel
+const allocResult = ref<AllocateResult | null>(null);
+
+function onAllocated(res: AllocateResult) {
+  allocResult.value = res;
 }
 
 onMounted(loadAndCompute);
@@ -174,11 +151,47 @@ function back(): void {
 
 const hasForward = computed(() => forwardResult.value !== null);
 const hasReverse = computed(() => reverseResult.value !== null);
+
+// v2.2: forward 三档 tiers for ResultTrio
+const PHASE_LABEL_MAP: Record<string, string> = {
+  budget: "预算编制",
+  bidding: "招投标",
+  planning: "立项审批",
+  change: "变更评估",
+  settled: "结算审计",
+};
+
+const forwardTiers = computed(() => {
+  if (!forwardResult.value) return [];
+  const r = forwardResult.value;
+  return (["P10", "P50", "P90"] as const).map((k) => ({
+    key: k,
+    label:
+      k === "P10"
+        ? "乐观 · 行业最高效率"
+        : k === "P50"
+          ? "中位 · CSBMK 行业基准"
+          : "保守 · 含返工/沟通损耗",
+    cost: r.cost_total_yuan[k],
+    recommended: k === "P50",
+    unit: "yuan" as const,
+    extras: [
+      ["调整后规模 S", `${r.scale_adjusted.toFixed(2)} FP`],
+      ["开发工作量", `${r.effort_dev_hours[k].toFixed(2)} 人时`],
+      ["运维工作量", `${r.effort_ops_hours[k].toFixed(2)} 人时`],
+      ["其他费用", `${(r.cost_other_yuan ?? 0).toLocaleString()} 元`],
+    ] as Array<[string, string]>,
+  }));
+});
+
+function fmtWan(n: number): string {
+  return (n / 10000).toFixed(2);
+}
 </script>
 
 <template>
   <section
-    class="page"
+    class="page hero-bg"
     aria-labelledby="title"
   >
     <header class="page-header">
@@ -191,8 +204,35 @@ const hasReverse = computed(() => reverseResult.value !== null);
         class="btn"
         @click="back"
       >
-        返回 FP 编辑
+        返回
       </button>
+      <div class="page-spacer" />
+      <template v-if="project?.mode === 'reverse' && hasReverse">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          :disabled="!hasReverse"
+          @click="reverseCalc"
+        >
+          ↻ 重新反算
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="downloading"
+          @click="download"
+        >
+          {{ downloading ? "下载中…" : "下载 Excel" }}
+        </button>
+      </template>
+      <p
+        v-if="downloadError && project?.mode === 'reverse'"
+        class="dl-error"
+        role="alert"
+        style="width: 100%; margin-top: 8px"
+      >
+        下载失败：{{ downloadError }}
+      </p>
     </header>
 
     <StaleBanner
@@ -214,54 +254,129 @@ const hasReverse = computed(() => reverseResult.value !== null);
       @retry="loadAndCompute"
     />
 
+    <!-- v2.2: forward 结果区域 — ResultTrio + PipelineGrid + CostBar + ComplianceCard -->
     <div
       v-else-if="project?.mode === 'forward' && hasForward"
-      class="cards"
+      class="forward-result"
     >
-      <ResultCard
-        :band="'P10'"
-        :value="forwardResult!.cost_total_yuan.P10"
-        :unit="'元'"
-        :description="`${forwardResult!.effort_dev_hours.P10.toFixed(0)} 人时`"
-      />
-      <ResultCard
-        :band="'P50'"
-        :value="forwardResult!.cost_total_yuan.P50"
-        :unit="'元'"
-        :recommended="true"
-        :description="`${forwardResult!.effort_dev_hours.P50.toFixed(0)} 人时 · 规模 ${forwardResult!.scale_adjusted.toFixed(2)} FP`"
-      />
-      <ResultCard
-        :band="'P90'"
-        :value="forwardResult!.cost_total_yuan.P90"
-        :unit="'元'"
-        :description="`${forwardResult!.effort_dev_hours.P90.toFixed(0)} 人时`"
-      />
+      <ResultTrio :tiers="forwardTiers" />
+
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">计算路径详解 · P50 推荐档</div>
+          <div class="section-sub">附录 D 算例 · 黄金测试基准</div>
+        </div>
+        <div
+          class="card"
+          style="padding: 20px"
+        >
+          <PipelineGrid
+            v-if="forwardResult!.trace"
+            :trace="forwardResult!.trace"
+            :phase-label="PHASE_LABEL_MAP[project!.phase] || project!.phase"
+            :city-label="project!.city"
+          />
+          <div
+            v-else
+            class="muted"
+          >
+            trace 数据待计算 — 点上方 "重新计算"
+          </div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-top: 16px">
+        <div
+          class="card"
+          style="padding: 20px"
+        >
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px">
+            <div class="section-title">成本构成分布</div>
+            <span
+              class="muted mono"
+              style="font-size: 11px"
+            >P50 · 合计 {{ Math.round(forwardResult!.cost_total_yuan.P50).toLocaleString() }} 元</span>
+          </div>
+          <CostBar
+            v-if="forwardResult!.composition"
+            :composition="forwardResult!.composition"
+          />
+          <div
+            v-else
+            class="muted"
+          >
+            composition 数据待计算
+          </div>
+        </div>
+        <ComplianceCard :p50-wan="fmtWan(forwardResult!.cost_total_yuan.P50)" />
+      </div>
     </div>
 
     <div
       v-else-if="project?.mode === 'reverse'"
       class="reverse"
     >
-      <fieldset class="card reverse-card">
-        <legend>反算输入</legend>
-        <label class="field">
-          <span class="field-label">目标总造价（元）</span>
-          <input
-            v-model.number="targetTotal"
-            type="number"
-            min="0"
+      <div
+        class="card"
+        style="padding: 20px; margin-bottom: 16px"
+      >
+        <div
+          class="section-title"
+          style="margin-bottom: 14px"
+        >
+          反算输入
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px">
+          <div
+            class="field"
+            style="margin-bottom: 0"
           >
-        </label>
-        <label class="field">
-          <span class="field-label">其他费用（元）</span>
-          <input
-            v-model.number="otherCost"
-            type="number"
-            min="0"
+            <label class="field-label">目标总造价 (元)</label>
+            <input
+              v-model.number="targetTotal"
+              class="field-input mono"
+              type="number"
+              min="0"
+            >
+          </div>
+          <div
+            class="field"
+            style="margin-bottom: 0"
           >
-        </label>
-        <div class="reverse-actions">
+            <label class="field-label">其他费用 (元)</label>
+            <input
+              v-model.number="otherCost"
+              class="field-input mono"
+              type="number"
+              min="0"
+            >
+          </div>
+          <div
+            class="field"
+            style="margin-bottom: 0"
+          >
+            <label class="field-label">可用预算 (元)</label>
+            <input
+              class="field-input mono"
+              :value="availableBudget"
+              disabled
+              style="background: var(--surface-sunken)"
+            >
+          </div>
+          <div
+            class="field"
+            style="margin-bottom: 0"
+          >
+            <label class="field-label">α 开发占比</label>
+            <input
+              class="field-input mono"
+              :value="(project?.alpha_dev ?? 1.0).toFixed(3)"
+              disabled
+              style="background: var(--surface-sunken)"
+            >
+          </div>
+        </div>
+        <div style="margin-top: 14px; display: flex; gap: 8px">
           <button
             type="button"
             class="btn btn-primary"
@@ -270,101 +385,23 @@ const hasReverse = computed(() => reverseResult.value !== null);
             反算
           </button>
         </div>
-      </fieldset>
-
-      <div
-        v-if="hasReverse"
-        class="cards"
-      >
-        <ResultCard
-          :band="'P10'"
-          :value="reverseResult!.scale_adjusted_bands.P10"
-          :unit="'FP'"
-          :recommended="reverseResult!.recommended_band === 'P10'"
-          :description="'乐观（高生产率假设 → FP 较大）'"
-        />
-        <ResultCard
-          :band="'P50'"
-          :value="reverseResult!.scale_adjusted_bands.P50"
-          :unit="'FP'"
-          :recommended="reverseResult!.recommended_band === 'P50'"
-          :description="'中位（建议采纳）'"
-        />
-        <ResultCard
-          :band="'P90'"
-          :value="reverseResult!.scale_adjusted_bands.P90"
-          :unit="'FP'"
-          :recommended="reverseResult!.recommended_band === 'P90'"
-          :description="'保守（低生产率假设 → FP 较小）'"
-        />
       </div>
 
-      <section
+      <ResultTrio
         v-if="hasReverse"
-        class="allocator-panel"
-        aria-labelledby="alloc-title"
-      >
-        <h3 id="alloc-title">
-          AI 模块分摊（GAP-C）
-        </h3>
-        <p class="alloc-desc">
-          反向计算给出三档总 FP；输入模块草稿（或让 Claude 通过 <code>/cost-allocate</code> 生成）→
-          按权重把推荐档总规模分摊到各模块。
-        </p>
-        <button
-          type="button"
-          class="btn btn-primary"
-          :disabled="allocating"
-          @click="onAllocate"
-        >
-          {{ allocating ? "计算中…" : "生成模块分摊" }}
-        </button>
-        <p
-          v-if="allocateHint"
-          class="hint"
-          role="status"
-        >
-          {{ allocateHint }}
-        </p>
-        <table
-          v-if="allocResult.length > 0"
-          class="alloc-table"
-          aria-label="模块分摊结果"
-        >
-          <thead>
-            <tr>
-              <th scope="col">
-                模块
-              </th>
-              <th scope="col">
-                分配 US（FP）
-              </th>
-              <th scope="col">
-                锁定
-              </th>
-              <th scope="col">
-                审计标签
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="r in allocResult"
-              :key="r.name"
-              data-testid="alloc-row"
-            >
-              <td>{{ r.name }}</td>
-              <td>{{ r.us.toFixed(2) }}</td>
-              <td>{{ r.locked ? "是" : "否" }}</td>
-              <td>{{ r.audit_tag ?? "—" }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+        :tiers="reverseTiers"
+      />
+
+      <AllocatorPanel
+        v-if="reverseResult && project"
+        :reverse-result="reverseResult"
+        :project-id="projectId"
+        @allocated="onAllocated"
+      />
     </div>
 
     <footer
-      v-if="hasForward || hasReverse"
+      v-if="hasForward"
       class="dl-bar"
     >
       <button
@@ -402,6 +439,41 @@ const hasReverse = computed(() => reverseResult.value !== null);
 .page-header h1 {
   margin: 0;
 }
+.forward-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.section {
+  margin-top: 16px;
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.section-sub {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.muted {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.mono {
+  font-family: var(--font-mono);
+}
 .cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -418,21 +490,6 @@ const hasReverse = computed(() => reverseResult.value !== null);
   flex-direction: column;
   gap: var(--space-5);
 }
-.reverse-card {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-5);
-}
-.reverse-card legend {
-  font-weight: 600;
-  font-size: var(--font-size-md);
-  color: var(--color-text-title);
-  padding: 0 var(--space-2);
-}
 .field {
   display: flex;
   flex-direction: column;
@@ -442,11 +499,6 @@ const hasReverse = computed(() => reverseResult.value !== null);
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   font-weight: 500;
-}
-.reverse-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-2);
 }
 .dl-bar {
   margin-top: var(--space-4);
@@ -463,52 +515,5 @@ const hasReverse = computed(() => reverseResult.value !== null);
   font-size: var(--font-size-sm);
   text-align: center;
   max-width: 60ch;
-}
-.allocator-panel {
-  margin-top: var(--space-4);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.allocator-panel h3 {
-  margin: 0;
-  font-size: var(--font-size-md);
-  color: var(--color-text-title);
-}
-.alloc-desc {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-}
-.alloc-desc code {
-  background: var(--color-bg-muted, #f5f5f5);
-  padding: 0 4px;
-  border-radius: 3px;
-  font-size: 0.95em;
-}
-.alloc-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: var(--space-2);
-}
-.alloc-table th,
-.alloc-table td {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  text-align: left;
-  font-size: var(--font-size-sm);
-}
-.alloc-table th {
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-.hint {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
 }
 </style>

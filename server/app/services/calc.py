@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from ..core.context import EvaluationContext, ProjectInputs
 from ..core.forward import calculate_forward, ForwardInput, FpItem
 from ..core.reverse import calculate_reverse, ReverseInput
-from ..core.allocator import allocate, AllocatorInput, FpDraft
+from ..core.allocator import allocate, allocate_with_validation, AllocatorInput, FpDraft
 from ..db.models import Project
 from . import factors as fsvc
 from . import params as ps
@@ -110,16 +110,22 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
     return out
 
 
-def run_allocate(db: Session, project_id: str, payload: dict) -> list[dict]:
+def run_allocate(db: Session, project_id: str, payload: dict) -> dict:
     """Allocator 算法本身不需要 project_id（纯数学切分），但 schema 要求是
     为了：1) 显式绑定到一个项目作为审计 / 权限作用域，2) 保证调用者拿到的
     drafts 之后能 bulk_write 回同一个项目。这里加一道存在性校验，避免对
-    不存在的项目调用 allocate 也返回 200（ISSUE-012 round 2 QA）。"""
+    不存在的项目调用 allocate 也返回 200（ISSUE-012 round 2 QA）。
+
+    v2.3 升级：返回 {items, validation} envelope。
+    """
     if not db.query(Project).filter_by(id=project_id).first():
         raise ValueError("PROJECT_NOT_FOUND")
     drafts = [FpDraft(name=d["name"], weight=d["weight"],
                       locked=d.get("locked", False), locked_us=d.get("locked_us", 0.0))
               for d in payload["drafts"]]
-    out = allocate(AllocatorInput(
+    result = allocate_with_validation(AllocatorInput(
         target_us=payload["target_us"], drafts=drafts, cf=payload.get("cf", 1.21)))
-    return [o.__dict__ for o in out]
+    return {
+        "items": [o.__dict__ for o in result["items"]],
+        "validation": result["validation"],
+    }

@@ -1,6 +1,8 @@
 import json
 import shutil
 import uuid
+from calendar import monthrange
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -175,3 +177,65 @@ def delete(db: Session, project_id: str) -> bool:
     db.delete(p)  # cascade 自动清 fps/snapshots/results/overrides/uploads 行
     db.commit()
     return True
+
+
+def get_stats(db: Session, month: str | None = None) -> dict:
+    """v2.2 — 项目 KPI 汇总（counts + 月度数）。
+
+    无 Project.status / Project.result_p50_total 列 — 改用 derived counts:
+    - draft       = 无 function_points 的项目
+    - in_progress = 有 function_points 的项目
+    - archived / delivered = 0 (future)
+    - monthly_p50_sum      = 0.0 (no cached field; future enhancement)
+    - monthly_growth_pct   = 0.0
+    """
+    if not month:
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+    # v2.4 review fix: 校验 month 格式，invalid input fallback to current month
+    # 避免 split("-") 或 int() 抛出 → 500
+    try:
+        year_str, mo_str = month.split("-")
+        year, mo = int(year_str), int(mo_str)
+        if mo < 1 or mo > 12:
+            raise ValueError("month out of range")
+    except (ValueError, AttributeError):
+        now = datetime.now(timezone.utc)
+        year, mo = now.year, now.month
+
+    total = db.query(ProjectORM).count()
+
+    # 子查询：拥有至少一个 FP 的项目 id 集合
+    fp_project_ids = (
+        db.query(FunctionPoint.project_id).distinct().subquery()
+    )
+    in_progress = (
+        db.query(ProjectORM)
+        .filter(ProjectORM.id.in_(fp_project_ids.select()))
+        .count()
+    )
+    draft = total - in_progress
+
+    counts = {
+        "total": total,
+        "draft": draft,
+        "in_progress": in_progress,
+        "archived": 0,
+        "delivered": 0,
+    }
+
+    # 月度项目数（按 created_at）
+    start = datetime(year, mo, 1, tzinfo=timezone.utc)
+    end_day = monthrange(year, mo)[1]
+    end = datetime(year, mo, end_day, 23, 59, 59, 999999, tzinfo=timezone.utc)
+    monthly_count = (
+        db.query(ProjectORM)
+        .filter(ProjectORM.created_at >= start, ProjectORM.created_at <= end)
+        .count()
+    )
+
+    return {
+        "counts": counts,
+        "monthly_count": monthly_count,
+        "monthly_p50_sum": 0.0,
+        "monthly_growth_pct": 0.0,
+    }

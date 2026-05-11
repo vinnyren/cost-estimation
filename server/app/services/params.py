@@ -28,12 +28,22 @@ def _unflatten(flat: dict) -> dict:
     return out
 
 
-def seed_from_csbmk() -> None:
+def seed_from_csbmk(db: Session | None = None) -> None:
+    """从 CSBMK seed JSON 文件批量写 ParamGlobal 行。
+
+    Args:
+        db: 可选 Session。None 时用 module-level SessionLocal（v2.0 行为，
+            兼容现有 bootstrap.py / api 调用方）；传入时复用调用方的 session
+            （v2.1+ 测试用 in-memory engine 必须经此路径，否则 seed 写到
+            另一个 disk engine 看不见）。
+    """
     raw = json.loads(settings.csbmk_seed_path.read_text(encoding="utf-8"))
     version = raw.get("version", "CSBMK®-unknown")
     flat: dict = {}
     _flatten("", raw, flat)
-    db = SessionLocal()
+    owns_session = db is None
+    if owns_session:
+        db = SessionLocal()
     try:
         existing = {p.key for p in db.query(ParamGlobal).all()}
         for k, v in flat.items():
@@ -47,7 +57,8 @@ def seed_from_csbmk() -> None:
             ))
         db.commit()
     finally:
-        db.close()
+        if owns_session:
+            db.close()
 
 
 def get_global(db: Session) -> dict:

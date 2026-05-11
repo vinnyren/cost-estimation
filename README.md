@@ -55,7 +55,7 @@ v1.1 老项目自动兼容：
 
 ```bash
 # 在 Claude Code 中：
-/plugin marketplace add github.com/your-org/cost-estimation
+/plugin marketplace add github.com/vinnyren/cost-estimation
 /plugin install cost-estimation
 /cost-estimation:setup
 /cost
@@ -108,6 +108,147 @@ pnpm test:e2e
 ```
 
 详见 [docs/dev-guide.md](docs/dev-guide.md)。
+
+## 覆盖率验证（v2.1+）
+
+项目维护 `coverage-baseline.json` 防止覆盖率退化。本地验证：
+
+```bash
+# 跑全套测试 + 与 baseline 比对（>0.5% 退化时退出 1）
+./scripts/check-coverage.sh
+
+# 覆盖率上升时锁定新 baseline
+./scripts/update-coverage-baseline.sh
+```
+
+可选 pre-commit hook（自决）：
+
+```bash
+ln -sf ../../scripts/check-coverage.sh .git/hooks/pre-commit
+```
+
+测试基线（v2.1）：
+
+| 项 | 数量 | line coverage |
+|---|---:|---:|
+| Backend pytest | 173 | 91.9% |
+| Frontend vitest | 220 | 97.8% |
+| Playwright e2e | 13 | n/a |
+
+## v2.2 — 设计 import 全屏重做
+
+v2.2 把 claude.ai/design import 的 6 屏以**像素级复刻**落到前端，并补齐后端 4 个 endpoint。
+
+### 前端
+
+- 暗色 sidebar + topbar 双区布局 + ⌘K 命令面板
+- ProjectList KPI cards + 城市/行业/阶段 filter + table/card 视图切换
+- ResultView 9 步 Pipeline 详解 + 4 段 CostBar + 合规说明卡
+- AuditView 时间轴重做（替换 v2.0 的表格视图）
+- FpEditor AI 提取模态对话框（CLI 触发 + polling 进度）
+- 全局参数库 `/params/global` + 报告中心 `/reports` 入口
+
+### 后端
+
+- `GET /api/projects/stats` — KPI 汇总（counts + 本月聚合）
+- forward calc 返回 `trace`（9 步详解）+ `composition`（4 段拆分）
+- `/api/ai-tasks` CRUD endpoints — AI 任务状态轮询（plugin 接入留 v2.3）
+
+### 新表
+
+- `ai_tasks`（alembic migration 自动应用）
+
+### 升级（v2.1 → v2.2）
+
+```bash
+git pull && cd server && .venv/bin/alembic upgrade head
+```
+
+### 设计 token 变化
+
+v2.2 全套换 design import 自带 token（详见 `web/src/styles/tokens.css`）：
+- 字号基线 13px（v1.x 是 14px）
+- 配色 `--accent: #1E5EFF`（v1.x 是 `#165DFF`）
+- 字体 Noto Sans SC + JetBrains Mono
+- Sidebar 深色 `#0F1626`
+
+Legacy `--color-*` token 保留为 alias，避免破坏旧组件。
+
+### v2.2 测试基线
+
+| 项 | 数量 |
+|---|---:|
+| pytest | 185 |
+| vitest | 221 |
+| playwright e2e | 21 |
+| backend coverage | 92.27%（见 coverage-baseline.json） |
+| frontend coverage | 95.88%（见 coverage-baseline.json） |
+
+## v2.3 — 闭环 (Plugin AI · Allocator UI · 测试补齐)
+
+v2.3 闭环 v2.2 留下的 3 项 "半完成"，零技术债。
+
+### Plugin AI 接入
+- `commands/cost.md` 在 FP 提取流程中加 6 次 PATCH `/api/ai-tasks` 上报（创建/解析/切分/归类/写入/完成）
+- `commands/cost-allocate.md` 加 4 次 PATCH 上报
+- 前端 AiTaskModal 自动 polling，每 1.5s 拉最新 task 状态 → 显示阶段日志 + 进度条
+
+### AI 模块分摊 UI
+- `AllocatorPanel.vue` 替换原 `window.prompt` JSON 输入
+- 表格行内编辑 drafts（模块名 / 权重滑块 / 锁定 FP / 删除）
+- backend `core/allocator.py` 加 `allocate_with_validation()` 返回 `{items, validation}` envelope
+- 一致性 banner 显示反算误差（≤ 1% 绿色，否则黄色）
+
+### 测试闭环
+- 修 `forward.spec.ts` 严格行数断言 → 宽松 ">= 1 row"，并改用 v2.2 `.result-card` selector
+- 修 `audit-view.spec.ts` selector 从 `data-testid` → `.tl-item`
+- 修 `reverse-allocator.spec.ts` data.items envelope
+- 加 4 个 thin view + api smoke unit test + 1 个 composable 单测
+- 恢复 vitest function coverage threshold 至 **80**
+
+### 升级（v2.2 → v2.3）
+
+```bash
+git pull
+# 无 schema migration
+```
+
+### v2.3 测试基线
+
+| 项 | 数量 |
+|---|---:|
+| pytest | 191 |
+| vitest | 236 |
+| playwright e2e | 25 |
+| backend coverage | 92.39% |
+| frontend coverage | line 96.98% / function 80%+ |
+
+## v2.4 — 反算路径视觉升级
+
+v2.4 把 ResultView 的 **reverse 分支**视觉对齐 v2.2 design import：
+
+- 反算输入卡 → v2.2 `.card` + 4 列 grid（目标总造价 / 其他费 / 可用预算 disabled / α 开发占比 disabled）
+- 三档 FP 卡片 → 用 v2.2 `ResultTrio` (unit="fp")，与 forward 同款组件
+- `.page` 加 `hero-bg` accent gradient
+- Reverse 下载按钮上移到 page-header 右侧（与 forward 一致体验）
+- AllocatorPanel（v2.3）和反算算法保持不变
+
+### 升级（v2.3 → v2.4）
+
+```bash
+git pull
+# 无 schema 改动，无 plugin 改动
+```
+
+### v2.4 测试基线
+
+| 项 | 数量 |
+|---|---:|
+| pytest | 191 |
+| vitest | 237 |
+| playwright e2e | 26 |
+| backend coverage | 92.39% |
+| frontend coverage | line 96.88% / function 80%+ |
 
 ## 标准合规
 

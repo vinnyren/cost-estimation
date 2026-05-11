@@ -32,6 +32,20 @@ curl -fsS "$BASE/health" >/dev/null || {
 
 ---
 
+## T0 — 创建 AI 分摊任务
+
+```bash
+PROJECT_ID="<project_id>"   # 替换为实际传入的 project_id 参数
+TASK_ID=$(curl -fsS -X POST "$BASE/api/ai-tasks" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d "{\"project_id\":\"$PROJECT_ID\",\"kind\":\"allocate\"}" | jq -r .id)
+echo "AiTask created: $TASK_ID (kind=allocate)"
+```
+
+`$TASK_ID` 在后续 3 次 PATCH 中使用。PATCH 失败不阻断主流程（用 `|| true` 兜底）。
+
+---
+
 ## Step 2：确认项目处于反向模式
 
 ```http
@@ -64,6 +78,17 @@ X-Auth-Token: $TOKEN
 
 ---
 
+## T1 — 反向结果已加载（progress 20%）
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"status":"running","progress_pct":20,"stage_log_append":"✓ 加载项目反向结果"}' \
+  > /dev/null || true
+```
+
+---
+
 ## Step 4：让 AI 推断模块清单
 
 根据 Step 2 拿到的项目元数据（name / description / industry / city）推断该项目应包含哪些模块。示例启发：
@@ -84,6 +109,17 @@ X-Auth-Token: $TOKEN
 - 鉴权 / 用户中心（标准化）：**0.8–1.0**
 
 数量建议 5–10 个模块。如果项目描述非常薄，给出 5 个通用模块（前端、后端管理、数据层、用户中心、报表）即可。
+
+---
+
+## T2 — AI 推荐权重生成完成（progress 70%）
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"progress_pct":70,"stage_log_append":"✓ AI 推荐权重"}' \
+  > /dev/null || true
+```
 
 ---
 
@@ -160,6 +196,31 @@ X-Auth-Token: $TOKEN
 ## Step 7：完成后回复用户
 
 > "已根据 P50 = X us 生成 N 条模块草稿，写入项目 {id}。请在浏览器审核：$BASE/projects/{id}/functions"
+
+---
+
+## T3 — 任务完成（progress 100%）
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"status":"done","progress_pct":100,"stage_log_append":"✓ 完成"}' \
+  > /dev/null || true
+echo "✅ AiTask $TASK_ID marked done"
+```
+
+---
+
+## 错误兜底：标记任务 failed
+
+如果上述任何步骤失败：
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"status":"failed","error_message":"分摊流程中断"}' \
+  > /dev/null || true
+```
 
 ---
 

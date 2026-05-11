@@ -20,6 +20,7 @@ import ModuleTree from "@/components/ModuleTree.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import EmptyState from "@/components/status/EmptyState.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
+import AiTaskModal from "@/components/fp/AiTaskModal.vue";
 
 const props = defineProps<{ projectId: string }>();
 
@@ -35,6 +36,7 @@ const uploading = ref(false);
 const historyOpen = ref(false);
 const snapshots = ref<FpSnapshotMeta[]>([]);
 const restoring = ref<number | null>(null);
+const aiModalOpen = ref(false);
 
 // GAP-A: AI Plugin polling state. 上传完成后告诉用户去 Claude Code 跑 /cost；
 // 同时每 30s 轮询一次 FP 列表，发现 claude_draft 行数增加就停止并提示审核。
@@ -271,6 +273,13 @@ async function reloadFps(): Promise<void> {
         </button>
         <button
           type="button"
+          class="btn"
+          @click="aiModalOpen = true"
+        >
+          ✨ AI 任务
+        </button>
+        <button
+          type="button"
           class="btn btn-primary"
           @click="calcAndGo"
         >
@@ -399,6 +408,8 @@ async function reloadFps(): Promise<void> {
       hidden
       @change="onFileChange"
     >
+
+    <AiTaskModal v-model:open="aiModalOpen" :project-id="projectId" />
   </section>
 </template>
 

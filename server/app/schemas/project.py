@@ -71,3 +71,18 @@ class ProjectPatch(BaseModel):
     # v2.0 — per-project 调整因子选择
     factors_dev: Optional[dict] = None
     factors_ops: Optional[dict] = None
+
+
+class ProjectStatsCounts(BaseModel):
+    total: int
+    draft: int
+    in_progress: int
+    archived: int
+    delivered: int
+
+
+class ProjectStats(BaseModel):
+    counts: ProjectStatsCounts
+    monthly_count: int
+    monthly_p50_sum: float
+    monthly_growth_pct: float

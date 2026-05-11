@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..db.session import get_db
-from ..schemas.project import ProjectCreate, ProjectRead, ProjectPatch
+from ..schemas.project import ProjectCreate, ProjectRead, ProjectPatch, ProjectStats
 from ..services import projects as svc
 
 router = APIRouter(prefix="/api/projects")
@@ -60,6 +60,11 @@ def list_all(
         "error": None,
         "meta": {"total": total, "page": page, "size": size},
     }
+
+
+@router.get("/stats", response_model=ProjectStats)
+def get_project_stats(month: str | None = None, db: Session = Depends(get_db)):
+    return svc.get_stats(db, month=month)
 
 
 @router.get("/{project_id}")
