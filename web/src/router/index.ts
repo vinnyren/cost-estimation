@@ -62,6 +62,22 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/AuditView.vue"),
   },
   {
+    path: "/params/global",
+    name: "params-global",
+    component: () => import("@/views/ParamManager.vue"),
+    props: () => ({ projectId: null }),
+  },
+  {
+    path: "/reports",
+    name: "report-center",
+    component: () => import("@/views/ReportCenterView.vue"),
+  },
+  {
+    path: "/audit",
+    name: "audit-global",
+    component: () => import("@/views/AuditGlobalView.vue"),
+  },
+  {
     // SPA fallback: any unmatched URL resolves here so users see a real
     // "page not found" instead of a blank body under the layout shell.
     path: "/:pathMatch(.*)*",
