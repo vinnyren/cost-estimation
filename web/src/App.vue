@@ -1,64 +1,47 @@
 <script setup lang="ts">
-declare const __APP_VERSION__: string;
-const version =
-  typeof __APP_VERSION__ === "string" && __APP_VERSION__.length > 0
-    ? __APP_VERSION__
-    : "1.0";
+import { onMounted, onBeforeUnmount, ref } from "vue";
+import Sidebar from "@/components/shell/Sidebar.vue";
+import Topbar from "@/components/shell/Topbar.vue";
+
+const topbarRef = ref<InstanceType<typeof Topbar> | null>(null);
+
+function onKey(e: KeyboardEvent) {
+  const isMod = e.metaKey || e.ctrlKey;
+  if (isMod && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    topbarRef.value?.openPalette();
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", onKey));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
 </script>
 
 <template>
-  <div class="app-shell">
-    <header
-      class="app-header"
-      role="banner"
-    >
-      <!-- 品牌不用 h1，让每个页面只保留一个 h1（页面标题） -->
-      <div
-        class="app-logo"
-        aria-label="软件造价制作系统"
-      >
-        软件造价制作系统
-      </div>
-      <span class="app-meta text-muted">v{{ version }} · CSBMK®-202510</span>
-    </header>
-    <main
-      class="app-main"
-      aria-live="polite"
-    >
-      <router-view />
-    </main>
+  <div class="app">
+    <Sidebar />
+    <div class="app-main">
+      <Topbar ref="topbarRef" />
+      <main class="app-content" aria-live="polite">
+        <router-view />
+      </main>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.app-shell {
+.app {
   display: flex;
-  flex-direction: column;
   min-height: 100vh;
 }
-.app-header {
-  height: var(--layout-header-height);
-  padding: 0 var(--space-6);
-  background: var(--color-bg-elevated);
-  border-bottom: 1px solid var(--color-border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: var(--shadow-sm);
-  flex-shrink: 0;
-}
-.app-logo {
-  margin: 0;
-  font-size: var(--font-size-md);
-  color: var(--color-text-title);
-  font-weight: 600;
-  line-height: 1.2;
-}
-.app-meta {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-}
+
 .app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.app-content {
   flex: 1;
   padding: var(--space-6);
   max-width: var(--layout-max-width);
