@@ -69,7 +69,8 @@ class AllocateRequest(BaseModel):
     project_id: str
     target_us: float = Field(ge=0)
     cf: float = Field(default=1.21, gt=0)
-    drafts: list[FpDraftIn]
+    # v2.4 review fix: 至少 1 个模块 — 空 drafts 无意义且会返回 100% 误差
+    drafts: list[FpDraftIn] = Field(min_length=1)
 
     @field_validator("target_us", "cf")
     @classmethod

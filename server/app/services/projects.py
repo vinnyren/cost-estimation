@@ -191,8 +191,16 @@ def get_stats(db: Session, month: str | None = None) -> dict:
     """
     if not month:
         month = datetime.now(timezone.utc).strftime("%Y-%m")
-    year_str, mo_str = month.split("-")
-    year, mo = int(year_str), int(mo_str)
+    # v2.4 review fix: 校验 month 格式，invalid input fallback to current month
+    # 避免 split("-") 或 int() 抛出 → 500
+    try:
+        year_str, mo_str = month.split("-")
+        year, mo = int(year_str), int(mo_str)
+        if mo < 1 or mo > 12:
+            raise ValueError("month out of range")
+    except (ValueError, AttributeError):
+        now = datetime.now(timezone.utc)
+        year, mo = now.year, now.month
 
     total = db.query(ProjectORM).count()
 

@@ -49,6 +49,9 @@ function close() {
         <div class="ai-modal-log">
           <pre>{{ task.stage_log || "（等待 plugin 上报日志）" }}</pre>
         </div>
+        <div v-if="task.status === 'failed' && task.error_message" class="banner banner-amber" style="margin-top: 12px">
+          ⚠ 任务失败：{{ task.error_message }}
+        </div>
         <div class="ai-modal-progress">
           <div class="ai-modal-bar">
             <div class="ai-modal-bar-fill" :style="{ width: task.progress_pct + '%' }" />
@@ -61,7 +64,7 @@ function close() {
 
       <div class="ai-modal-foot">
         <button class="btn btn-ghost" @click="close">
-          {{ task && task.status === "done" ? "查看结果" : "后台运行" }}
+          {{ task && task.status === "done" ? "查看结果" : task && task.status === "failed" ? "关闭" : "后台运行" }}
         </button>
         <button v-if="task && task.status === 'done'" class="btn btn-primary">采纳 FP</button>
       </div>
