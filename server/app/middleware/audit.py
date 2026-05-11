@@ -84,7 +84,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
         m = _PROJECT_RX.match(path)
         project_id: str | None = m.group("pid") if m else None
 
-        # 对 create 和 copy 都需要从响应 body 取新生成的 project id
+        # 对 create 和 copy 都需要从响应 body 取新生成的 project id。
+        # 注意：此处 body 缓冲假定响应是一次性 JSON（FastAPI JSONResponse 的默认
+        # 行为）。如果未来给 `/api/projects` POST 或 `/api/projects/{id}/copy` 加
+        # 流式响应（SSE / file download），需要把这个路径加白名单跳过，否则客户
+        # 端会拿不到 streaming 直到 buffer 满。
         copy_target_id: str | None = None
         if action in ("project.create", "project.copy"):
             body = b""
