@@ -13,7 +13,9 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "html"],
+      // v2.1 — json-summary lets the baseline check script (T14) parse totals from JSON.
+      reporter: ["text", "html", "json-summary"],
+      reportsDirectory: "./coverage",
       // Exclude untestable bootstrap (main.ts), pure type files, config files,
       // and test files themselves from coverage. Without these exclusions the
       // app entry drags functions/branches well below 80% even with full
