@@ -374,7 +374,7 @@ async function onFactorEdit(
                 <td>{{ SCALE_CHANGE_LABELS[String(key)] ?? String(key) }}</td>
                 <td>
                   <OverrideField
-                    :label="SCALE_CHANGE_LABELS[String(key)] ?? String(key)"
+                    label=""
                     :model-value="value as number"
                     :default-value="value as number"
                     :overridden="store.isOverridden(`scale_change.${String(key)}`)"
@@ -394,7 +394,7 @@ async function onFactorEdit(
                 </td>
                 <td>
                   <OverrideField
-                    :label="`${String(key)}/${String(subKey)}`"
+                    label=""
                     :model-value="sub"
                     :default-value="sub"
                     :overridden="store.isOverridden(`scale_change.${String(key)}.${String(subKey)}`)"
