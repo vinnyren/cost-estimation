@@ -10,7 +10,7 @@ describe("CommandPalette", () => {
     setActivePinia(createPinia());
     const store = useProjectsStore();
     // @ts-expect-error — direct mutation for test
-    store.list = [
+    store.items = [
       { id: "p-001", name: "政务平台", city: "北京", industry: "电子政务" },
       { id: "p-002", name: "税务系统", city: "杭州", industry: "金融" },
     ];
