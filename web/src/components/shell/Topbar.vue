@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import Breadcrumbs from "./Breadcrumbs.vue";
+import CommandPalette from "./CommandPalette.vue";
 
 const router = useRouter();
 const paletteOpen = ref(false);
@@ -31,7 +32,7 @@ defineExpose({ openPalette });
         </div>
       </div>
     </header>
-    <!-- CommandPalette 留 T6 集成 -->
+    <CommandPalette v-model:open="paletteOpen" />
   </div>
 </template>
 
