@@ -11,8 +11,8 @@ test.describe("Forward 模式完整流程", () => {
     const TOKEN = process.env.E2E_AUTH_TOKEN ?? "e2e-token";
     await page.goto(`${baseURL}/?t=${TOKEN}`);
 
-    // 1. 项目列表能看到刚刚创建的项目
-    await expect(page.getByRole("heading", { name: "项目列表" })).toBeVisible();
+    // 1. 项目工作台能看到刚刚创建的项目
+    await expect(page.getByRole("heading", { name: "项目工作台" })).toBeVisible();
     await expect(page.getByText(freshProject.name)).toBeVisible();
 
     // 2. 接口预填 FP（保持 e2e 速度），字段对齐 server schema
@@ -83,8 +83,8 @@ test.describe("Forward 模式完整流程", () => {
     );
     expect(apiBulk.ok()).toBeTruthy();
 
-    // 3. 在项目列表点击"打开"进入项目（紧固 selector）
-    await page.getByRole("button", { name: "打开" }).first().click();
+    // 3. 在项目列表点击行进入项目（v2.2 row-link 替代旧"打开"按钮）
+    await page.locator("tr.row-link").first().click();
 
     await expect(page.getByText(/FP 编辑.*#/)).toBeVisible();
     await expect(page.locator("table tbody tr")).toHaveCount(5);
