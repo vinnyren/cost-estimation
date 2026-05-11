@@ -30,16 +30,19 @@ test.describe("Reverse 模式完整流程", () => {
       await page.goto(`${baseURL}/projects/${id}/result?t=${TOKEN}`);
       await expect(page.getByText(/评估结果.*反向/)).toBeVisible();
 
-      // 3. 填入目标金额并反算
-      await page.getByLabel(/目标总造价/).fill("500000");
-      await page.getByLabel(/其他费用/).fill("50000");
+      // 3. 填入目标金额并反算（v2.4 — 4 列 grid，label 无 for/id，用 nth 索引）
+      const numInputs = page.locator("input[type='number']");
+      await numInputs.nth(0).fill("500000"); // 目标总造价
+      await numInputs.nth(1).fill("50000");  // 其他费用
       await page.getByRole("button", { name: /^反算$/ }).click();
+      await page.waitForLoadState("networkidle");
 
-      // 4. 三档 FP 卡片
-      await expect(page.locator("[data-band]")).toHaveCount(3);
-      await expect(page.locator("[data-band='P10']")).toContainText(/FP/);
-      await expect(page.locator("[data-band='P50']")).toContainText(/FP/);
-      await expect(page.locator("[data-band='P90']")).toContainText(/FP/);
+      // 4. 三档 FP 卡片（v2.4 — ResultTrio 替代旧 ResultCard，用 .result-card-tag 区分档位）
+      await expect(page.locator(".result-trio .result-card")).toHaveCount(3);
+      await expect(page.locator(".result-card-tag", { hasText: "P10" }).first()).toBeVisible();
+      await expect(page.locator(".result-card-tag", { hasText: "P50" }).first()).toBeVisible();
+      await expect(page.locator(".result-card-tag", { hasText: "P90" }).first()).toBeVisible();
+      await expect(page.locator(".result-card-amt").first()).toContainText(/FP/);
     } finally {
       // teardown
       await request.delete(`${baseURL}/api/projects/${id}`, {

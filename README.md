@@ -223,6 +223,33 @@ git pull
 | backend coverage | 92.39% |
 | frontend coverage | line 96.98% / function 80%+ |
 
+## v2.4 — 反算路径视觉升级
+
+v2.4 把 ResultView 的 **reverse 分支**视觉对齐 v2.2 design import：
+
+- 反算输入卡 → v2.2 `.card` + 4 列 grid（目标总造价 / 其他费 / 可用预算 disabled / α 开发占比 disabled）
+- 三档 FP 卡片 → 用 v2.2 `ResultTrio` (unit="fp")，与 forward 同款组件
+- `.page` 加 `hero-bg` accent gradient
+- Reverse 下载按钮上移到 page-header 右侧（与 forward 一致体验）
+- AllocatorPanel（v2.3）和反算算法保持不变
+
+### 升级（v2.3 → v2.4）
+
+```bash
+git pull
+# 无 schema 改动，无 plugin 改动
+```
+
+### v2.4 测试基线
+
+| 项 | 数量 |
+|---|---:|
+| pytest | 191 |
+| vitest | 237 |
+| playwright e2e | 26 |
+| backend coverage | 92.39% |
+| frontend coverage | line 96.88% / function 80%+ |
+
 ## 标准合规
 
 - GB/T 36964-2018 软件工程 软件开发成本度量规范
