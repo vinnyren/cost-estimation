@@ -52,6 +52,7 @@ async def test_allocator_endpoint(client_factory):
                                           {"name": "B", "weight": 10},
                                           {"name": "C", "weight": 4}]})
         assert r.status_code == 200
-        items = r.json()["data"]
+        data = r.json()["data"]
+        items = data["items"]  # v2.3: data is now {items, validation} envelope
         assert len(items) == 3
         assert all(i["audit_tag"] == "budget_derived" for i in items)

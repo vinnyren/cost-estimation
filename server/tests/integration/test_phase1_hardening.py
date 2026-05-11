@@ -124,4 +124,4 @@ async def test_allocate_existing_project_still_works(client_factory):
             },
         )
         assert r.status_code == 200
-        assert len(r.json()["data"]) == 2
+        assert len(r.json()["data"]["items"]) == 2  # v2.3: data is now {items, validation} envelope
