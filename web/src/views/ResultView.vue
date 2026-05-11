@@ -1,4 +1,18 @@
 <script setup lang="ts">
+/**
+ * ResultView — 计算结果页（v2.0 反向路径加 allocator panel）。
+ *
+ * 两个模式共用同一个 view：
+ *   - 正向：onMounted 直接调 calcApi.forward 渲染 P10/P50/P90 三档总成本卡片
+ *   - 反向：用户输入目标总造价 + 其他费用 → calcApi.reverse 给出三档 FP →
+ *           （v2.0 GAP-C 新增）allocator panel 让用户输入模块草稿，调
+ *           calcApi.allocate 把推荐档总 FP 按权重分摊到各模块
+ *
+ * 模块草稿支持锁定项 (locked_us)：先扣除锁定额度，剩余规模按 weight 分摊。
+ * 用户也可在 Claude Code 跑 /cost-allocate 让 AI 生成 drafts 数组再贴回来。
+ *
+ * StaleBanner 监听 results.isStale — 参数页改了 override 后回到这里会提示重算。
+ */
 import { onMounted, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { projectsApi, type Project } from "@/api/projects";
@@ -46,6 +60,7 @@ const DEFAULT_DRAFTS_JSON = JSON.stringify(
   0,
 );
 
+// 用反向计算的推荐档（默认 P50）作为分摊基数，与计算页其它地方的 band 语义保持一致
 async function onAllocate(): Promise<void> {
   if (!reverseResult.value) {
     allocateHint.value = "请先点击「反算」生成三档 FP 结果。";

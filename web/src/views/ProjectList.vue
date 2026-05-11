@@ -1,4 +1,17 @@
 <script setup lang="ts">
+/**
+ * ProjectList — 项目列表页（v2.0 加 toolbar + ⋯ 行操作）。
+ *
+ * v1.1 只有简单列表 + 新建按钮；v2.0 新增：
+ *   - toolbar：搜索（防抖 250ms）+ 城市/行业/阶段筛选 + 排序字段 + 升降序
+ *   - 分页（PAGE_SIZE=20，total/meta 由 query envelope 提供）
+ *   - 每行 ⋯ 菜单：删除 (GAP-F) / 拷贝 (GAP-I) — 委托给 ProjectActionMenu
+ *
+ * 数据源从 projectsApi.list 切到 projectsApi.query —— 后者返回
+ * { data, meta:{total} } envelope，支持过滤 / 排序 / 分页。
+ * 直接调 API（绕开 store）因为 toolbar/分页状态本就只在这个 view 里用，
+ * store 还是给 wizard 等其它入口用的。
+ */
 import { onMounted, reactive, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { projectsApi, type Project, type ProjectQuery } from "@/api/projects";
@@ -91,6 +104,8 @@ async function reload(): Promise<void> {
   }
 }
 
+// 搜索输入防抖：用户连续敲键时只触发一次 query，避免噪音请求。
+// 每次重置 page=1 是因为筛选条件变了再停留在原页码没意义。
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 function onSearchInput(): void {
   if (debounceTimer) clearTimeout(debounceTimer);

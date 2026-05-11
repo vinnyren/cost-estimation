@@ -1,4 +1,15 @@
 <script setup lang="ts">
+/**
+ * FactorTable — ParamManager 因子 tab 的可编辑表格（每个级别一行系数）。
+ *
+ * 父组件 ParamManager 把 CSBMK 原始 levels（值可能是直接 number 也可能是
+ * { multiplier, description } 对象）通过 normalizeLevels 统一成
+ * Record<levelKey, { multiplier, description? }> 后再传进来 — 这个组件
+ * 不感知 CSBMK 双形态，只渲染 {multiplier, description}。
+ *
+ * 关联：@update:multiplier 事件冒到 ParamManager.onFactorEdit，
+ * 拼成 "factors_dev.{name}.{levelKey}" 路径调 paramsApi.applyOverride。
+ */
 import { computed } from "vue";
 
 interface Level {
@@ -29,6 +40,7 @@ const rows = computed(() =>
   })),
 );
 
+// 仅在数值有效且非负时上报；空串 / 负数 / NaN 静默忽略，避免 override 写入脏值
 function onInput(levelKey: string, ev: Event): void {
   const raw = (ev.target as HTMLInputElement).value;
   const v = parseFloat(raw);

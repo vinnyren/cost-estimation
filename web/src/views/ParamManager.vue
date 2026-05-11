@@ -1,4 +1,19 @@
 <script setup lang="ts">
+/**
+ * ParamManager — 项目级参数管理面板（v2.0 实装全部 6 个 tab）。
+ *
+ * v1.1 只有"费率"和"生产率"两个 tab 是 stub，其它 4 个仅展示骨架；
+ * v2.0 全部接通，按 tab 分别对应不同的 effective 字段：
+ *   1 费率 (city_rate)            2 生产率 (productivity_dev/ops)
+ *   3 开发因子 (factors_dev)      4 运维因子 (factors_ops)
+ *   5 规模变更 (scale_change)     6 快照 (snapshotsApi)
+ *
+ * 数据流：paramsApi.effective → store.effective → 各 tab 通过 OverrideField /
+ * FactorTable 渲染；用户改动经 patchOverride 落 paramsApi.applyOverride，
+ * 顺手 results.markParamsChanged() 让结果页显示 stale 横幅。
+ *
+ * 快照 (GAP-H) 走 snapshotsApi — 懒加载（切到 snapshots tab 时才拉列表）。
+ */
 import { onMounted, ref, computed, watch } from "vue";
 import { useParamsStore } from "@/stores/params";
 import { useResultsStore } from "@/stores/results";
@@ -115,6 +130,7 @@ const TABS = [
 
 const eff = computed(() => store.effective);
 
+// 每次 override 都触发 markParamsChanged，确保结果页的 StaleBanner 能提示重算
 async function patchOverride(key: string, value: unknown): Promise<void> {
   await store.applyOverride(props.projectId, { [key]: value });
   results.markParamsChanged();

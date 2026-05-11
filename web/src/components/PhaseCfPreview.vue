@@ -1,4 +1,13 @@
 <script setup lang="ts">
+/**
+ * PhaseCfPreview — Wizard step 3：选择项目阶段并实时预览 CF 调整因子（GAP-K）。
+ *
+ * 5 个阶段（预算/招标/立项/变更/结算）对应 5 个 CF 值，从 effective.cf 注入。
+ * 卡片同时显示阶段含义提示（PHASE_HINTS），帮助新用户理解为什么 CF 不同 —
+ * 早期阶段不确定性高，CF 偏保守；结算阶段 CF=1.0 表示数值已固定。
+ *
+ * 关联：ProjectWizard 的 form.phase 通过 update:phase 双向绑定。
+ */
 import { computed } from "vue";
 
 const props = defineProps<{
@@ -23,6 +32,7 @@ const PHASE_HINTS: Record<string, string> = {
   settled: "项目结束 — 数值已确定。",
 };
 
+// 缺省到 1.0 — 后端未返回该阶段 CF 时不影响计算（等价于不调整）
 const currentCf = computed(() => props.cf?.[props.phase] ?? 1.0);
 </script>
 

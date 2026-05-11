@@ -1,4 +1,16 @@
 <script setup lang="ts">
+/**
+ * FpEditor — 功能点编辑视图（v2.0 接入 AI Plugin）。
+ *
+ * v1 已有：上传文档、手工添加 FP、模块树、历史版本快照（functionsApi.snapshots）。
+ * v2.0 GAP-A 新增：
+ *   - 上传后告知用户去 Claude Code 跑 `/cost` 命令让 AI 抽取 FP 草稿
+ *   - 30s 轮询 FP 列表，发现新增立即刷新并提示用户审核（5 分钟上限自动停）
+ *   - source="claude_draft" 的 FP 行用浅黄底色 + AI 徽标，与 allocator 橙色拉开层级
+ *
+ * 不在前端跑 AI 抽取（同步阻塞 + 超时风险），转 Plugin 模式：上传只落文档，
+ * 实际抽取由 Claude Code 终端发起，前端轮询拿结果。
+ */
 import { onMounted, onBeforeUnmount, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { functionsApi, type FunctionPoint, type FpSnapshotMeta } from "@/api/functions";
@@ -79,6 +91,8 @@ async function onFileChange(e: Event): Promise<void> {
   }
 }
 
+// pollTimer 守卫确保重复点上传不会启动多个 interval；
+// POLL_MAX_MS 上限避免用户离开页面后无限轮询消耗后端
 function startAiPolling(): void {
   if (pollTimer) return;
   aiPolling.value = true;

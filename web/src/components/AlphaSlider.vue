@@ -1,4 +1,14 @@
 <script setup lang="ts">
+/**
+ * AlphaSlider — 开发 / 运维占比 α 滑块。
+ *
+ * 仅在 project_type = "dev_and_ops" 时使用：α 表示开发工作量占总成本比例，
+ * (1 − α) 即运维占比。range 限制 0.5–1.0 是项目经验值：低于 0.5 的开发占比
+ * 在企业 IT 项目中罕见，刻意收窄区间避免误操作。
+ *
+ * 关联：ProjectWizard step 2；submit 时 v-model 写回 form.alpha，
+ * 进而落到 projectsApi.create 的 alpha_dev 字段。
+ */
 import { computed } from "vue";
 
 const props = defineProps<{
@@ -12,6 +22,7 @@ const value = computed({
   get: () => props.modelValue,
   set: (v) => emit("update:modelValue", v),
 });
+// 派生展示用运维占比；保留 toFixed(2) 避免 0.7 + 0.1 浮点抖动 (0.7999... 之类)
 const opsShare = computed(() => (1 - value.value).toFixed(2));
 </script>
 

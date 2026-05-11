@@ -1,4 +1,14 @@
 <script setup lang="ts">
+/**
+ * FactorDropdown — Wizard 因子配置 dropdown。用户给每个因子选一个 level，
+ * 同组所有因子的 multiplier 链式相乘 = 该组（dev / ops）的总调整系数。
+ *
+ * 与 FactorTable 的区别：FactorTable 改的是参数值本身（落库 override），
+ * 这里只在 form 上记选择，submit 时进 projectsApi.create 的
+ * factors_dev / factors_ops payload。
+ *
+ * 关联：ProjectWizard step 5（开发因子）与 step 6（运维因子）。
+ */
 interface FactorLevel {
   multiplier: number;
   description?: string;

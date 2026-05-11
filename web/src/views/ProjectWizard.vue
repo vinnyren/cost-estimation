@@ -1,4 +1,20 @@
 <script setup lang="ts">
+/**
+ * ProjectWizard — 新建项目向导（v2.0 7 步骨架）。
+ *
+ * v1.1 是 5 步；v2.0 拆出"项目类型 (T14)"和"阶段 (T15)"独立成步，并新增
+ * step 5 / 6 的开发/运维因子配置（T17）。7 步:
+ *   1 基础信息   2 项目类型   3 阶段   4 正/反向
+ *   5 开发因子   6 运维因子（按 include_ops 跳过）   7 确认
+ *
+ * 关键 form 字段（v2 新增标 *）：
+ *   - name / city / industry / phase / mode / target_total — v1 已有
+ *   - project_type *, client *, evaluator *, alpha *,
+ *     factors_dev *, factors_ops *, include_ops *
+ *
+ * Submit 把所有字段拼成 projectsApi.create payload；TS Project 接口未声明
+ * factors_dev/ops（仅后端 schema 有），所以用 intersection 类型扩展。
+ */
 import { ref, reactive, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useProjectsStore } from "@/stores/projects";
@@ -158,6 +174,7 @@ const CITIES = [
 
 const INDUSTRIES = ["全行业", "电子政务", "金融", "电信", "制造", "能源", "交通"];
 
+// 步进闸门：step 1 必须填项目名；step 4 反向模式必须给非零目标成本
 const canAdvance = computed<boolean>(() => {
   if (currentStep.value === 1) return form.name.trim().length > 0;
   if (currentStep.value === 4) {
@@ -174,6 +191,8 @@ function back(): void {
   if (currentStep.value > 1) currentStep.value -= 1;
 }
 
+// project_type 改变时联动 include_ops / alpha — dev_only 时 α 强制 1.0
+// 等价于"纯开发"；其余两类都包含运维。后端 schema 也有同等约束。
 function onProjectTypeChange(): void {
   if (form.project_type === "ops_only") {
     form.include_ops = true;
