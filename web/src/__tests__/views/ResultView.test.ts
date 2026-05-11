@@ -86,9 +86,11 @@ describe("ResultView", () => {
     await flushPromises();
     await flushPromises();
     expect(w.text()).toContain("48.92");
-    const recommended = w.find("[data-recommended='true']");
+    // v2.2: ResultTrio uses .recommended CSS class (not data-recommended attr)
+    const recommended = w.find(".result-card.recommended");
     expect(recommended.exists()).toBe(true);
-    expect(recommended.attributes("data-band")).toBe("P50");
+    // P50 card should contain the recommended pill text
+    expect(recommended.text()).toContain("P50");
   });
 
   it("reverse 模式：显示反算输入区（fieldset + 目标总造价 input + 反算按钮）", async () => {

@@ -1,15 +1,12 @@
 <script setup lang="ts">
 /**
- * ResultView — 计算结果页（v2.0 反向路径加 allocator panel）。
+ * ResultView — 计算结果页（v2.2 forward 用 ResultTrio + PipelineGrid + CostBar + ComplianceCard）。
  *
  * 两个模式共用同一个 view：
- *   - 正向：onMounted 直接调 calcApi.forward 渲染 P10/P50/P90 三档总成本卡片
+ *   - 正向：onMounted 直接调 calcApi.forward 渲染 ResultTrio（三档）+ PipelineGrid + CostBar + ComplianceCard
  *   - 反向：用户输入目标总造价 + 其他费用 → calcApi.reverse 给出三档 FP →
- *           （v2.0 GAP-C 新增）allocator panel 让用户输入模块草稿，调
+ *           allocator panel 让用户输入模块草稿，调
  *           calcApi.allocate 把推荐档总 FP 按权重分摊到各模块
- *
- * 模块草稿支持锁定项 (locked_us)：先扣除锁定额度，剩余规模按 weight 分摊。
- * 用户也可在 Claude Code 跑 /cost-allocate 让 AI 生成 drafts 数组再贴回来。
  *
  * StaleBanner 监听 results.isStale — 参数页改了 override 后回到这里会提示重算。
  */
@@ -24,6 +21,10 @@ import {
 } from "@/api/calc";
 import { reportsApi } from "@/api/reports";
 import { useResultsStore } from "@/stores/results";
+import ResultTrio from "@/components/result/ResultTrio.vue";
+import PipelineGrid from "@/components/result/PipelineGrid.vue";
+import CostBar from "@/components/result/CostBar.vue";
+import ComplianceCard from "@/components/result/ComplianceCard.vue";
 import ResultCard from "@/components/ResultCard.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
@@ -174,6 +175,42 @@ function back(): void {
 
 const hasForward = computed(() => forwardResult.value !== null);
 const hasReverse = computed(() => reverseResult.value !== null);
+
+// v2.2: forward 三档 tiers for ResultTrio
+const PHASE_LABEL_MAP: Record<string, string> = {
+  budget: "预算编制",
+  bidding: "招投标",
+  planning: "立项审批",
+  change: "变更评估",
+  settled: "结算审计",
+};
+
+const forwardTiers = computed(() => {
+  if (!forwardResult.value) return [];
+  const r = forwardResult.value;
+  return (["P10", "P50", "P90"] as const).map((k) => ({
+    key: k,
+    label:
+      k === "P10"
+        ? "乐观 · 行业最高效率"
+        : k === "P50"
+          ? "中位 · CSBMK 行业基准"
+          : "保守 · 含返工/沟通损耗",
+    cost: r.cost_total_yuan[k],
+    recommended: k === "P50",
+    unit: "yuan" as const,
+    extras: [
+      ["调整后规模 S", `${r.scale_adjusted.toFixed(2)} FP`],
+      ["开发工作量", `${r.effort_dev_hours[k].toFixed(2)} 人时`],
+      ["运维工作量", `${r.effort_ops_hours[k].toFixed(2)} 人时`],
+      ["其他费用", `${(r.cost_other_yuan ?? 0).toLocaleString()} 元`],
+    ] as Array<[string, string]>,
+  }));
+});
+
+function fmtWan(n: number): string {
+  return (n / 10000).toFixed(2);
+}
 </script>
 
 <template>
@@ -214,29 +251,62 @@ const hasReverse = computed(() => reverseResult.value !== null);
       @retry="loadAndCompute"
     />
 
+    <!-- v2.2: forward 结果区域 — ResultTrio + PipelineGrid + CostBar + ComplianceCard -->
     <div
       v-else-if="project?.mode === 'forward' && hasForward"
-      class="cards"
+      class="forward-result"
     >
-      <ResultCard
-        :band="'P10'"
-        :value="forwardResult!.cost_total_yuan.P10"
-        :unit="'元'"
-        :description="`${forwardResult!.effort_dev_hours.P10.toFixed(0)} 人时`"
-      />
-      <ResultCard
-        :band="'P50'"
-        :value="forwardResult!.cost_total_yuan.P50"
-        :unit="'元'"
-        :recommended="true"
-        :description="`${forwardResult!.effort_dev_hours.P50.toFixed(0)} 人时 · 规模 ${forwardResult!.scale_adjusted.toFixed(2)} FP`"
-      />
-      <ResultCard
-        :band="'P90'"
-        :value="forwardResult!.cost_total_yuan.P90"
-        :unit="'元'"
-        :description="`${forwardResult!.effort_dev_hours.P90.toFixed(0)} 人时`"
-      />
+      <ResultTrio :tiers="forwardTiers" />
+
+      <div class="section">
+        <div class="section-head">
+          <div class="section-title">计算路径详解 · P50 推荐档</div>
+          <div class="section-sub">附录 D 算例 · 黄金测试基准</div>
+        </div>
+        <div
+          class="card"
+          style="padding: 20px"
+        >
+          <PipelineGrid
+            v-if="forwardResult!.trace"
+            :trace="forwardResult!.trace"
+            :phase-label="PHASE_LABEL_MAP[project!.phase] || project!.phase"
+            :city-label="project!.city"
+          />
+          <div
+            v-else
+            class="muted"
+          >
+            trace 数据待计算 — 点上方 "重新计算"
+          </div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-top: 16px">
+        <div
+          class="card"
+          style="padding: 20px"
+        >
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px">
+            <div class="section-title">成本构成分布</div>
+            <span
+              class="muted mono"
+              style="font-size: 11px"
+            >P50 · 合计 {{ Math.round(forwardResult!.cost_total_yuan.P50).toLocaleString() }} 元</span>
+          </div>
+          <CostBar
+            v-if="forwardResult!.composition"
+            :composition="forwardResult!.composition"
+          />
+          <div
+            v-else
+            class="muted"
+          >
+            composition 数据待计算
+          </div>
+        </div>
+        <ComplianceCard :p50-wan="fmtWan(forwardResult!.cost_total_yuan.P50)" />
+      </div>
     </div>
 
     <div
@@ -401,6 +471,41 @@ const hasReverse = computed(() => reverseResult.value !== null);
 }
 .page-header h1 {
   margin: 0;
+}
+.forward-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.section {
+  margin-top: 16px;
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.section-sub {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.muted {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.mono {
+  font-family: var(--font-mono);
 }
 .cards {
   display: grid;

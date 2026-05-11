@@ -3,6 +3,26 @@ import { api } from "./client";
 export type Band = "P10" | "P50" | "P90";
 export type BandValues = { P10: number; P50: number; P90: number };
 
+export interface PipelineTrace {
+  us: number;
+  cf: number;
+  s_adjusted: number;
+  pdr_p50: number;
+  dev_factor: number;
+  eff_pm_p50: number;
+  eff_hours_p50: number;
+  f_city: number;
+  ops_plus_other: number;
+  total_p50: number;
+}
+
+export interface CostComposition {
+  dev_labor: number;
+  ops_labor: number;
+  other: number;
+  indirect: number;
+}
+
 /**
  * Forward 正向计算返回值（与 server `app/core/forward.py:ForwardResult` 一一对应）。
  *
@@ -19,6 +39,10 @@ export interface ForwardResult {
   cost_ops_yuan: BandValues;
   cost_other_yuan: number;
   cost_total_yuan: BandValues;
+  warning_messages?: string[];
+  // v2.2 新增
+  trace?: PipelineTrace;
+  composition?: CostComposition;
 }
 
 /**
