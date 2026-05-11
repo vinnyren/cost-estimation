@@ -93,7 +93,7 @@ describe("ResultView", () => {
     expect(recommended.text()).toContain("P50");
   });
 
-  it("reverse 模式：显示反算输入区（fieldset + 目标总造价 input + 反算按钮）", async () => {
+  it("reverse 模式：显示 4 列反算输入区 + 反算按钮 (v2.4)", async () => {
     vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
     router.push("/projects/2/result");
     await router.isReady();
@@ -103,12 +103,37 @@ describe("ResultView", () => {
     });
     await flushPromises();
     await flushPromises();
-    expect(w.find("fieldset").exists()).toBe(true);
+    // v2.4 — 4 列 grid 代替原 fieldset
     expect(w.text()).toContain("反算输入");
     expect(w.text()).toContain("目标总造价");
+    expect(w.text()).toContain("其他费用");
+    expect(w.text()).toContain("可用预算");
+    expect(w.text()).toContain("α 开发占比");
     const buttons = w.findAll("button");
     const reverseBtn = buttons.find((b) => b.text() === "反算");
     expect(reverseBtn).toBeDefined();
+  });
+
+  it("reverse 模式：可用预算 = target - other（disabled 字段）(v2.4)", async () => {
+    vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
+    router.push("/projects/2/result");
+    await router.isReady();
+    const w = mount(ResultView, {
+      props: { projectId: "p-2" },
+      global: { plugins: [createPinia(), router] },
+    });
+    await flushPromises();
+    await flushPromises();
+    // 模拟用户输入（number 类型 input）
+    const numInputs = w.findAll("input[type='number']");
+    expect(numInputs.length).toBeGreaterThanOrEqual(2);
+    await numInputs[0].setValue(1500000);
+    await numInputs[1].setValue(60000);
+    await flushPromises();
+    // 可用预算 input（disabled）应为 1,440,000（zh-CN locale 带逗号）
+    const budgetInput = w.find("input.field-input[disabled]");
+    expect(budgetInput.exists()).toBe(true);
+    expect((budgetInput.element as HTMLInputElement).value).toBe("1,440,000");
   });
 
   it("Excel 下载失败时显示 ErrorBanner（role=alert）", async () => {
@@ -217,6 +242,10 @@ describe("ResultView", () => {
       other_cost: 50_000,
     });
     expect(w.text()).toContain("FP");
+    // v2.4 — ResultTrio 渲染（替代旧 ResultCard × 3）
+    await flushPromises();
+    const trio = w.find(".result-trio");
+    expect(trio.exists()).toBe(true);
   });
 
   it("reverse 模式：allocator panel 仅在反算结果出现后渲染", async () => {
