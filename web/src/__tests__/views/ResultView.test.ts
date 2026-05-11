@@ -149,7 +149,7 @@ describe("ResultView", () => {
     expect(reportsApi.download).toHaveBeenCalledWith("p-1", "p.xlsx");
   });
 
-  it("点击「返回 FP 编辑」→ 路由跳 fp-editor 并带 id", async () => {
+  it("点击「返回」→ 路由跳 fp-editor 并带 id", async () => {
     vi.mocked(projectsApi.get).mockResolvedValueOnce(forwardProject);
     router.push("/projects/1/result");
     await router.isReady();
@@ -159,7 +159,7 @@ describe("ResultView", () => {
     });
     await flushPromises();
     await flushPromises();
-    const backBtn = w.findAll("button").find((b) => b.text() === "返回 FP 编辑");
+    const backBtn = w.findAll("button").find((b) => b.text() === "返回");
     expect(backBtn).toBeDefined();
     await backBtn!.trigger("click");
     await flushPromises();

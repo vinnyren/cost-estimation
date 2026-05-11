@@ -191,7 +191,7 @@ function fmtWan(n: number): string {
 
 <template>
   <section
-    class="page"
+    class="page hero-bg"
     aria-labelledby="title"
   >
     <header class="page-header">
@@ -204,8 +204,35 @@ function fmtWan(n: number): string {
         class="btn"
         @click="back"
       >
-        返回 FP 编辑
+        返回
       </button>
+      <div class="page-spacer" />
+      <template v-if="project?.mode === 'reverse' && hasReverse">
+        <button
+          type="button"
+          class="btn btn-ghost"
+          :disabled="!hasReverse"
+          @click="reverseCalc"
+        >
+          ↻ 重新反算
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="downloading"
+          @click="download"
+        >
+          {{ downloading ? "下载中…" : "下载 Excel" }}
+        </button>
+      </template>
+      <p
+        v-if="downloadError && project?.mode === 'reverse'"
+        class="dl-error"
+        role="alert"
+        style="width: 100%; margin-top: 8px"
+      >
+        下载失败：{{ downloadError }}
+      </p>
     </header>
 
     <StaleBanner
@@ -374,7 +401,7 @@ function fmtWan(n: number): string {
     </div>
 
     <footer
-      v-if="hasForward || hasReverse"
+      v-if="hasForward"
       class="dl-bar"
     >
       <button
