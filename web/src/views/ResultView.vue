@@ -17,7 +17,7 @@ import {
   calcApi,
   type ForwardResult,
   type ReverseResult,
-  type AllocateOutput,
+  type AllocateResult,
 } from "@/api/calc";
 import { reportsApi } from "@/api/reports";
 import { useResultsStore } from "@/stores/results";
@@ -51,7 +51,7 @@ const otherCost = ref(0);
 // GAP-C: 反向 allocator — 把反向结果 P50 总规模按模块草稿权重分摊。
 const allocating = ref(false);
 const allocateHint = ref<string>("");
-const allocResult = ref<AllocateOutput[]>([]);
+const allocResult = ref<AllocateResult | null>(null);
 const DEFAULT_DRAFTS_JSON = JSON.stringify(
   [
     { name: "前端", weight: 1 },
@@ -397,7 +397,7 @@ function fmtWan(n: number): string {
           {{ allocateHint }}
         </p>
         <table
-          v-if="allocResult.length > 0"
+          v-if="allocResult && allocResult.items.length > 0"
           class="alloc-table"
           aria-label="模块分摊结果"
         >
@@ -419,7 +419,7 @@ function fmtWan(n: number): string {
           </thead>
           <tbody>
             <tr
-              v-for="r in allocResult"
+              v-for="r in allocResult.items"
               :key="r.name"
               data-testid="alloc-row"
             >

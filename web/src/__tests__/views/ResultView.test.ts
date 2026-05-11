@@ -278,10 +278,13 @@ describe("ResultView", () => {
       cf_used: 1.21,
       recommended_band: "P50" as const,
     });
-    vi.mocked(calcApi.allocate).mockResolvedValueOnce([
-      { name: "前端", us: 66.12, locked: false, audit_tag: "budget_derived" },
-      { name: "后端", us: 99.17, locked: false, audit_tag: "budget_derived" },
-    ]);
+    vi.mocked(calcApi.allocate).mockResolvedValueOnce({
+      items: [
+        { name: "前端", us: 66.12, locked: false, audit_tag: "budget_derived" },
+        { name: "后端", us: 99.17, locked: false, audit_tag: "budget_derived" },
+      ],
+      validation: { recalc_total_us: 165.29, recalc_total_adjusted: 200.0, error_pct: 0.0 },
+    });
     const promptSpy = vi
       .spyOn(window, "prompt")
       .mockReturnValue('[{"name":"前端","weight":1},{"name":"后端","weight":1.5}]');

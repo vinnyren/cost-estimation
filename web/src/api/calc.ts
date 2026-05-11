@@ -73,6 +73,17 @@ export interface AllocateOutput {
   audit_tag: string | null;
 }
 
+export interface AllocateValidation {
+  recalc_total_us: number;
+  recalc_total_adjusted: number;
+  error_pct: number;
+}
+
+export interface AllocateResult {
+  items: AllocateOutput[];
+  validation: AllocateValidation;
+}
+
 export const calcApi = {
   forward: (body: { project_id: string }) =>
     api.post<ForwardResult>("/api/calc/forward", body),
@@ -83,5 +94,5 @@ export const calcApi = {
     target_us: number;
     cf: number;
     drafts: Array<{ name: string; weight: number; locked?: boolean; locked_us?: number }>;
-  }) => api.post<AllocateOutput[]>("/api/calc/allocate", body),
+  }) => api.post<AllocateResult>("/api/calc/allocate", body),
 };
