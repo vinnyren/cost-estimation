@@ -43,13 +43,14 @@ test("反向 + AI 模块分摊 — calc → allocator 渲染分摊结果", async
     });
     expect(alloc.status()).toBe(200);
     const allocData = await alloc.json();
-    expect(allocData.data).toHaveLength(2);
+    // v2.3 — data 是 envelope {items, validation}
+    expect(allocData.data.items).toHaveLength(2);
 
     // 验返回值 us 字段（按 weight 比例分摊；2:1 比例下后台应该 ≈ 2 * 前端）
-    const frontend = allocData.data.find(
+    const frontend = allocData.data.items.find(
       (x: { name: string; us: number }) => x.name === "前端门户",
     );
-    const backend = allocData.data.find(
+    const backend = allocData.data.items.find(
       (x: { name: string; us: number }) => x.name === "后台管理",
     );
     expect(frontend).toBeDefined();

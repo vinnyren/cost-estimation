@@ -95,11 +95,11 @@ test.describe("Forward 模式完整流程", () => {
 
     await expect(page.getByText(/评估结果.*正向/)).toBeVisible();
 
-    // 5. 三档卡片渲染
-    const cards = page.locator("[data-band]");
+    // 5. 三档卡片渲染（v2.2 改为 ResultTrio + .result-card）
+    const cards = page.locator(".result-card");
     await expect(cards).toHaveCount(3);
-    await expect(page.locator("[data-band='P50'][data-recommended='true']")).toBeVisible();
-    await expect(page.locator("[data-band='P50']")).toContainText(/万元/);
+    await expect(page.locator(".result-card.recommended")).toBeVisible();
+    await expect(page.locator(".result-card.recommended")).toContainText(/万元/);
 
     // 6. 下载 Excel
     const downloadPromise = page.waitForEvent("download");
