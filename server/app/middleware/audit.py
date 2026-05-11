@@ -84,6 +84,20 @@ class AuditMiddleware(BaseHTTPMiddleware):
         m = _PROJECT_RX.match(path)
         project_id: str | None = m.group("pid") if m else None
 
+        # 把 path 的 sub_path（去掉 /api/projects/{id}/ 前缀部分）+ query 参数
+        # 序列化进 audit context。后续审计需要还原"哪条具体操作"时不需要从 log
+        # 文件回溯 — 例 fp.restore 的 version、calc.run 的 mode、bulk_write 的
+        # replace flag 都会被记录。Review finding #2。
+        sub_path = m.group("sub").lstrip("/") if m else ""
+        query_params = dict(request.query_params)
+        # 不要记 t= (auth token via query)
+        query_params.pop("t", None)
+        audit_context: dict = {}
+        if sub_path:
+            audit_context["sub_path"] = sub_path
+        if query_params:
+            audit_context["query"] = query_params
+
         # 对 create 和 copy 都需要从响应 body 取新生成的 project id。
         # 注意：此处 body 缓冲假定响应是一次性 JSON（FastAPI JSONResponse 的默认
         # 行为）。如果未来给 `/api/projects` POST 或 `/api/projects/{id}/copy` 加
@@ -120,11 +134,15 @@ class AuditMiddleware(BaseHTTPMiddleware):
         try:
             # 主 audit 行：source/创建/普通操作记到 project_id
             target = copy_target_id or project_id
+            main_diff = audit_context or None
             svc.write(
                 db,
                 project_id=project_id,
                 action=action,
                 target=target,
+                diff_json=(
+                    json.dumps(main_diff, ensure_ascii=False) if main_diff else None
+                ),
             )
             # BUG-03: 副本项目自己也需要一条 audit 入口，否则它的时间线是空的
             if action == "project.copy" and copy_target_id:
