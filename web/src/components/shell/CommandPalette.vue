@@ -14,8 +14,8 @@ const activeIdx = ref(0);
 
 const results = computed(() => {
   const q = query.value.trim().toLowerCase();
-  if (!q) return store.list.slice(0, 8);
-  return store.list
+  if (!q) return store.items.slice(0, 8);
+  return store.items
     .filter((p) =>
       p.name.toLowerCase().includes(q) ||
       p.id.toLowerCase().includes(q) ||

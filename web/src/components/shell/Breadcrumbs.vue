@@ -15,7 +15,7 @@ const crumbs = computed<Crumb[]>(() => {
 
   if (route.name === "project-wizard") out.push({ label: "新建项目" });
   if (id) {
-    const project = projectsStore.list.find((p) => p.id === id);
+    const project = projectsStore.items.find((p: { id: string }) => p.id === id);
     out.push({ label: project?.name ?? id, to: `/projects/${id}/functions` });
     if (route.name === "param-manager") out.push({ label: "参数管理" });
     if (route.name === "result-view") out.push({ label: "三档造价" });
