@@ -8,18 +8,17 @@
 """
 from __future__ import annotations
 
-import importlib
-
 import pytest
-from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client_with_dist(tmp_path, monkeypatch):
-    """构造一个临时 web/dist 目录并用 reload 重置 settings + app。
+def web_dist_dir(tmp_path, monkeypatch):
+    """构造一个临时 web/dist 目录并通过环境变量推给 client_factory。
 
     SPA shell + assets 是浏览器自发请求（无 X-Auth-Token header），
     因此 token 中间件对非 /api/ GET 请求免认证；token 仍保护所有 /api/* 路由。
+    create_app 内部读 `fresh.web_dist_dir = Settings().web_dist_dir`，
+    所以 setenv 之后调用 client_factory 触发的 create_app() 会读到新值。
     """
     dist = tmp_path / "web_dist"
     dist.mkdir()
@@ -28,43 +27,36 @@ def client_with_dist(tmp_path, monkeypatch):
     )
     (dist / "assets").mkdir()
     (dist / "assets" / "app.js").write_text("console.log('ok')", encoding="utf-8")
-    monkeypatch.setenv("COST_AUTH_TOKEN", "static-test-token")
     monkeypatch.setenv("COST_WEB_DIST_DIR", str(dist))
-    import app.config as cfg
-    importlib.reload(cfg)
-    import app.deps as deps
-    importlib.reload(deps)
-    import app.main as main
-    importlib.reload(main)
-    return TestClient(main.app), "static-test-token"
+    return dist
 
 
-def test_serves_index_html(client_with_dist):
-    client, token = client_with_dist
-    resp = client.get("/", headers={"X-Auth-Token": token})
-    assert resp.status_code == 200
-    assert "web app" in resp.text
+async def test_serves_index_html(client_factory, web_dist_dir):
+    async with await client_factory() as client:
+        resp = await client.get("/")
+        assert resp.status_code == 200
+        assert "web app" in resp.text
 
 
-def test_serves_static_asset(client_with_dist):
-    client, token = client_with_dist
-    resp = client.get("/assets/app.js", headers={"X-Auth-Token": token})
-    assert resp.status_code == 200
-    assert "console.log" in resp.text
+async def test_serves_static_asset(client_factory, web_dist_dir):
+    async with await client_factory() as client:
+        resp = await client.get("/assets/app.js")
+        assert resp.status_code == 200
+        assert "console.log" in resp.text
 
 
-def test_spa_fallback_for_unknown_route(client_with_dist):
-    client, token = client_with_dist
-    resp = client.get(
-        "/projects/1/functions",
-        headers={"X-Auth-Token": token},
-    )
-    assert resp.status_code == 200
-    assert "web app" in resp.text
+async def test_spa_fallback_for_unknown_route(client_factory, web_dist_dir):
+    async with await client_factory() as client:
+        resp = await client.get("/projects/1/functions")
+        assert resp.status_code == 200
+        assert "web app" in resp.text
 
 
-def test_api_routes_unaffected(client_with_dist):
-    client, token = client_with_dist
-    resp = client.get("/api/projects", headers={"X-Auth-Token": token})
-    # 200=空列表 / 4xx=已实现错误；都不应返回 SPA shell HTML
-    assert "web app" not in resp.text
+async def test_api_routes_unaffected(client_factory, web_dist_dir):
+    async with await client_factory() as client:
+        resp = await client.get(
+            "/api/projects",
+            headers={"X-Auth-Token": "test-secret-token-xyz"},
+        )
+        # 200=空列表 / 4xx=已实现错误；都不应返回 SPA shell HTML
+        assert "web app" not in resp.text
