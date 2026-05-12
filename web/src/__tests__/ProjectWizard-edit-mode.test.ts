@@ -59,6 +59,10 @@ vi.mock("@/api/params", () => ({
   },
 }));
 
+vi.mock("@/api/factorMeta", () => ({
+  factorMetaApi: { get: vi.fn().mockResolvedValue({ factors_dev: {}, factors_ops: {} }) },
+}));
+
 import { projectsApi } from "@/api/projects";
 
 describe("ProjectWizard edit mode (v2.5)", () => {

@@ -19,6 +19,10 @@ vi.mock("@/api/params", () => ({
   },
 }));
 
+vi.mock("@/api/factorMeta", () => ({
+  factorMetaApi: { get: vi.fn().mockResolvedValue({ factors_dev: {}, factors_ops: {} }) },
+}));
+
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [
