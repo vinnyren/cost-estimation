@@ -1,0 +1,162 @@
+{
+  "version": "CSBMK-202510",
+  "factors_dev": {
+    "app_type": {
+      "label": "应用类型",
+      "description": "项目所属软件应用领域 — 决定开发工作量基数。业务处理类基准 ×1.00，越偏向底层 / 控制类，系数越高。",
+      "options": {
+        "业务处理": {"label": "业务处理（OLTP）", "description": "在线事务处理类 — 典型企业管理 / 业务系统。基准 ×1.00。"},
+        "软件集成": {"label": "软件集成", "description": "以异构系统对接 / 接口开发为主。×1.20。"},
+        "科技": {"label": "科技计算", "description": "数值计算 / 科研类系统。×1.20。"},
+        "多媒体": {"label": "多媒体", "description": "音视频 / 图像 / 流媒体处理。×1.30。"},
+        "智能信息": {"label": "智能信息（AI）", "description": "AI / ML / 智能分析类。×1.50。"},
+        "基础软件": {"label": "基础软件", "description": "操作系统 / 中间件 / 数据库等基础平台。×1.70。"},
+        "通信控制": {"label": "通信控制", "description": "通信协议 / 设备控制类系统。×1.90。"},
+        "流程控制": {"label": "流程控制", "description": "工业控制 / 实时流程类。×2.00。"}
+      }
+    },
+    "integrity_level": {
+      "label": "完整性等级",
+      "description": "GB/T 25000 系列软件完整性级别 — 等级越高，对开发严谨度（评审 / 测试 / 文档）要求越大。",
+      "options": {
+        "C/D": {"label": "C/D 级", "description": "完整性 C 或 D — 一般业务系统。基准 ×1.00。"},
+        "A/B": {"label": "A/B 级", "description": "完整性 A 或 B — 关键业务系统。×1.10。"},
+        "A_full_lifecycle": {"label": "A 级全生命周期", "description": "A 级且贯穿全生命周期 — 极关键系统（如核电 / 航空控制）。×1.30。"}
+      }
+    },
+    "non_func": {
+      "label": "非功能性要求",
+      "description": "性能 / 可靠性 / 分布式 / 多站点等非功能性约束。base 为基准 ×1.00；其余每项叠加 +0.025（多选累计）。",
+      "options": {
+        "base": {"label": "基础", "description": "无特殊非功能要求 — 单机或单数据中心，常规性能。×1.00（基准）。"},
+        "distributed": {"label": "分布式", "description": "分布式部署 — 需考虑节点间一致性、容错。叠加 +0.025。"},
+        "performance": {"label": "高性能", "description": "高并发 / 低延迟要求。叠加 +0.025。"},
+        "reliability": {"label": "高可靠", "description": "需 7×24 SLA、自动故障转移。叠加 +0.025。"},
+        "multi_site": {"label": "多站点", "description": "多地域多活部署 — 跨城 / 跨国。叠加 +0.025。"}
+      }
+    },
+    "platform": {
+      "label": "开发平台",
+      "description": "项目主要开发语言 / 平台。C/C++ 内存管理负担大，PowerBuilder/ASP 为遗留低代码平台。",
+      "options": {
+        "JAVA": {"label": "Java / Kotlin", "description": "JVM 生态 — 基准 ×1.00。"},
+        "C": {"label": "C", "description": "C 语言 — 内存管理负担大。×1.50。"},
+        "C++": {"label": "C++", "description": "C++ — 现代项目按 C++ 标准开发。×1.00。"},
+        "C#": {"label": "C# / .NET", "description": "C# / .NET 生态。×1.00。"},
+        "PowerBuilder": {"label": "PowerBuilder", "description": "PowerBuilder — 遗留低代码平台。×0.60。"},
+        "ASP": {"label": "ASP / ASP.NET", "description": "ASP / ASP.NET — 遗留 Web 平台。×0.60。"}
+      }
+    },
+    "team_bg": {
+      "label": "团队行业背景",
+      "description": "实施团队对当前项目所属行业的熟悉度。",
+      "options": {
+        "same_industry": {"label": "同行业", "description": "团队过去 3 年深耕本行业 — 领域知识可直接复用。×0.80。"},
+        "related": {"label": "相关行业", "description": "做过相邻行业 — 部分领域知识可复用。×1.00。"},
+        "none": {"label": "无行业经验", "description": "团队首次接触本行业 — 需大量调研 / 培训。×1.20。"}
+      }
+    }
+  },
+  "factors_ops": {
+    "update_freq": {
+      "label": "更新频率",
+      "description": "运维期内系统更新发布的频率 — 频率越高运维工作量越大。",
+      "options": {
+        "quarterly": {"label": "季度级", "description": "每季度一次更新（含小修补）。×0.95。"},
+        "monthly": {"label": "月度级", "description": "每月发布一次 — 行业基准。×1.00。"},
+        "frequent": {"label": "高频", "description": "每周或更频繁发布。×1.12。"}
+      }
+    },
+    "support": {
+      "label": "支持方式",
+      "description": "运维支持的现场到位程度 — 驻场比远程贵。",
+      "options": {
+        "remote": {"label": "远程支持", "description": "工单 + 远程接入 + 电话。×0.89。"},
+        "onsite": {"label": "驻场为主", "description": "部分时间驻场 + 远程结合。×1.00。"},
+        "pure_onsite": {"label": "纯驻场", "description": "全职驻场工程师。×1.08。"}
+      }
+    },
+    "security_level": {
+      "label": "安全等级",
+      "description": "等保 / 系统分级安全要求 — L1 最低，L5 涉密。等级越高对运维投入越高。",
+      "options": {
+        "L1": {"label": "L1（一级）", "description": "无敏感数据 — 公开类系统。×0.90。"},
+        "L2": {"label": "L2（二级）", "description": "一般业务系统。×0.95。"},
+        "L3": {"label": "L3（三级）", "description": "重要业务系统 — 多数政务 / 金融业务。×1.00。"},
+        "L4": {"label": "L4（四级）", "description": "关键业务系统 — 银行核心 / 证券交易。×1.05。"},
+        "L5": {"label": "L5（五级）", "description": "极重要 / 涉密系统。×1.10。"}
+      }
+    },
+    "business_importance": {
+      "label": "业务重要性",
+      "description": "系统对业务的关键程度 — 核心业务对运维 SLA 要求更高。",
+      "options": {
+        "peripheral": {"label": "边缘业务", "description": "对主营业务影响小。×0.90。"},
+        "general": {"label": "一般业务", "description": "支撑业务运行。×1.00。"},
+        "core": {"label": "核心业务", "description": "业务命脉系统 — 宕机即停工。×1.10。"}
+      }
+    },
+    "response_time": {
+      "label": "响应时间",
+      "description": "故障 / 工单响应 SLA 要求。",
+      "options": {
+        "72h": {"label": "72 小时", "description": "三个工作日内响应。×0.90。"},
+        "48h": {"label": "48 小时", "description": "两个工作日内响应。×1.00。"},
+        "24h": {"label": "24 小时", "description": "一个工作日内响应。×1.10。"}
+      }
+    },
+    "integrity_level": {
+      "label": "完整性等级",
+      "description": "与开发因子同义 — 运维侧沿用同一软件完整性等级。",
+      "options": {
+        "C/D": {"label": "C/D 级", "description": "完整性 C 或 D。×1.00。"},
+        "A/B": {"label": "A/B 级", "description": "完整性 A 或 B。×1.10。"},
+        "A_full_lifecycle": {"label": "A 级全生命周期", "description": "A 级且全生命周期跟踪。×1.30。"}
+      }
+    },
+    "team_exp": {
+      "label": "团队经验",
+      "description": "运维团队对当前系统 / 行业的熟悉度。",
+      "options": {
+        "same_industry": {"label": "同行业老手", "description": "原开发或同领域多年。×0.80。"},
+        "related": {"label": "相关行业", "description": "经过培训交接 / 相关行业经验。×1.00。"},
+        "none": {"label": "无经验", "description": "新团队接手。×1.20。"}
+      }
+    },
+    "automation": {
+      "label": "自动化程度",
+      "description": "运维自动化工具链覆盖度 — 自动化越高人力需求越少。",
+      "options": {
+        "auto": {"label": "高度自动化", "description": "CI/CD + 监控 + 自动告警 + 自愈。×0.90。"},
+        "semi": {"label": "部分自动化", "description": "部分流程自动化。×1.00。"},
+        "manual": {"label": "手工为主", "description": "依赖人工运维。×1.10。"}
+      }
+    },
+    "deployment": {
+      "label": "部署方式",
+      "description": "系统部署架构 — 分布式比集中式管理复杂。",
+      "options": {
+        "centralized": {"label": "集中式", "description": "单数据中心 / 单集群部署。×1.00。"},
+        "distributed": {"label": "分布式", "description": "多节点 / 多机房分布式部署。×1.06。"}
+      }
+    },
+    "user_scale": {
+      "label": "用户规模",
+      "description": "系统活跃用户量级。",
+      "options": {
+        "<=1k": {"label": "≤ 1000 用户", "description": "小规模系统。×0.90。"},
+        "<=10k": {"label": "≤ 10000 用户", "description": "中规模系统。×1.00。"},
+        ">10k": {"label": "> 10000 用户", "description": "大规模系统。×1.10。"}
+      }
+    },
+    "system_relevance": {
+      "label": "系统关联性",
+      "description": "与外部系统的对接数量 — 对接越多接口测试 / 故障排查越复杂。",
+      "options": {
+        "none": {"label": "无对接", "description": "孤立系统，无外部对接。×0.97。"},
+        "1-5": {"label": "1~5 个对接", "description": "少量对接系统。×1.00。"},
+        "6+": {"label": "6 个以上对接", "description": "大量对接 / 数据同步。×1.14。"}
+      }
+    }
+  }
+}
