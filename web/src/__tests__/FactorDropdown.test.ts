@@ -58,3 +58,41 @@ describe("FactorDropdown", () => {
     expect(select.value).toBe("");
   });
 });
+
+const factorForMeta = {
+  name: "app_type",
+  label: "应用类型",
+  levels: {
+    "业务处理": { multiplier: 1.0 },
+    "基础软件": { multiplier: 1.5 },
+  },
+};
+
+const meta = {
+  label: "应用类型",
+  description: "项目所属软件应用领域",
+  options: {
+    "业务处理": { label: "业务处理（OLTP）", description: "在线事务处理" },
+    "基础软件": { label: "基础软件", description: "操作系统、中间件" },
+  },
+};
+
+describe("FactorDropdown v2.5 meta", () => {
+  it("renders option label from meta when provided", () => {
+    const w = mount(FactorDropdown, { props: { factor: factorForMeta, modelValue: undefined, meta } });
+    expect(w.text()).toContain("业务处理（OLTP）");
+    expect(w.text()).toContain("基础软件");
+  });
+
+  it("falls back to factor.label when no meta", () => {
+    const w = mount(FactorDropdown, { props: { factor: factorForMeta, modelValue: undefined } });
+    expect(w.text()).toContain("应用类型");
+  });
+
+  it("ⓘ title attr contains factor description from meta", () => {
+    const w = mount(FactorDropdown, { props: { factor: factorForMeta, modelValue: undefined, meta } });
+    const tip = w.find('span[title]');
+    expect(tip.exists()).toBe(true);
+    expect(tip.attributes("title")).toBe("项目所属软件应用领域");
+  });
+});
