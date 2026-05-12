@@ -93,6 +93,8 @@ export const projectsApi = {
   },
   get: (id: string) => api.get<Project>(`/api/projects/${id}`),
   create: (body: Partial<Project>) => api.post<Project>("/api/projects", body),
+  update: (id: string, body: Partial<Project>) =>
+    api.patch<Project>(`/api/projects/${id}`, body),
   patch: (id: string, body: Partial<Project>) =>
     api.patch<Project>(`/api/projects/${id}`, body),
   remove: (id: string) => api.delete<void>(`/api/projects/${id}`),
