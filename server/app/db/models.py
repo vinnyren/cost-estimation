@@ -277,6 +277,7 @@ class AiTask(Base):
     stage_log = Column(Text, nullable=False, default="")
     output_json = Column(Text)
     error_message = Column(Text)
+    pid = Column(Integer, nullable=True)  # v2.5 — spawn 后写入，stop 时用
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime,
