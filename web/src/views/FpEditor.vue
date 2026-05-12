@@ -21,6 +21,7 @@ import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import EmptyState from "@/components/status/EmptyState.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import AiTaskModal from "@/components/fp/AiTaskModal.vue";
+import UploadListModal from "@/components/fp/UploadListModal.vue";
 
 const props = defineProps<{ projectId: string }>();
 
@@ -37,6 +38,8 @@ const historyOpen = ref(false);
 const snapshots = ref<FpSnapshotMeta[]>([]);
 const restoring = ref<number | null>(null);
 const aiModalOpen = ref(false);
+const uploadModalOpen = ref(false);
+const uploadCount = ref(0);
 
 // GAP-A: AI Plugin polling state. 上传完成后告诉用户去 Claude Code 跑 /cost；
 // 同时每 30s 轮询一次 FP 列表，发现 claude_draft 行数增加就停止并提示审核。
@@ -51,7 +54,13 @@ const lastFpCount = ref(0);
 const isEmpty = computed(() => !loading.value && error.value === null && functions.value.length === 0);
 const isError = computed(() => !loading.value && error.value !== null);
 
-onMounted(load);
+onMounted(async () => {
+  await load();
+  try {
+    const list = await uploadsApi.list(props.projectId);
+    uploadCount.value = list.length;
+  } catch { /* silent — fallback to 0 */ }
+});
 
 async function load(): Promise<void> {
   loading.value = true;
@@ -274,6 +283,13 @@ async function reloadFps(): Promise<void> {
         <button
           type="button"
           class="btn"
+          @click="uploadModalOpen = true"
+        >
+          📁 已上传文件 ({{ uploadCount }})
+        </button>
+        <button
+          type="button"
+          class="btn"
           @click="aiModalOpen = true"
         >
           ✨ AI 任务
@@ -410,6 +426,11 @@ async function reloadFps(): Promise<void> {
     >
 
     <AiTaskModal v-model:open="aiModalOpen" :project-id="projectId" />
+    <UploadListModal
+      v-model:open="uploadModalOpen"
+      :project-id="projectId"
+      @refreshed="uploadCount = $event"
+    />
   </section>
 </template>
 
