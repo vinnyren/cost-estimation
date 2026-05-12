@@ -1,0 +1,60 @@
+"""v2.5 — POST /api/ai-tasks/{id}/start + /stop endpoints."""
+import pytest
+from unittest.mock import patch
+from app.db.models import Project
+
+H = {"X-Auth-Token": "test-secret-token-xyz"}
+
+
+def _seed(db, pid="p-start"):
+    p = Project(
+        id=pid, name="start stop test",
+        project_type="dev_only", phase="bidding",
+        city="北京", industry="电子政务",
+        mode="forward", basis_data_ver="CSBMK-202510",
+    )
+    db.add(p)
+    db.commit()
+    return p
+
+
+@pytest.mark.asyncio
+async def test_start_task_spawns_claude_when_available(client_factory, db_session):
+    _seed(db_session)
+    async with await client_factory(seed_csbmk=False) as client:
+        r = await client.post("/api/ai-tasks", json={"project_id": "p-start", "kind": "extract"}, headers=H)
+        assert r.status_code == 201
+        task_id = r.json()["id"]
+        with patch("app.api.ai_tasks.svc.spawn_claude_extract", return_value=54321):
+            r = await client.post(f"/api/ai-tasks/{task_id}/start", headers=H)
+        assert r.status_code == 200
+        assert r.json()["pid"] == 54321
+
+
+@pytest.mark.asyncio
+async def test_start_task_returns_500_when_claude_missing(client_factory, db_session):
+    _seed(db_session, pid="p-start-2")
+    async with await client_factory(seed_csbmk=False) as client:
+        r = await client.post("/api/ai-tasks", json={"project_id": "p-start-2", "kind": "extract"}, headers=H)
+        assert r.status_code == 201
+        task_id = r.json()["id"]
+        with patch("app.api.ai_tasks.svc.spawn_claude_extract", return_value=None):
+            r = await client.post(f"/api/ai-tasks/{task_id}/start", headers=H)
+        assert r.status_code == 500
+        assert "claude" in r.json()["detail"]["error"]["code"].lower()
+
+
+@pytest.mark.asyncio
+async def test_stop_task_calls_kill(client_factory, db_session):
+    _seed(db_session, pid="p-stop")
+    async with await client_factory(seed_csbmk=False) as client:
+        r = await client.post("/api/ai-tasks", json={"project_id": "p-stop", "kind": "extract"}, headers=H)
+        assert r.status_code == 201
+        task_id = r.json()["id"]
+        with patch("app.api.ai_tasks.svc.spawn_claude_extract", return_value=11111):
+            await client.post(f"/api/ai-tasks/{task_id}/start", headers=H)
+        with patch("app.api.ai_tasks.svc.stop_claude_subprocess", return_value=True) as mock_stop:
+            r = await client.post(f"/api/ai-tasks/{task_id}/stop", headers=H)
+        assert r.status_code == 200
+        assert r.json()["stopped"] is True
+        mock_stop.assert_called_once_with(11111)

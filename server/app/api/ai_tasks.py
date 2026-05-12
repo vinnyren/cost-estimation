@@ -1,4 +1,6 @@
 """v2.2 — /api/ai-tasks endpoints."""
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -41,3 +43,48 @@ def patch(task_id: str, payload: AiTaskUpdate, db: Session = Depends(get_db)):
     if not t:
         raise HTTPException(404, "task not found")
     return t
+
+
+@router.post("/{task_id}/start")
+def start_task(task_id: str, db: Session = Depends(get_db)):
+    """v2.5 — UI 触发后台 spawn claude 进程。"""
+    t = svc.get_task(db, task_id)
+    if not t:
+        raise HTTPException(404, "task not found")
+    if t.status in ("running", "done"):
+        raise HTTPException(409, detail={"error": {
+            "code": "TASK_ALREADY_RUNNING",
+            "problem": f"task already {t.status}",
+        }})
+
+    base_url = os.environ.get("COST_BASE_URL", "http://127.0.0.1:8788")
+    token = os.environ.get("COST_AUTH_TOKEN", "")
+    pid = svc.spawn_claude_extract(t.id, t.project_id, base_url, token)
+    if pid is None:
+        raise HTTPException(500, detail={"error": {
+            "code": "CLAUDE_CLI_UNAVAILABLE",
+            "problem": "claude CLI 不在 PATH 中或未登录",
+            "fix": "确认 claude 命令可用：`which claude && claude --version`",
+        }})
+    svc.update_task(db, t.id, status="running", progress_pct=1.0,
+                    stage_log_append=f"✓ 后台进程已启动 (pid={pid})")
+    t.pid = pid
+    db.commit()
+    return {"pid": pid}
+
+
+@router.post("/{task_id}/stop")
+def stop_task(task_id: str, db: Session = Depends(get_db)):
+    """v2.5 — kill 后台 claude 进程并标记 failed。"""
+    t = svc.get_task(db, task_id)
+    if not t:
+        raise HTTPException(404, "task not found")
+    if not t.pid:
+        raise HTTPException(400, detail={"error": {
+            "code": "NO_SUBPROCESS",
+            "problem": "task 未关联 subprocess，可能从未 /start 过",
+        }})
+    ok = svc.stop_claude_subprocess(t.pid)
+    svc.update_task(db, t.id, status="failed",
+                    error_message="用户手动停止" if ok else "停止失败 — 进程可能已退出")
+    return {"stopped": ok}
