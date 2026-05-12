@@ -34,7 +34,8 @@ export const uploadsApi = {
   },
 
   remove: async (projectId: string, uploadId: number): Promise<void> => {
-    await api.delete(
+    // DELETE returns 204 No Content — use raw axios to skip envelope unwrapping.
+    await api.raw.delete(
       `/api/projects/${encodeURIComponent(projectId)}/uploads/${uploadId}`
     );
   },
