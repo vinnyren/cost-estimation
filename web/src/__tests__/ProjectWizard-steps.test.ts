@@ -5,7 +5,11 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import ProjectWizard from "@/views/ProjectWizard.vue";
 
 vi.mock("@/api/projects", () => ({
-  projectsApi: { create: vi.fn() },
+  projectsApi: {
+    create: vi.fn(),
+    get: vi.fn().mockResolvedValue(null),
+    update: vi.fn(),
+  },
 }));
 
 vi.mock("@/api/params", () => ({

@@ -19,6 +19,7 @@ import { ref, reactive, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useProjectsStore } from "@/stores/projects";
 import { paramsApi, type EffectiveParams } from "@/api/params";
+import { projectsApi } from "@/api/projects";
 import type {
   Project,
   ProjectMode,
@@ -114,6 +115,9 @@ const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
 const PROJECT_TYPES = ["dev_only", "ops_only", "dev_and_ops"] as const;
 
 const BASIS_DATA_VER = "CSBMK®-202510";
+
+const props = defineProps<{ projectId?: string }>();
+const isEditMode = computed(() => !!props.projectId);
 
 const router = useRouter();
 const store = useProjectsStore();
@@ -215,6 +219,30 @@ onMounted(async () => {
   } catch {
     // 静默兜底
   }
+
+  // v2.5 — edit mode: 预填 form 从现有 project 数据
+  if (props.projectId) {
+    try {
+      const proj = await projectsApi.get(props.projectId);
+      Object.assign(form, {
+        name: proj.name,
+        city: proj.city,
+        industry: proj.industry,
+        phase: proj.phase,
+        project_type: proj.project_type,
+        mode: proj.mode as ProjectMode,
+        target_total: proj.target_cost ?? 0,
+        client: proj.client ?? "",
+        evaluator: proj.evaluator ?? "",
+        alpha: proj.alpha_dev ?? 1.0,
+        include_ops: proj.include_ops ?? false,
+        factors_dev: (proj as unknown as { factors_dev?: Record<string, string> }).factors_dev ?? {},
+        factors_ops: (proj as unknown as { factors_ops?: Record<string, string> }).factors_ops ?? {},
+      });
+    } catch {
+      // 加载失败 — form 保留默认值
+    }
+  }
 });
 
 // 实时 chain 预览：用户在 step 5 / 6 选 dropdown 时即时显示乘积。
@@ -269,8 +297,13 @@ async function submit(): Promise<void> {
           ? { ...form.factors_ops }
           : undefined,
     };
-    const created = await store.create(payload);
-    router.push({ name: "fp-editor", params: { id: created.id } });
+    if (isEditMode.value && props.projectId) {
+      await projectsApi.update(props.projectId, payload);
+      router.push({ name: "fp-editor", params: { id: props.projectId } });
+    } else {
+      const created = await store.create(payload);
+      router.push({ name: "fp-editor", params: { id: created.id } });
+    }
   } catch (e: unknown) {
     errorMsg.value = e instanceof Error ? e.message : "创建失败";
   } finally {
@@ -286,7 +319,7 @@ async function submit(): Promise<void> {
   >
     <header class="page-header">
       <h1 id="title">
-        新建项目
+        {{ isEditMode ? "编辑项目设定" : "新建项目" }}
       </h1>
       <span class="text-muted step-indicator">第 {{ currentStep }} / {{ totalSteps }} 步</span>
     </header>
@@ -620,7 +653,7 @@ async function submit(): Promise<void> {
           :disabled="submitting"
           @click="submit"
         >
-          {{ submitting ? "创建中…" : "创建项目" }}
+          {{ submitting ? (isEditMode ? "保存中…" : "创建中…") : (isEditMode ? "保存项目" : "创建项目") }}
         </button>
       </div>
     </form>
