@@ -1,8 +1,8 @@
 """v2.5 — spawn_claude_extract + stop_claude_subprocess 单测。
 
-不真跑 claude — 用 monkeypatch 替换 subprocess.Popen 和 os.kill。
+不真跑 claude — 用 monkeypatch 替换 subprocess.Popen / os.killpg / os.getpgid。
+/review F4：stop 用 killpg 杀整个进程组（含 plugin 派生的 curl/jq）。
 """
-import pytest
 from unittest.mock import MagicMock, patch
 from app.services import ai_tasks as svc
 
@@ -30,23 +30,28 @@ def test_spawn_claude_returns_none_when_claude_not_found(monkeypatch):
     assert pid is None
 
 
-def test_stop_claude_subprocess_kills_running_pid(monkeypatch):
-    killed = {"pid": None, "sig": None}
+def test_stop_claude_subprocess_kills_running_pgid(monkeypatch):
+    """stop 应该 killpg 整个进程组（不只是 pid）。"""
+    killed = {"pgid": None, "sig": None}
 
-    def fake_kill(pid, sig):
-        killed["pid"] = pid
+    def fake_getpgid(pid):
+        return pid  # 单进程组的简化
+
+    def fake_killpg(pgid, sig):
+        killed["pgid"] = pgid
         killed["sig"] = sig
 
-    monkeypatch.setattr("app.services.ai_tasks.os.kill", fake_kill)
+    monkeypatch.setattr("app.services.ai_tasks.os.getpgid", fake_getpgid)
+    monkeypatch.setattr("app.services.ai_tasks.os.killpg", fake_killpg)
     ok = svc.stop_claude_subprocess(99999)
     assert ok is True
-    assert killed["pid"] == 99999
+    assert killed["pgid"] == 99999
 
 
 def test_stop_claude_subprocess_returns_false_for_dead_pid(monkeypatch):
-    def fake_kill(pid, sig):
+    def fake_getpgid(pid):
         raise ProcessLookupError("no such process")
 
-    monkeypatch.setattr("app.services.ai_tasks.os.kill", fake_kill)
+    monkeypatch.setattr("app.services.ai_tasks.os.getpgid", fake_getpgid)
     ok = svc.stop_claude_subprocess(99999)
     assert ok is False

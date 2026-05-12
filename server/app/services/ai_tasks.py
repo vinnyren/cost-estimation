@@ -106,13 +106,25 @@ def spawn_claude_extract(
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
+    # /review F5: 关父进程持有的 log fd（子进程已 dup 一份），避免 fd 泄露
+    if log_fh is not subprocess.DEVNULL:
+        try:
+            log_fh.close()
+        except OSError:
+            pass
     return proc.pid
 
 
 def stop_claude_subprocess(pid: int) -> bool:
-    """v2.5 — kill 后台 claude 进程。返回是否成功 (False 表示进程已不存在)。"""
+    """v2.5 — kill 后台 claude 进程 + 其派生 curl/jq 等子进程。
+
+    spawn_claude_extract 用 start_new_session=True，子进程在独立进程组。
+    用 killpg 杀整个进程组，避免 plugin /cost 派生的 curl/jq 成为孤儿进程。
+    返回是否成功 (False 表示进程已不存在)。
+    """
     try:
-        os.kill(pid, signal.SIGTERM)
+        pgid = os.getpgid(pid)
+        os.killpg(pgid, signal.SIGTERM)
         return True
     except (ProcessLookupError, PermissionError):
         return False

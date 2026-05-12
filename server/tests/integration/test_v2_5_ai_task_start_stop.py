@@ -58,3 +58,34 @@ async def test_stop_task_calls_kill(client_factory, db_session):
         assert r.status_code == 200
         assert r.json()["stopped"] is True
         mock_stop.assert_called_once_with(11111)
+
+
+@pytest.mark.asyncio
+async def test_stop_task_refuses_to_overwrite_done_status(client_factory, db_session):
+    """/review F2: /stop 在 task 已 done 时应返回 409，不能把 done 改写为 failed。"""
+    _seed(db_session, pid="p-stop-done")
+    async with await client_factory(seed_csbmk=False) as client:
+        r = await client.post(
+            "/api/ai-tasks",
+            json={"project_id": "p-stop-done", "kind": "extract"},
+            headers=H,
+        )
+        task_id = r.json()["id"]
+        # 模拟 plugin 已完成：PATCH 把 task 推到 done
+        with patch("app.api.ai_tasks.svc.spawn_claude_extract", return_value=22222):
+            await client.post(f"/api/ai-tasks/{task_id}/start", headers=H)
+        r = await client.patch(
+            f"/api/ai-tasks/{task_id}",
+            json={"status": "done", "progress_pct": 100, "stage_log_append": "✓ 完成"},
+            headers=H,
+        )
+        assert r.status_code == 200
+
+        # 用户在 done 之后再点 "停止" — 应该被拒
+        r = await client.post(f"/api/ai-tasks/{task_id}/stop", headers=H)
+        assert r.status_code == 409
+        assert r.json()["detail"]["error"]["code"] == "TASK_ALREADY_DONE"
+
+        # 验证 task 状态没被改回 failed
+        r = await client.get(f"/api/ai-tasks/{task_id}", headers=H)
+        assert r.json()["status"] == "done"

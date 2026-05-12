@@ -66,19 +66,28 @@ def start_task(task_id: str, db: Session = Depends(get_db)):
             "problem": "claude CLI 不在 PATH 中或未登录",
             "fix": "确认 claude 命令可用：`which claude && claude --version`",
         }})
+    # /review F3: 单次 commit — 先写 pid，再 update_task 走同一事务，避免
+    # status=running 已 commit 但 pid=NULL 的窗口让 /stop 误判 NO_SUBPROCESS。
+    t.pid = pid
     svc.update_task(db, t.id, status="running", progress_pct=1.0,
                     stage_log_append=f"✓ 后台进程已启动 (pid={pid})")
-    t.pid = pid
-    db.commit()
     return {"pid": pid}
 
 
 @router.post("/{task_id}/stop")
 def stop_task(task_id: str, db: Session = Depends(get_db)):
-    """v2.5 — kill 后台 claude 进程并标记 failed。"""
+    """v2.5 — kill 后台 claude 进程并标记 failed。
+
+    /review F2: 不允许停止已完成（done）任务 — 避免把成功结果写回 failed。
+    """
     t = svc.get_task(db, task_id)
     if not t:
         raise HTTPException(404, "task not found")
+    if t.status == "done":
+        raise HTTPException(409, detail={"error": {
+            "code": "TASK_ALREADY_DONE",
+            "problem": "task 已成功完成，无需停止",
+        }})
     if not t.pid:
         raise HTTPException(400, detail={"error": {
             "code": "NO_SUBPROCESS",
