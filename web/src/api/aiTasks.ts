@@ -28,4 +28,16 @@ export const aiTasksApi = {
     const r = await api.raw.get<AiTask>(`/api/ai-tasks/${encodeURIComponent(id)}`);
     return r.data;
   },
+  async create(projectId: string, kind: AiTaskKind = "extract"): Promise<AiTask> {
+    const r = await api.raw.post<AiTask>("/api/ai-tasks", { project_id: projectId, kind });
+    return r.data;
+  },
+  async start(id: string): Promise<{ pid: number }> {
+    const r = await api.raw.post<{ pid: number }>(`/api/ai-tasks/${id}/start`);
+    return r.data;
+  },
+  async stop(id: string): Promise<{ stopped: boolean }> {
+    const r = await api.raw.post<{ stopped: boolean }>(`/api/ai-tasks/${id}/stop`);
+    return r.data;
+  },
 };
