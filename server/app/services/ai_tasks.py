@@ -25,10 +25,22 @@ def get_task(db: Session, task_id: str) -> AiTask | None:
 
 
 def list_for_project(db: Session, project_id: str, limit: int = 10) -> list[AiTask]:
-    return (db.query(AiTask)
-            .filter(AiTask.project_id == project_id)
-            .order_by(AiTask.created_at.desc())
-            .limit(limit).all())
+    tasks = (db.query(AiTask)
+             .filter(AiTask.project_id == project_id)
+             .order_by(AiTask.created_at.desc())
+             .limit(limit).all())
+    # v2.5 自检：running 但进程已死 → 转 failed，避免 UI 卡在 1%
+    for t in tasks:
+        if t.status == "running" and t.pid:
+            try:
+                os.kill(t.pid, 0)  # signal 0 = 探测，不发信号
+            except (ProcessLookupError, PermissionError):
+                t.status = "failed"
+                if not t.error_message:
+                    t.error_message = "后台进程异常退出 — 请查看 ai-task log"
+    if any(t.status == "failed" for t in tasks):
+        db.commit()
+    return tasks
 
 
 def update_task(
@@ -78,12 +90,15 @@ def spawn_claude_extract(
     if not claude_bin:
         return None
 
+    # claude CLI 的 --allowedTools 是 variadic（吞所有后续位置参数），所以 prompt
+    # 不能放在 argv 里 — 否则会被 --allowedTools 消耗，触发
+    # "Input must be provided either through stdin or as a prompt argument"。
+    # 改用 stdin 管道传 prompt — 更稳定且不受 flag 顺序影响。
     cmd = [
         claude_bin,
         "--print",
-        "--allowedTools",
+        "--allowed-tools",
         "Bash(curl *) Bash(jq *) Read",
-        f"/cost {project_id}",
     ]
     env = {
         **os.environ,
@@ -102,10 +117,18 @@ def spawn_claude_extract(
     proc = subprocess.Popen(
         cmd,
         env=env,
+        stdin=subprocess.PIPE,
         stdout=log_fh,
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
+    # 把 /cost <project_id> 通过 stdin 喂给 claude，再关 stdin 让 claude 看到 EOF
+    try:
+        assert proc.stdin is not None
+        proc.stdin.write(f"/cost {project_id}\n".encode())
+        proc.stdin.close()
+    except (BrokenPipeError, OSError):
+        pass
     # /review F5: 关父进程持有的 log fd（子进程已 dup 一份），避免 fd 泄露
     if log_fh is not subprocess.DEVNULL:
         try:
