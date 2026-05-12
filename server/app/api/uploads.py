@@ -27,3 +27,12 @@ async def upload_one(project_id: str, file: UploadFile = File(...),
 def list_uploads(project_id: str, db: Session = Depends(get_db)):
     rows = svc.list_for_project(db, project_id)
     return {"ok": True, "data": [UploadRead.model_validate(r).model_dump(mode="json") for r in rows]}
+
+
+@router.delete("/{upload_id}", status_code=204)
+def delete_upload_endpoint(project_id: str, upload_id: int, db: Session = Depends(get_db)):
+    """v2.5 — 删除上传记录 + 物理文件。"""
+    ok = svc.delete_upload(db, project_id, upload_id)
+    if not ok:
+        raise HTTPException(404, detail={"error": {"code": "UPLOAD_NOT_FOUND"}})
+    return None

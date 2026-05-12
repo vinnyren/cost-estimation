@@ -106,3 +106,37 @@ def resolve_parsed_path(rec: Upload) -> Path:
 
 def list_for_project(db: Session, project_id: str) -> list[Upload]:
     return db.query(Upload).filter_by(project_id=project_id).order_by(Upload.id.desc()).all()
+
+
+def delete_upload(db: Session, project_id: str, upload_id: int) -> bool:
+    """v2.5 — 删除上传记录 + 物理文件（解析文本 + 原始文件）。
+
+    Returns True if deleted, False if not found.
+    原始文件存储路径：settings.upload_dir / project_id / uuid__filename
+    解析文本路径：由 resolve_parsed_path(rec) 还原为绝对路径。
+    """
+    rec = db.query(Upload).filter_by(id=upload_id, project_id=project_id).first()
+    if not rec:
+        return False
+
+    # 删解析文本
+    try:
+        parsed_fp = resolve_parsed_path(rec)
+        if parsed_fp.exists():
+            parsed_fp.unlink()
+    except Exception:
+        pass  # 不阻断 DB 删除
+
+    # 删原始文件 — 存储在 upload_dir/project_id/ 目录下，文件名为 uuid__original_name
+    try:
+        upload_proj_dir = settings.upload_dir / project_id
+        if upload_proj_dir.exists():
+            # 匹配以任意 uuid 前缀 + __ + 原始文件名命名的文件
+            for f in upload_proj_dir.glob(f"*__{rec.filename}"):
+                f.unlink(missing_ok=True)
+    except Exception:
+        pass  # 不阻断 DB 删除
+
+    db.delete(rec)
+    db.commit()
+    return True
