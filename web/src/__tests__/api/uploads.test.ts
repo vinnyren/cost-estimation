@@ -6,6 +6,9 @@ vi.mock("@/api/client", () => ({
     post: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
+    raw: {
+      delete: vi.fn().mockResolvedValue({ data: null, status: 204 }),
+    },
   },
   ApiError: class ApiError extends Error {},
 }));
@@ -80,20 +83,16 @@ describe("uploadsApi.remove (v2.5)", () => {
     vi.clearAllMocks();
   });
 
-  it("calls DELETE /api/projects/{pid}/uploads/{id}", async () => {
-    (api.delete as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-
+  it("calls DELETE /api/projects/{pid}/uploads/{id} via api.raw (204 no envelope)", async () => {
     await uploadsApi.remove("p-1", 42);
 
-    expect(api.delete).toHaveBeenCalledTimes(1);
-    expect(api.delete).toHaveBeenCalledWith("/api/projects/p-1/uploads/42");
+    expect(api.raw.delete).toHaveBeenCalledTimes(1);
+    expect(api.raw.delete).toHaveBeenCalledWith("/api/projects/p-1/uploads/42");
   });
 
   it("URL-encodes project ID in delete path", async () => {
-    (api.delete as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-
     await uploadsApi.remove("p/special", 7);
 
-    expect(api.delete).toHaveBeenCalledWith("/api/projects/p%2Fspecial/uploads/7");
+    expect(api.raw.delete).toHaveBeenCalledWith("/api/projects/p%2Fspecial/uploads/7");
   });
 });
