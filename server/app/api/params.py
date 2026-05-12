@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,6 +10,21 @@ from ..schemas.params import ParamPatch
 from ..services import params as svc
 
 router = APIRouter()
+
+
+@router.get("/api/params/factor-meta")
+def get_factor_meta():
+    """v2.5 — factors_dev/ops 中文 meta（label/description/options）。
+
+    数据来源 server/app/data/csbmk_factors_meta.json。
+    """
+    from ..config import settings
+
+    meta_path = settings.csbmk_seed_path.parent / "csbmk_factors_meta.json"
+    if not meta_path.exists():
+        # 兜底：从文件位置派生
+        meta_path = Path(__file__).parent.parent / "data" / "csbmk_factors_meta.json"
+    return json.loads(meta_path.read_text(encoding="utf-8"))
 
 
 @router.get("/api/params/global")
