@@ -24,21 +24,44 @@ def get_task(db: Session, task_id: str) -> AiTask | None:
     return db.query(AiTask).filter(AiTask.id == task_id).first()
 
 
+def _is_process_dead_or_zombie(pid: int) -> bool:
+    """检测 pid 是否已死或处于 zombie 状态。
+
+    os.kill(pid, 0) 对 zombie（defunct）进程仍返回成功，所以单独不够。
+    用 ps 读 state 字段：Z = zombie，空 = 进程不存在。
+    """
+    try:
+        os.kill(pid, 0)
+    except (ProcessLookupError, PermissionError):
+        return True
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "state="],
+            capture_output=True, text=True, timeout=2,
+        )
+        state = result.stdout.strip()
+        if not state:
+            return True
+        # macOS/BSD: Z = zombie; Linux: Z 或 X (dead)
+        return state.startswith("Z") or state.startswith("X")
+    except (subprocess.SubprocessError, OSError):
+        return False  # 不确定 → 不动它
+
+
 def list_for_project(db: Session, project_id: str, limit: int = 10) -> list[AiTask]:
     tasks = (db.query(AiTask)
              .filter(AiTask.project_id == project_id)
              .order_by(AiTask.created_at.desc())
              .limit(limit).all())
-    # v2.5 自检：running 但进程已死 → 转 failed，避免 UI 卡在 1%
+    # v2.5 自检：running 但进程已死/zombie → 转 failed，避免 UI 卡在 1%
+    dirty = False
     for t in tasks:
-        if t.status == "running" and t.pid:
-            try:
-                os.kill(t.pid, 0)  # signal 0 = 探测，不发信号
-            except (ProcessLookupError, PermissionError):
-                t.status = "failed"
-                if not t.error_message:
-                    t.error_message = "后台进程异常退出 — 请查看 ai-task log"
-    if any(t.status == "failed" for t in tasks):
+        if t.status == "running" and t.pid and _is_process_dead_or_zombie(t.pid):
+            t.status = "failed"
+            if not t.error_message:
+                t.error_message = "后台进程异常退出 — 请查看 ai-task log"
+            dirty = True
+    if dirty:
         db.commit()
     return tasks
 
@@ -122,10 +145,12 @@ def spawn_claude_extract(
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
-    # 把 /cost <project_id> 通过 stdin 喂给 claude，再关 stdin 让 claude 看到 EOF
+    # 把 /cost-estimation:cost <project_id> 通过 stdin 喂给 claude。
+    # 注：必须用插件命名空间 (cost-estimation:cost)，否则 `/cost` 会被 claude
+    # 内置 cost 命令（显示会话成本）截获，导致 plugin 永远不执行。
     try:
         assert proc.stdin is not None
-        proc.stdin.write(f"/cost {project_id}\n".encode())
+        proc.stdin.write(f"/cost-estimation:cost {project_id}\n".encode())
         proc.stdin.close()
     except (BrokenPipeError, OSError):
         pass
