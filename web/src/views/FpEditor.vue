@@ -20,7 +20,7 @@ import ModuleTree from "@/components/ModuleTree.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import EmptyState from "@/components/status/EmptyState.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
-import AiTaskModal from "@/components/fp/AiTaskModal.vue";
+import AiTaskPanel from "@/components/fp/AiTaskPanel.vue";
 import UploadListModal from "@/components/fp/UploadListModal.vue";
 
 const props = defineProps<{ projectId: string }>();
@@ -299,7 +299,7 @@ async function reloadFps(): Promise<void> {
           class="btn"
           @click="aiModalOpen = true"
         >
-          ✨ AI 任务
+          🤖 AI 任务面板
         </button>
         <button
           type="button"
@@ -432,7 +432,10 @@ async function reloadFps(): Promise<void> {
       @change="onFileChange"
     >
 
-    <AiTaskModal v-model:open="aiModalOpen" :project-id="projectId" />
+    <AiTaskPanel
+      v-model:open="aiModalOpen"
+      :project-id="projectId"
+    />
     <UploadListModal
       v-model:open="uploadModalOpen"
       :project-id="projectId"
