@@ -12,6 +12,24 @@ from ..db.models import AiTask
 
 
 def create_task(db: Session, project_id: str, kind: str) -> AiTask:
+    """v2.5 fix: 30s 去重窗口 — 避免 UI + plugin 双创建同一 (project_id, kind) task。
+
+    UI 点 "新建提取任务" → 创建 task A → /start 起 claude → plugin v2.4
+    自己 POST /api/ai-tasks 又创建 task B（plugin 不读 $TASK_ID env）。
+    这里把 30s 内、相同 (project_id, kind) 的 queued/running task 视为同一次
+    操作，直接复用，让 UI 和 plugin 操作同一行。
+    """
+    from datetime import datetime, timedelta
+    cutoff = datetime.utcnow() - timedelta(seconds=30)
+    existing = (db.query(AiTask)
+                .filter(AiTask.project_id == project_id,
+                        AiTask.kind == kind,
+                        AiTask.status.in_(("queued", "running")),
+                        AiTask.created_at >= cutoff)
+                .order_by(AiTask.created_at.desc())
+                .first())
+    if existing:
+        return existing
     task = AiTask(id=str(uuid.uuid4()), project_id=project_id, kind=kind, status="queued",
                   progress_pct=0.0, stage_log="")
     db.add(task)

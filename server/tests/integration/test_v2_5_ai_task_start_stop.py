@@ -61,6 +61,30 @@ async def test_stop_task_calls_kill(client_factory, db_session):
 
 
 @pytest.mark.asyncio
+async def test_create_task_dedup_within_30s_window(client_factory, db_session):
+    """/qa: UI 和 plugin 同时 POST /api/ai-tasks 同 (project_id, kind) 应复用同一行。"""
+    _seed(db_session, pid="p-dedup")
+    async with await client_factory(seed_csbmk=False) as client:
+        r1 = await client.post(
+            "/api/ai-tasks",
+            json={"project_id": "p-dedup", "kind": "extract"},
+            headers=H,
+        )
+        assert r1.status_code == 201
+        task_id_1 = r1.json()["id"]
+
+        # 模拟 plugin POST 同 (project_id, kind) 应复用
+        r2 = await client.post(
+            "/api/ai-tasks",
+            json={"project_id": "p-dedup", "kind": "extract"},
+            headers=H,
+        )
+        assert r2.status_code == 201
+        task_id_2 = r2.json()["id"]
+        assert task_id_1 == task_id_2, "30s 内同 (project_id, kind) 应复用同一 task"
+
+
+@pytest.mark.asyncio
 async def test_stop_task_refuses_to_overwrite_done_status(client_factory, db_session):
     """/review F2: /stop 在 task 已 done 时应返回 409，不能把 done 改写为 failed。"""
     _seed(db_session, pid="p-stop-done")
