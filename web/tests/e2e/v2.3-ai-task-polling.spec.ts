@@ -63,13 +63,14 @@ test("AiTaskModal polling 显示进度从 running → done", async ({ page, requ
     stage_log_append: "✓ 章节切分",
   });
 
-  // 5. 打开 AI 任务 modal（按钮含文案 "AI 任务"）
+  // 5. 打开 AI 任务面板（T19: AiTaskModal → AiTaskPanel；按钮含文案 "AI 任务"）
   await page.locator("button", { hasText: "AI 任务" }).first().click();
-  await expect(page.locator(".ai-modal")).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator(".task-panel")).toBeVisible({ timeout: 5_000 });
 
-  // 6. Polling 后应看到进度条 + 日志文字
-  await expect(page.locator(".ai-modal-bar-fill")).toBeVisible({ timeout: 6_000 });
-  await expect(page.locator(".ai-modal-log")).toContainText("章节切分", { timeout: 6_000 });
+  // 6. Polling 后应看到任务行 + 进度条 + 日志文字
+  await expect(page.locator(".task-row")).toBeVisible({ timeout: 6_000 });
+  await expect(page.locator(".task-row-progress .bar-fill")).toBeVisible({ timeout: 6_000 });
+  await expect(page.locator(".task-row-log")).toContainText("章节切分", { timeout: 6_000 });
 
   // 7. PATCH → done 100%
   await patchTask(request, base, taskId, {
@@ -80,6 +81,6 @@ test("AiTaskModal polling 显示进度从 running → done", async ({ page, requ
 
   // 8. "采纳 FP" 按钮在 status=done 时显示
   await expect(
-    page.locator(".ai-modal button", { hasText: "采纳" }),
+    page.locator(".task-row button", { hasText: "采纳" }),
   ).toBeVisible({ timeout: 6_000 });
 });

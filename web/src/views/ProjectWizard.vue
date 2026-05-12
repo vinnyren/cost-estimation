@@ -19,6 +19,8 @@ import { ref, reactive, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useProjectsStore } from "@/stores/projects";
 import { paramsApi, type EffectiveParams } from "@/api/params";
+import { projectsApi } from "@/api/projects";
+import { factorMetaApi, type FactorMetaPayload } from "@/api/factorMeta";
 import type {
   Project,
   ProjectMode,
@@ -115,6 +117,9 @@ const PROJECT_TYPES = ["dev_only", "ops_only", "dev_and_ops"] as const;
 
 const BASIS_DATA_VER = "CSBMK®-202510";
 
+const props = defineProps<{ projectId?: string }>();
+const isEditMode = computed(() => !!props.projectId);
+
 const router = useRouter();
 const store = useProjectsStore();
 
@@ -207,6 +212,7 @@ function onProjectTypeChange(): void {
 // 拉取 effective 参数（用于后续 T15 PhaseCfPreview / T17 因子默认值展示）。
 // 失败时静默 — 后续 step 自行兜底或显示默认值。
 const effectiveParams = ref<EffectiveParams | null>(null);
+const factorMeta = ref<FactorMetaPayload | null>(null);
 onMounted(async () => {
   try {
     // 新建项目场景：尚无 projectId。后端 /api/params/global 提供等价的全局有效参数。
@@ -214,6 +220,34 @@ onMounted(async () => {
     effectiveParams.value = resp ?? null;
   } catch {
     // 静默兜底
+  }
+
+  try {
+    factorMeta.value = await factorMetaApi.get();
+  } catch { /* silent — fallback to no meta */ }
+
+  // v2.5 — edit mode: 预填 form 从现有 project 数据
+  if (props.projectId) {
+    try {
+      const proj = await projectsApi.get(props.projectId);
+      Object.assign(form, {
+        name: proj.name,
+        city: proj.city,
+        industry: proj.industry,
+        phase: proj.phase,
+        project_type: proj.project_type,
+        mode: proj.mode as ProjectMode,
+        target_total: proj.target_cost ?? 0,
+        client: proj.client ?? "",
+        evaluator: proj.evaluator ?? "",
+        alpha: proj.alpha_dev ?? 1.0,
+        include_ops: proj.include_ops ?? false,
+        factors_dev: (proj as unknown as { factors_dev?: Record<string, string> }).factors_dev ?? {},
+        factors_ops: (proj as unknown as { factors_ops?: Record<string, string> }).factors_ops ?? {},
+      });
+    } catch {
+      // 加载失败 — form 保留默认值
+    }
   }
 });
 
@@ -269,8 +303,13 @@ async function submit(): Promise<void> {
           ? { ...form.factors_ops }
           : undefined,
     };
-    const created = await store.create(payload);
-    router.push({ name: "fp-editor", params: { id: created.id } });
+    if (isEditMode.value && props.projectId) {
+      await projectsApi.update(props.projectId, payload);
+      router.push({ name: "fp-editor", params: { id: props.projectId } });
+    } else {
+      const created = await store.create(payload);
+      router.push({ name: "fp-editor", params: { id: created.id } });
+    }
   } catch (e: unknown) {
     errorMsg.value = e instanceof Error ? e.message : "创建失败";
   } finally {
@@ -286,7 +325,7 @@ async function submit(): Promise<void> {
   >
     <header class="page-header">
       <h1 id="title">
-        新建项目
+        {{ isEditMode ? "编辑项目设定" : "新建项目" }}
       </h1>
       <span class="text-muted step-indicator">第 {{ currentStep }} / {{ totalSteps }} 步</span>
     </header>
@@ -456,6 +495,15 @@ async function submit(): Promise<void> {
         <p class="hint">
           不填的因子按 ×1.00 计算（不影响成本）。
         </p>
+        <details class="factor-intro" style="margin-bottom: 14px; padding: 10px 14px; background: var(--surface-sunken); border-radius: var(--radius); cursor: pointer">
+          <summary style="font-weight: 500">📖 开发因子说明（点击展开）</summary>
+          <div style="margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--text-2)">
+            <p>开发调整因子用于在 CSBMK 标准生产率（PDR）基础上修正特殊场景的成本。</p>
+            <p>所有 5 个因子按乘积叠加 — 例如 <span class="mono">platform=C × team_bg=none = 1.50 × 1.20 = 1.80×</span>，会让最终成本翻 1.8 倍。</p>
+            <p>选项右侧 <span class="muted">ⓘ</span> 悬停查看每个级别的详细说明。</p>
+            <p>不填 / 不选的因子按 ×1.00（不影响成本）。</p>
+          </div>
+        </details>
         <FactorDropdown
           v-for="(levels, key) in (effectiveParams?.factors_dev ?? {})"
           :key="String(key)"
@@ -465,6 +513,7 @@ async function submit(): Promise<void> {
             levels: normalizeLevels(levels as Record<string, unknown>),
           }"
           :model-value="form.factors_dev[String(key)]"
+          :meta="factorMeta?.factors_dev?.[String(key)]"
           @update:model-value="(v: string) => (form.factors_dev[String(key)] = v)"
         />
         <div
@@ -480,6 +529,15 @@ async function submit(): Promise<void> {
         <p class="hint">
           不填的因子按 ×1.00 计算（不影响成本）。
         </p>
+        <details class="factor-intro" style="margin-bottom: 14px; padding: 10px 14px; background: var(--surface-sunken); border-radius: var(--radius); cursor: pointer">
+          <summary style="font-weight: 500">📖 运维因子说明（点击展开）</summary>
+          <div style="margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--text-2)">
+            <p>运维调整因子用于 11 个维度修正运维阶段的成本。</p>
+            <p>所有因子按乘积叠加 — 例如 <span class="mono">platform=C × team_bg=none = 1.50 × 1.20 = 1.80×</span>，会让最终成本翻 1.8 倍。</p>
+            <p>选项右侧 <span class="muted">ⓘ</span> 悬停查看每个级别的详细说明。</p>
+            <p>不填 / 不选的因子按 ×1.00（不影响成本）。</p>
+          </div>
+        </details>
         <FactorDropdown
           v-for="(levels, key) in (effectiveParams?.factors_ops ?? {})"
           :key="String(key)"
@@ -489,6 +547,7 @@ async function submit(): Promise<void> {
             levels: normalizeLevels(levels as Record<string, unknown>),
           }"
           :model-value="form.factors_ops[String(key)]"
+          :meta="factorMeta?.factors_ops?.[String(key)]"
           @update:model-value="(v: string) => (form.factors_ops[String(key)] = v)"
         />
         <div
@@ -620,7 +679,7 @@ async function submit(): Promise<void> {
           :disabled="submitting"
           @click="submit"
         >
-          {{ submitting ? "创建中…" : "创建项目" }}
+          {{ submitting ? (isEditMode ? "保存中…" : "创建中…") : (isEditMode ? "保存项目" : "创建项目") }}
         </button>
       </div>
     </form>

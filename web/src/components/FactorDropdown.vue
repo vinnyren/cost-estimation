@@ -8,7 +8,11 @@
  * factors_dev / factors_ops payload。
  *
  * 关联：ProjectWizard step 5（开发因子）与 step 6（运维因子）。
+ *
+ * v2.5：增加 meta prop，接 /api/params/factor-meta 返回的中文 label/description/options。
  */
+import type { FactorMeta } from "@/api/factorMeta";
+
 interface FactorLevel {
   multiplier: number;
   description?: string;
@@ -23,6 +27,7 @@ interface FactorDef {
 defineProps<{
   factor: FactorDef;
   modelValue: string | undefined;
+  meta?: FactorMeta;
 }>();
 
 defineEmits<{
@@ -36,7 +41,13 @@ defineEmits<{
     :data-factor="factor.name"
   >
     <span class="lbl">
-      {{ factor.label }}
+      {{ meta?.label ?? factor.label }}
+      <span
+        v-if="meta?.description"
+        class="muted"
+        :title="meta.description"
+        style="cursor: help; margin-left: 4px"
+      >ⓘ</span>
       <span class="key">({{ factor.name }})</span>
     </span>
     <select
@@ -53,8 +64,9 @@ defineEmits<{
         v-for="(lvl, key) in factor.levels"
         :key="String(key)"
         :value="String(key)"
+        :title="meta?.options?.[String(key)]?.description ?? lvl.description"
       >
-        {{ key }} — ×{{ lvl.multiplier.toFixed(2) }}<span v-if="lvl.description"> · {{ lvl.description }}</span>
+        {{ meta?.options?.[String(key)]?.label ?? key }} — ×{{ lvl.multiplier.toFixed(2) }}<span v-if="!meta?.options?.[String(key)] && lvl.description"> · {{ lvl.description }}</span>
       </option>
     </select>
   </label>
@@ -76,6 +88,11 @@ defineEmits<{
   font-weight: 400;
   color: var(--color-text-muted, #6b7280);
   margin-left: 4px;
+}
+.muted {
+  font-weight: 400;
+  color: var(--color-text-muted, #6b7280);
+  font-size: var(--font-size-xs, 12px);
 }
 .factor-dd select {
   width: 100%;

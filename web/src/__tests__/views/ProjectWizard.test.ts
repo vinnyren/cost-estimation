@@ -8,6 +8,8 @@ import { projectsApi } from "@/api/projects";
 vi.mock("@/api/projects", () => ({
   projectsApi: {
     create: vi.fn(),
+    get: vi.fn().mockResolvedValue(null),
+    update: vi.fn(),
   },
 }));
 

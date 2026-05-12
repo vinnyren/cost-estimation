@@ -43,6 +43,11 @@ async function onCopy(): Promise<void> {
   router.push(`/projects/${result.id}/functions`);
 }
 
+function onEdit(): void {
+  open.value = false;
+  router.push(`/projects/${props.projectId}/edit`);
+}
+
 function onAudit(): void {
   open.value = false;
   router.push(`/projects/${props.projectId}/audit`);
@@ -78,6 +83,13 @@ async function onDelete(): Promise<void> {
       data-testid="action-menu"
       @click.stop
     >
+      <li
+        role="menuitem"
+        data-testid="action-menu-edit"
+        @click="onEdit"
+      >
+        ⚙️ 编辑设定
+      </li>
       <li
         role="menuitem"
         data-testid="action-menu-copy"

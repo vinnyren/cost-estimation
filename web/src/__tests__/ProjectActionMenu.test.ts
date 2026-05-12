@@ -1,10 +1,12 @@
 // v2.0 T21 — Unit tests for ProjectActionMenu (GAP-I / GAP-J 前端).
+// v2.5 T7 — Added "编辑设定" action.
 //
-// Covers the three responsibilities of the row-level overflow menu:
+// Covers the responsibilities of the row-level overflow menu:
 //   1. open/close interaction (trigger toggles, outside click closes);
 //   2. dispatch — each menu item calls the right API and emits the right event;
-//   3. routing — "审计日志" pushes to /projects/:id/audit and copy navigates
-//      to the new project's FP editor after a successful copy.
+//   3. routing — "编辑设定" pushes to /projects/:id/edit, "审计日志" pushes to
+//      /projects/:id/audit, and copy navigates to the new project's FP editor
+//      after a successful copy.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createRouter, createMemoryHistory } from "vue-router";
@@ -29,6 +31,7 @@ const makeRouter = () =>
     history: createMemoryHistory(),
     routes: [
       { path: "/", component: { template: "<div/>" } },
+      { path: "/projects/:id/edit", component: { template: "<div/>" }, name: "project-edit" },
       { path: "/projects/:id/audit", component: { template: "<div/>" }, name: "project-audit" },
       { path: "/projects/:id/functions", component: { template: "<div/>" }, name: "fp-editor" },
     ],
@@ -59,6 +62,15 @@ describe("ProjectActionMenu", () => {
     expect(w.find('[data-testid="action-menu"]').exists()).toBe(true);
     await trigger.trigger("click");
     expect(w.find('[data-testid="action-menu"]').exists()).toBe(false);
+  });
+
+  it("点击编辑设定 → 路由跳到 /projects/:id/edit", async () => {
+    const router = makeRouter();
+    const w = mountMenu(router);
+    await w.find('[data-testid="action-menu-trigger"]').trigger("click");
+    await w.find('[data-testid="action-menu-edit"]').trigger("click");
+    await flushPromises();
+    expect(router.currentRoute.value.path).toBe("/projects/p1/edit");
   });
 
   it("点击审计 → 路由跳到 /projects/:id/audit", async () => {

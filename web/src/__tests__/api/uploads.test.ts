@@ -6,11 +6,14 @@ vi.mock("@/api/client", () => ({
     post: vi.fn(),
     patch: vi.fn(),
     delete: vi.fn(),
+    raw: {
+      delete: vi.fn().mockResolvedValue({ data: null, status: 204 }),
+    },
   },
   ApiError: class ApiError extends Error {},
 }));
 
-import { uploadsApi } from "@/api/uploads";
+import { uploadsApi, type UploadRecord } from "@/api/uploads";
 import { api } from "@/api/client";
 
 describe("uploadsApi", () => {
@@ -34,5 +37,62 @@ describe("uploadsApi", () => {
     expect(sent).toBeTruthy();
     expect((sent as File).name).toBe("spec.txt");
     expect(result).toEqual(reply);
+  });
+});
+
+describe("uploadsApi.list (v2.5)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls /api/projects/{pid}/uploads and returns data array", async () => {
+    const mockData: UploadRecord[] = [
+      {
+        id: 1,
+        project_id: "p-1",
+        filename: "a.txt",
+        size: 100,
+        filetype: "text/plain",
+        uploaded_at: "2026-05-12T00:00:00Z",
+        parsed_text_path: "p-1/1__a.txt",
+      },
+    ];
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(mockData);
+
+    const result = await uploadsApi.list("p-1");
+
+    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(api.get).toHaveBeenCalledWith("/api/projects/p-1/uploads");
+    expect(result).toHaveLength(1);
+    expect(result[0].filename).toBe("a.txt");
+  });
+
+  it("URL-encodes project IDs with special characters", async () => {
+    (api.get as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    await uploadsApi.list("p/special id");
+
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/projects/p%2Fspecial%20id/uploads"
+    );
+  });
+});
+
+describe("uploadsApi.remove (v2.5)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls DELETE /api/projects/{pid}/uploads/{id} via api.raw (204 no envelope)", async () => {
+    await uploadsApi.remove("p-1", 42);
+
+    expect(api.raw.delete).toHaveBeenCalledTimes(1);
+    expect(api.raw.delete).toHaveBeenCalledWith("/api/projects/p-1/uploads/42");
+  });
+
+  it("URL-encodes project ID in delete path", async () => {
+    await uploadsApi.remove("p/special", 7);
+
+    expect(api.raw.delete).toHaveBeenCalledWith("/api/projects/p%2Fspecial/uploads/7");
   });
 });

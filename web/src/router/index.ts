@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/ProjectWizard.vue"),
   },
   {
+    path: "/projects/:id/edit",
+    name: "project-edit",
+    component: () => import("@/views/ProjectWizard.vue"),
+    props: (route) => ({ projectId: String(route.params.id) }),
+  },
+  {
     path: "/projects/:id/functions",
     name: "fp-editor",
     component: () => import("@/views/FpEditor.vue"),

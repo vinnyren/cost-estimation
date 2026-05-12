@@ -106,3 +106,54 @@ def resolve_parsed_path(rec: Upload) -> Path:
 
 def list_for_project(db: Session, project_id: str) -> list[Upload]:
     return db.query(Upload).filter_by(project_id=project_id).order_by(Upload.id.desc()).all()
+
+
+def delete_upload(db: Session, project_id: str, upload_id: int) -> bool:
+    """v2.5 — 删除上传记录 + 物理文件（解析文本 + 原始文件）。
+
+    Returns True if deleted, False if not found.
+    原始文件存储路径：settings.upload_dir / project_id / uid12__filename
+    解析文本路径：由 resolve_parsed_path(rec) 还原为绝对路径。
+
+    /review F1：从 parsed_text_path 提取 uid12 前缀，按精确路径删原文件；
+    避免 glob `*__{filename}` 在同一项目同名文件场景下误删其它 upload。
+    旧 row 若 parsed_text_path 为空，回退 glob 兜底。
+    """
+    rec = db.query(Upload).filter_by(id=upload_id, project_id=project_id).first()
+    if not rec:
+        return False
+
+    # 删解析文本
+    try:
+        parsed_fp = resolve_parsed_path(rec)
+        if parsed_fp.exists():
+            parsed_fp.unlink()
+    except Exception:
+        pass  # 不阻断 DB 删除
+
+    # 删原始文件 — 从 parsed_text_path basename 派生 uid12，按精确路径删
+    try:
+        upload_proj_dir = settings.upload_dir / project_id
+        if upload_proj_dir.exists():
+            uid_prefix = ""
+            stored = rec.parsed_text_path or ""
+            if stored:
+                basename = Path(stored).name  # uid12__filename.txt
+                if "__" in basename:
+                    uid_prefix = basename.split("__", 1)[0]
+
+            if uid_prefix:
+                # 精确路径：uid12__{原始文件名}
+                target = upload_proj_dir / f"{uid_prefix}__{rec.filename}"
+                target.unlink(missing_ok=True)
+            else:
+                # 兜底：旧 row 无 parsed_text_path 时走 glob（可能误删同名文件，
+                # 但旧数据本来就没办法精确定位）
+                for f in upload_proj_dir.glob(f"*__{rec.filename}"):
+                    f.unlink(missing_ok=True)
+    except Exception:
+        pass  # 不阻断 DB 删除
+
+    db.delete(rec)
+    db.commit()
+    return True

@@ -250,6 +250,49 @@ git pull
 | backend coverage | 92.39% |
 | frontend coverage | line 96.88% / function 80%+ |
 
+## v2.5 — 用户反馈修复 (5 项)
+
+来源：v2.4 release 后用户反馈 PDF 汇总。
+
+### 1. 上传文件查看 + 删除管理
+- 新 endpoint `DELETE /api/projects/{pid}/uploads/{id}`（含磁盘物理清理）
+- FpEditor toolbar 加 `📁 已上传文件 (N)` 按钮 → `UploadListModal`
+- 列表：文件名 / 大小 / 类型 / 上传时间 + 单行删除按钮 + 确认弹窗
+
+### 2. 历史项目 Wizard 重新编辑
+- 新路由 `/projects/:id/edit`
+- `ProjectWizard` 接 `projectId` prop：有 prop → GET 项目预填表单 + Submit 用 PATCH
+- `ProjectActionMenu` ⋯ 加 `⚙️ 编辑设定` · `FpEditor` toolbar 同款入口
+
+### 3+4. 因子中文化 + 帮助说明
+- 新数据文件 `server/app/data/csbmk_factors_meta.json`：16 factor × 全部 options 中文 label + description（multiplier 与 csbmk_202510.json 校对一致）
+- 新 endpoint `GET /api/params/factor-meta`
+- `FactorDropdown` 接 `meta` prop：选项显示中文名 + ⓘ 悬停查看描述
+- Wizard step 5/6 顶部加 📖 折叠说明模块（含倍率叠加示例）
+
+### 5. AI 任务后台调 Claude + 任务列表
+- backend `services/ai_tasks.spawn_claude_extract()` 调 `subprocess.Popen(['claude', '--print', '/cost <id>'])` 启动后台进程（detached，server 重启不杀子进程）
+- 新 endpoints `POST /api/ai-tasks/{id}/start` + `POST /api/ai-tasks/{id}/stop`
+- AiTask 模型加 `pid` 列（alembic migration `e5be802ba4f1_add_pid_to_ai_tasks`）
+- 新组件 `AiTaskPanel.vue`（替换 v2.2 的 `AiTaskModal`）：任务列表 · 进度条 · 停止按钮 · 1.5s polling 实时刷新
+
+### 升级（v2.4 → v2.5）
+
+```bash
+git pull
+cd server && .venv/bin/alembic upgrade head   # 加 ai_tasks.pid 列
+```
+
+### v2.5 测试基线
+
+| 项 | 数量 |
+|---|---:|
+| pytest | 202 |
+| vitest | 256 |
+| playwright e2e | 28+ |
+| backend coverage | 92%+ |
+| frontend coverage | line 96%+ |
+
 ## 标准合规
 
 - GB/T 36964-2018 软件工程 软件开发成本度量规范
