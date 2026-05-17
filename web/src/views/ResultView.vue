@@ -54,22 +54,41 @@ const availableBudget = computed(() => {
   return avail.toLocaleString("zh-CN");
 });
 
+const REVERSE_BAND_LABEL: Record<string, string> = {
+  P10: "乐观 · 最大可承载",
+  P50: "中位 · 推荐采纳",
+  P90: "保守 · 最少可保证",
+};
+
 const reverseTiers = computed(() => {
   if (!reverseResult.value) return [];
   const r = reverseResult.value;
   return (["P10", "P50", "P90"] as const).map((k) => ({
     key: k,
-    label: k === "P10"
-      ? "乐观 · 最大可承载"
-      : k === "P50"
-      ? "中位 · 推荐采纳"
-      : "保守 · 最少可保证",
+    label: REVERSE_BAND_LABEL[k],
     cost: 0,
     fp: r.scale_adjusted_bands[k],
     recommended: r.recommended_band === k,
     unit: "fp" as const,
     extras: [
       ["未调整规模 US", `${r.scale_unadjusted_bands[k].toFixed(2)} FP`],
+    ] as Array<[string, string]>,
+  }));
+});
+
+// 运维口径反算三档 —— 后端 scale_*_ops_bands，之前前端漏渲染
+const reverseOpsTiers = computed(() => {
+  if (!reverseResult.value) return [];
+  const r = reverseResult.value;
+  return (["P10", "P50", "P90"] as const).map((k) => ({
+    key: k,
+    label: REVERSE_BAND_LABEL[k],
+    cost: 0,
+    fp: r.scale_adjusted_ops_bands[k],
+    recommended: r.recommended_band === k,
+    unit: "fp" as const,
+    extras: [
+      ["未调整规模 US", `${r.scale_unadjusted_ops_bands[k].toFixed(2)} FP`],
     ] as Array<[string, string]>,
   }));
 });
@@ -178,7 +197,9 @@ const forwardTiers = computed(() => {
     extras: [
       ["调整后规模 S", `${r.scale_adjusted.toFixed(2)} FP`],
       ["开发工作量", `${r.effort_dev_hours[k].toFixed(2)} 人时`],
+      ["开发成本", `${Math.round(r.cost_dev_yuan[k]).toLocaleString()} 元`],
       ["运维工作量", `${r.effort_ops_hours[k].toFixed(2)} 人时`],
+      ["运维成本", `${Math.round(r.cost_ops_yuan[k]).toLocaleString()} 元`],
       ["其他费用", `${(r.cost_other_yuan ?? 0).toLocaleString()} 元`],
     ] as Array<[string, string]>,
   }));
@@ -387,10 +408,54 @@ function fmtWan(n: number): string {
         </div>
       </div>
 
-      <ResultTrio
-        v-if="hasReverse"
-        :tiers="reverseTiers"
-      />
+      <template v-if="hasReverse">
+        <!-- 预算拆分：开发 / 运维 按 α 占比分配 -->
+        <div
+          class="card"
+          style="padding: 20px"
+        >
+          <div
+            class="section-title"
+            style="margin-bottom: 14px"
+          >
+            预算拆分（按 α 开发占比 {{ (project?.alpha_dev ?? 1).toFixed(2) }}）
+          </div>
+          <div class="budget-split">
+            <div class="budget-cell">
+              <div class="budget-label">开发预算</div>
+              <div class="budget-value">{{ fmtWan(reverseResult!.budget_for_dev) }} 万元</div>
+              <div class="muted mono">{{ Math.round(reverseResult!.budget_for_dev).toLocaleString() }} 元</div>
+            </div>
+            <div class="budget-cell">
+              <div class="budget-label">运维预算</div>
+              <div class="budget-value">{{ fmtWan(reverseResult!.budget_for_ops) }} 万元</div>
+              <div class="muted mono">{{ Math.round(reverseResult!.budget_for_ops).toLocaleString() }} 元</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 开发功能点三档 -->
+        <div>
+          <div
+            class="section-title"
+            style="margin-bottom: 10px"
+          >
+            ① 开发功能点 · 反算三档
+          </div>
+          <ResultTrio :tiers="reverseTiers" />
+        </div>
+
+        <!-- 运维功能点三档 -->
+        <div>
+          <div
+            class="section-title"
+            style="margin-bottom: 10px"
+          >
+            ② 运维功能点 · 反算三档
+          </div>
+          <ResultTrio :tiers="reverseOpsTiers" />
+        </div>
+      </template>
 
       <AllocatorPanel
         v-if="reverseResult && project"
@@ -515,5 +580,27 @@ function fmtWan(n: number): string {
   font-size: var(--font-size-sm);
   text-align: center;
   max-width: 60ch;
+}
+.budget-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+.budget-cell {
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-sunken, var(--color-bg-hover));
+  border: 1px solid var(--border, var(--color-border));
+  border-radius: var(--radius-md);
+}
+.budget-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+.budget-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text, var(--color-text));
+  margin: 4px 0 2px;
 }
 </style>
