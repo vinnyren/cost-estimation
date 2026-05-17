@@ -7,6 +7,7 @@
  */
 import { ref, onMounted } from "vue";
 import { uploadsApi, type UploadRecord } from "@/api/uploads";
+import { formatBeijing } from "@/lib/datetime";
 
 const props = defineProps<{ projectId: string }>();
 const emit = defineEmits<{ refreshed: [count: number] }>();
@@ -42,10 +43,6 @@ function fmtSize(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function fmtTime(s: string): string {
-  return s.replace("T", " ").slice(0, 16);
 }
 
 defineExpose({ reload: load });
@@ -84,7 +81,7 @@ onMounted(load);
           <td class="cell-name">{{ r.filename }}</td>
           <td class="mono">{{ fmtSize(r.size) }}</td>
           <td><span class="badge">{{ r.filetype }}</span></td>
-          <td class="mono cell-time">{{ fmtTime(r.uploaded_at) }}</td>
+          <td class="mono cell-time">{{ formatBeijing(r.uploaded_at) }}</td>
           <td>
             <button
               type="button"

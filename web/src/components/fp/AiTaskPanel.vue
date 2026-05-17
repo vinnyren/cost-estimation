@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { aiTasksApi, type AiTask } from "@/api/aiTasks";
+import { formatBeijing } from "@/lib/datetime";
 
 const props = defineProps<{ open: boolean; projectId: string }>();
 const emit = defineEmits<{ "update:open": [v: boolean] }>();
@@ -54,7 +55,6 @@ async function onStop(task: AiTask) {
   }
 }
 
-function fmtTime(s: string): string { return s.replace("T", " ").slice(0, 16); }
 
 watch(() => props.open, (v) => {
   if (v) startPolling(); else stopPolling();
@@ -105,7 +105,7 @@ function close() { stopPolling(); emit("update:open", false); }
             >
               {{ t.status }}
             </span>
-            <span class="muted mono" style="font-size: 10px">{{ fmtTime(t.created_at) }}</span>
+            <span class="muted mono" style="font-size: 10px">{{ formatBeijing(t.created_at) }}</span>
             <div style="flex: 1" />
             <button
               v-if="t.status === 'running'"

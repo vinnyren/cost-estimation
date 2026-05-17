@@ -20,6 +20,7 @@ import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import EmptyState from "@/components/status/EmptyState.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import ProjectActionMenu from "@/components/ProjectActionMenu.vue";
+import { formatBeijing } from "@/lib/datetime";
 
 const COST_PER_WAN = 10000;
 const PAGE_SIZE = 50;
@@ -255,7 +256,7 @@ function modeLabel(m: string): string {
               <span class="badge">{{ deriveStatus(p) }}</span>
             </td>
             <td class="muted mono" style="font-size: 11px">
-              {{ p.updated_at.slice(0, 16) }}
+              {{ formatBeijing(p.updated_at) }}
             </td>
             <td @click.stop>
               <ProjectActionMenu

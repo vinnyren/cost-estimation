@@ -22,6 +22,7 @@ import FactorTable from "@/components/FactorTable.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import { snapshotsApi, type ParamSnapshot } from "@/api/snapshots";
+import { formatBeijingFull } from "@/lib/datetime";
 
 const props = defineProps<{ projectId: string | null }>();
 
@@ -92,11 +93,7 @@ async function onDeleteSnapshot(id: number): Promise<void> {
 }
 
 function formatSnapshotTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
+  return formatBeijingFull(iso);
 }
 
 // 切到 snapshots tab 时拉列表（懒加载，避免初始加载多发请求）

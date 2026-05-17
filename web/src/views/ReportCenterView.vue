@@ -2,6 +2,7 @@
 import { ref, onMounted } from "vue";
 import { projectsApi, type Project } from "@/api/projects";
 import { reportsApi } from "@/api/reports";
+import { formatBeijing } from "@/lib/datetime";
 
 const projects = ref<Project[]>([]);
 onMounted(async () => {
@@ -29,7 +30,7 @@ async function downloadReport(p: Project) {
           <tr v-for="p in projects" :key="p.id">
             <td><b>{{ p.name }}</b><div class="muted mono" style="font-size:11px">{{ p.id }}</div></td>
             <td>{{ p.city }} · {{ p.industry }}</td>
-            <td class="muted mono" style="font-size:11px">{{ (p as any).updated_at?.slice(0, 16) ?? '—' }}</td>
+            <td class="muted mono" style="font-size:11px">{{ formatBeijing(p.updated_at) }}</td>
             <td><button class="btn btn-sm" @click="downloadReport(p)">下载 P50 报告</button></td>
           </tr>
         </tbody>

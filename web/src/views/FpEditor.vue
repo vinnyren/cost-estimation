@@ -15,6 +15,7 @@ import { onMounted, onBeforeUnmount, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { functionsApi, type FunctionPoint, type FpSnapshotMeta } from "@/api/functions";
 import { uploadsApi } from "@/api/uploads";
+import { formatBeijing } from "@/lib/datetime";
 import { useResultsStore } from "@/stores/results";
 import ModuleTree from "@/components/ModuleTree.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
@@ -182,12 +183,7 @@ async function restoreVersion(version: number): Promise<void> {
 }
 
 function formatSnapTime(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("zh-CN");
-  } catch {
-    return iso;
-  }
+  return formatBeijing(iso);
 }
 
 function sourceLabel(source: FunctionPoint["source"] | undefined): string {
