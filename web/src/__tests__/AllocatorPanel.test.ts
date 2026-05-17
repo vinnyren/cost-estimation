@@ -121,6 +121,10 @@ describe("AllocatorPanel", () => {
     await writeBtn!.trigger("click");
     await flushPromises();
 
+    // 写回确认框须展示规模前后量级（当前 60 → 写回后 300）
+    expect(confirmSpy.mock.calls[0][0]).toContain("当前 FP 规模合计 60.00");
+    expect(confirmSpy.mock.calls[0][0]).toContain("写回后 300.00");
+
     // 财务管理 200 → d1 占 30/40=0.75 → 150 ; d2 占 10/40 → 50
     // 电子结算 100 → d3 唯一 → 100
     expect(functionsApi.patch).toHaveBeenCalledTimes(3);
@@ -132,6 +136,29 @@ describe("AllocatorPanel", () => {
     expect(byId["d3"]).toBeCloseTo(100);
     expect(w.emitted("fp-updated")).toBeTruthy();
     expect(w.emitted("fp-updated")?.[0][0]).toBe(3);
+    confirmSpy.mockRestore();
+  });
+
+  it("写回剧烈缩放时确认框带强警告", async () => {
+    // 分摊总规模 0.9 vs 现有 60 → 缩小 ~67 倍，应触发警告
+    mockFn(calcApi.allocate).mockResolvedValue({
+      items: [
+        { name: "财务管理", us: 0.6, locked: false, audit_tag: "budget_derived" },
+        { name: "电子结算", us: 0.3, locked: false, audit_tag: "budget_derived" },
+      ],
+      validation: { recalc_total_us: 0.9, recalc_total_adjusted: 1.09, error_pct: 0.2 },
+    });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const w = mountPanel();
+    await flushPromises();
+    await w.find(".allocator-actions .btn-primary").trigger("click");
+    await flushPromises();
+    await w.findAll("button").find((b) => b.text().includes("写回 FP 表"))!.trigger("click");
+    await flushPromises();
+    expect(confirmSpy.mock.calls[0][0]).toContain("⚠ 警告");
+    expect(confirmSpy.mock.calls[0][0]).toContain("缩小");
+    // confirm 返回 false → 不写回
+    expect(functionsApi.patch).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
 

@@ -120,10 +120,11 @@ async function reverseCalc(): Promise<void> {
   }
   loading.value = true;
   try {
+    // 目标造价以万元录入，计算层以元运算 —— 调用反算 API 前换算。
     const r = await calcApi.reverse({
       project_id: props.projectId,
-      target_total: targetTotal.value,
-      other_cost: otherCost.value,
+      target_total: targetTotal.value * 10000,
+      other_cost: otherCost.value * 10000,
     });
     reverseResult.value = r;
     results.setReverseResult(r);
@@ -341,7 +342,7 @@ function fmtWan(n: number): string {
             class="field"
             style="margin-bottom: 0"
           >
-            <label class="field-label">目标总造价 (元)</label>
+            <label class="field-label">目标总造价 (万元)</label>
             <input
               v-model.number="targetTotal"
               class="field-input mono"
@@ -353,7 +354,7 @@ function fmtWan(n: number): string {
             class="field"
             style="margin-bottom: 0"
           >
-            <label class="field-label">其他费用 (元)</label>
+            <label class="field-label">其他费用 (万元)</label>
             <input
               v-model.number="otherCost"
               class="field-input mono"
@@ -365,7 +366,7 @@ function fmtWan(n: number): string {
             class="field"
             style="margin-bottom: 0"
           >
-            <label class="field-label">可用预算 (元)</label>
+            <label class="field-label">可用预算 (万元)</label>
             <input
               class="field-input mono"
               :value="availableBudget"

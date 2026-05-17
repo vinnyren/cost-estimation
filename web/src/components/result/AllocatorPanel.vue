@@ -147,10 +147,25 @@ async function onWriteBack(): Promise<void> {
     return;
   }
 
-  const ok = window.confirm(
-    `将按分摊结果更新 ${patches.length} 条功能点的规模，是否继续？`,
-  );
-  if (!ok) return;
+  // 写回前展示规模变化 —— 反算规模常远小于设计规模，写回会整体覆盖 FP，
+  // 必须让用户看清前后量级再决定（避免无声把设计稿冲掉）。
+  const currentTotal = allFps.value.reduce((s, fp) => s + fp.us, 0);
+  const newTotal = patches.reduce((s, p) => s + p.us, 0);
+  const factor = currentTotal > 0 ? newTotal / currentTotal : Infinity;
+  let msg =
+    `将按分摊结果写回 ${patches.length} 条功能点：\n` +
+    `当前 FP 规模合计 ${currentTotal.toFixed(2)} → 写回后 ${newTotal.toFixed(2)}。`;
+  if (currentTotal > 0 && (factor < 0.2 || factor > 5)) {
+    const dir =
+      factor < 1
+        ? `缩小约 ${(1 / factor).toFixed(1)} 倍`
+        : `放大约 ${factor.toFixed(1)} 倍`;
+    msg =
+      `⚠ 警告：写回会把每条功能点的规模整体${dir}，` +
+      `原 FP 规模将被覆盖且无法自动撤销（可在 FP 编辑页用历史版本恢复）。\n\n` +
+      msg;
+  }
+  if (!window.confirm(msg + "\n\n是否继续？")) return;
 
   writingBack.value = true;
   hint.value = "";

@@ -275,10 +275,11 @@ describe("ResultView", () => {
     await reverseBtn!.trigger("click");
     await flushPromises();
     await flushPromises();
+    // 目标造价以万元录入 → 调 API 前 ×10000 换算成元
     expect(calcApi.reverse).toHaveBeenCalledWith({
       project_id: "p-2",
-      target_total: 1_000_000,
-      other_cost: 50_000,
+      target_total: 10_000_000_000,
+      other_cost: 500_000_000,
     });
     expect(w.text()).toContain("FP");
     // v2.4 — ResultTrio 渲染（替代旧 ResultCard × 3）

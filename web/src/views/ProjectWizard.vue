@@ -479,7 +479,7 @@ async function submit(): Promise<void> {
           v-if="form.mode === 'reverse'"
           class="field"
         >
-          <span class="field-label">目标总成本（元） *</span>
+          <span class="field-label">目标总成本（万元） *</span>
           <input
             v-model.number="form.target_total"
             name="target_total"
@@ -605,7 +605,7 @@ async function submit(): Promise<void> {
           <dd>
             {{ form.mode === "forward"
               ? "正向"
-              : `反向（目标 ${form.target_total} 元）` }}
+              : `反向（目标 ${form.target_total} 万元）` }}
           </dd>
 
           <dt>开发因子</dt>
