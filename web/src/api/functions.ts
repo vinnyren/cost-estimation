@@ -43,8 +43,12 @@ export interface FpSnapshotMeta {
 export const functionsApi = {
   list: (projectId: string) =>
     api.get<FunctionPoint[]>(`/api/projects/${projectId}/functions`),
+  create: (projectId: string, body: Partial<FunctionPoint>) =>
+    api.post<FunctionPoint>(`/api/projects/${projectId}/functions`, body),
   patch: (projectId: string, fpId: string, body: Partial<FunctionPoint>) =>
     api.patch<FunctionPoint>(`/api/projects/${projectId}/functions/${fpId}`, body),
+  remove: (projectId: string, fpId: string) =>
+    api.delete<{ deleted: string }>(`/api/projects/${projectId}/functions/${fpId}`),
   bulk: (projectId: string, items: Partial<FunctionPoint>[]) =>
     api.post<{ written: number }>(`/api/projects/${projectId}/functions/bulk`, { items }),
   snapshots: (projectId: string) =>

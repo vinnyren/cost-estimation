@@ -22,6 +22,7 @@ import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import EmptyState from "@/components/status/EmptyState.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import AiTaskPanel from "@/components/fp/AiTaskPanel.vue";
+import FpFormModal from "@/components/fp/FpFormModal.vue";
 import UploadListSection from "@/components/fp/UploadListSection.vue";
 
 const props = defineProps<{ projectId: string }>();
@@ -43,6 +44,9 @@ const uploadSection = ref<{ reload: () => Promise<void> } | null>(null);
 
 // GAP-A: AI Plugin polling state. 上传完成后告诉用户去 Claude Code 跑 /cost；
 // 同时每 30s 轮询一次 FP 列表，发现 claude_draft 行数增加就停止并提示审核。
+const fpFormOpen = ref(false);
+const editingFp = ref<FunctionPoint | null>(null);
+
 const aiPollHint = ref<string>("");
 const aiPolling = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -223,6 +227,30 @@ function sourceBadgeClass(source: FunctionPoint["source"] | undefined): string {
 async function reloadFps(): Promise<void> {
   await load();
 }
+
+function openCreateFp(): void {
+  editingFp.value = null;
+  fpFormOpen.value = true;
+}
+
+function openEditFp(fp: FunctionPoint): void {
+  editingFp.value = fp;
+  fpFormOpen.value = true;
+}
+
+async function onDeleteFp(fp: FunctionPoint): Promise<void> {
+  if (!window.confirm(`确定删除功能点「${fp.name || fp.id}」？`)) return;
+  try {
+    await functionsApi.remove(props.projectId, fp.id);
+    await load();
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : "删除失败";
+  }
+}
+
+async function onFpSaved(): Promise<void> {
+  await load();
+}
 </script>
 
 <template>
@@ -285,6 +313,13 @@ async function reloadFps(): Promise<void> {
             </ol>
           </div>
         </div>
+        <button
+          type="button"
+          class="btn"
+          @click="openCreateFp"
+        >
+          + 添加功能点
+        </button>
         <button
           type="button"
           class="btn"
@@ -412,6 +447,9 @@ async function reloadFps(): Promise<void> {
               <th scope="col">
                 来源
               </th>
+              <th scope="col">
+                操作
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -441,6 +479,10 @@ async function reloadFps(): Promise<void> {
               <td>
                 <span :class="sourceBadgeClass(row.fp.source)">{{ sourceLabel(row.fp.source) }}</span>
               </td>
+              <td class="fp-ops">
+                <button type="button" class="btn btn-sm" @click="openEditFp(row.fp)">编辑</button>
+                <button type="button" class="btn btn-sm fp-del-btn" @click="onDeleteFp(row.fp)">删除</button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -465,6 +507,13 @@ async function reloadFps(): Promise<void> {
     <AiTaskPanel
       v-model:open="aiModalOpen"
       :project-id="projectId"
+    />
+
+    <FpFormModal
+      v-model:open="fpFormOpen"
+      :project-id="projectId"
+      :editing="editingFp"
+      @saved="onFpSaved"
     />
   </section>
 </template>
@@ -643,5 +692,12 @@ async function reloadFps(): Promise<void> {
 .btn-sm {
   padding: 4px 10px;
   font-size: var(--font-size-sm);
+}
+.fp-ops {
+  display: flex;
+  gap: 6px;
+}
+.fp-del-btn {
+  color: var(--red, #dc2626);
 }
 </style>

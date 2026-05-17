@@ -9,8 +9,10 @@ import { uploadsApi } from "@/api/uploads";
 vi.mock("@/api/functions", () => ({
   functionsApi: {
     list: vi.fn().mockResolvedValue({ items: [] }),
-    bulk: vi.fn(),
+    create: vi.fn(),
     patch: vi.fn(),
+    remove: vi.fn(),
+    bulk: vi.fn(),
     snapshots: vi.fn(),
     restore: vi.fn(),
   },
