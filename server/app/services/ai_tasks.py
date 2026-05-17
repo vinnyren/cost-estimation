@@ -133,15 +133,20 @@ def spawn_claude_extract(
     if not claude_bin:
         return None
 
-    # claude CLI 的 --allowedTools 是 variadic（吞所有后续位置参数），所以 prompt
-    # 不能放在 argv 里 — 否则会被 --allowedTools 消耗，触发
+    # claude CLI 的 --allowed-tools 是 variadic（吞所有后续位置参数），所以 prompt
+    # 不能放在 argv 里 — 否则会被消耗，触发
     # "Input must be provided either through stdin or as a prompt argument"。
-    # 改用 stdin 管道传 prompt — 更稳定且不受 flag 顺序影响。
+    # 改用 stdin 管道传 prompt。
+    #
+    # 工具白名单给整个 Bash —— plugin /cost 的 Branch B 要跑 cat/lsof/mkdir/
+    # curl/jq 等命令；窄白名单 "Bash(curl *)" 会拦掉 cat .port 这类读取，
+    # 在 --print 非交互模式下被自动拒绝 → plugin 卡死、零进度。
+    # plugin cost.md frontmatter 自身声明 allowed-tools: Bash, Read。
     cmd = [
         claude_bin,
         "--print",
         "--allowed-tools",
-        "Bash(curl *) Bash(jq *) Read",
+        "Bash Read",
     ]
     env = {
         **os.environ,
