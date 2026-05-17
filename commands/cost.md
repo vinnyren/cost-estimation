@@ -165,14 +165,41 @@ curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
 
 ### Step 3：按 NESMA 5 类别生成 FP 列表
 
-按 SKILL.md "AI 功能点提取 — Step 2/3" 的 prompt 把文本里描述的功能逐条归类为：
+按 SKILL.md "AI 功能点提取 — Step 2/3" 的 prompt 把文本里描述的功能逐条归类。
+
+#### 3.0 必须提取三级模块层级（强制）
+
+每一条 FP **必须**带上完整的模块层级 —— `subsystem`（子系统）、
+`l1_module`（一级模块）、`l2_module`（二级模块）。这不是可选项。
+
+**源文档是结构化表格（功能清单 Excel）时**：直接按列读取层级。
+常见列名映射（大小写 / 同义词都要识别）：
+
+| 文档列名 | FP 字段 |
+|---|---|
+| 子系统 / 软件开发 / 系统 | `subsystem` |
+| 一级模块 / 一级目录 / 一级功能 | `l1_module` |
+| 二级模块 / 二级目录 / 功能模块 | `l2_module` |
+| 子功能 / 功能点计数项名称 / 功能名称 | `name` |
+| 功能项描述 / 功能说明 / 描述 | `description` |
+
+表格里层级单元格常用**纵向合并**（一个子系统跨多行）。解析纯文本时
+若某行层级列为空，**沿用上一非空行的值**（向下填充），不要留空。
+
+**源文档是使用手册 / 需求文档（无表格）时**：从章节标题层级推断 ——
+一级标题 → `subsystem`，二级标题 → `l1_module`，三级标题 → `l2_module`，
+正文里的每个功能动作 → 一条 FP。手册没有明确三级时，至少要给出
+`subsystem` + `l1_module`；`l2_module` 可为空但前两级不许空。
+
+**校验**：写入前自查 —— 若有 FP 的 `subsystem` 或 `l1_module` 为空，
+说明层级没提取干净，回到文档重新归类，不要直接写入空层级的 FP。
 
 **T2 — 章节切分完成**
 
 ```bash
 curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
   -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
-  -d '{"progress_pct":30,"stage_log_append":"✓ 章节切分"}' \
+  -d '{"progress_pct":30,"stage_log_append":"✓ 章节切分 + 三级模块层级"}' \
   > /dev/null || true
 ```
 
@@ -216,13 +243,16 @@ X-Auth-Token: $TOKEN
 {
   "items": [
     {
-      "name": "用户注册",
-      "category": "EI",
-      "complexity": "low",
-      "ufp": 3,
-      "us": 3,
+      "subsystem": "电子结算",
+      "l1_module": "交易机构资金管理",
+      "l2_module": "资金查询",
+      "name": "客户账户查询",
+      "category": "EQ",
+      "complexity": "average",
+      "ufp": 4,
+      "us": 4,
       "source": "claude_draft",
-      "description": "用户填写邮箱+密码，提交"
+      "description": "可查询商户交易账户、保证金账户、欠款账户、白条账户资金明细"
     }
   ],
   "replace": false
@@ -231,6 +261,7 @@ X-Auth-Token: $TOKEN
 
 **关键约束**：
 
+- `subsystem` + `l1_module` **必填**（见 3.0），`l2_module` 尽量填、实在无层级才留空
 - `source` 必须是 `"claude_draft"`（前端会高亮提示用户审核）
 - `ufp` 与 `us` 必须等于上表对应单元格的 NESMA 默认值（不要自创）
 - `replace=false` 走追加模式，不覆盖用户已手填的 FP
