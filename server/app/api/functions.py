@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..db.session import get_db
+from ..db.models import Project
 from ..schemas.functions import (FunctionPointCreate, FunctionPointRead,
                                     FunctionPointPatch, BulkRequest)
 from ..services import functions as svc
@@ -16,6 +17,10 @@ def _read(fp):
 
 @router.get("")
 def list_all(project_id: str, db: Session = Depends(get_db)):
+    # 校验项目存在 — 与 list_snapshots 一致。否则项目被删后，前端 FP 编辑页
+    # 仍能渲染出孤儿 FP，而同页的「参数管理」却 404，造成"无响应"的错觉。
+    if not db.query(Project).filter_by(id=project_id).first():
+        raise HTTPException(404, detail={"error": {"code": "PROJECT_NOT_FOUND"}})
     return {"ok": True, "data": [_read(fp) for fp in svc.list_for_project(db, project_id)]}
 
 

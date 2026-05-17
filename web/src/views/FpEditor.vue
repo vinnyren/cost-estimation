@@ -274,7 +274,7 @@ async function reloadFps(): Promise<void> {
         </button>
         <button
           type="button"
-          class="btn btn-ghost"
+          class="btn"
           @click="router.push(`/projects/${projectId}/edit`)"
         >
           ⚙️ 编辑设定
