@@ -54,6 +54,26 @@ const lastFpCount = ref(0);
 const isEmpty = computed(() => !loading.value && error.value === null && functions.value.length === 0);
 const isError = computed(() => !loading.value && error.value !== null);
 
+// 模块树选中过滤 —— null = 全部
+type ModuleSel = { subsystem: string; l1_module: string } | null;
+const selectedModule = ref<ModuleSel>(null);
+
+// 表格行 = 过滤后的 FP，但保留在完整列表里的原始序号（# 列稳定）
+const displayedRows = computed(() => {
+  const rows = functions.value.map((fp, i) => ({ fp, num: i + 1 }));
+  const sel = selectedModule.value;
+  if (!sel) return rows;
+  return rows.filter(
+    (r) =>
+      (r.fp.subsystem ?? "未分组") === sel.subsystem &&
+      (r.fp.l1_module ?? "未分类") === sel.l1_module,
+  );
+});
+
+function onModuleSelect(payload: ModuleSel): void {
+  selectedModule.value = payload;
+}
+
 onMounted(async () => {
   await load();
 });
@@ -344,7 +364,10 @@ async function reloadFps(): Promise<void> {
       class="layout"
     >
       <aside class="sidebar">
-        <ModuleTree :functions="functions" />
+        <ModuleTree
+          :functions="functions"
+          @select="onModuleSelect"
+        />
       </aside>
       <main class="grid-body">
         <p
@@ -393,34 +416,40 @@ async function reloadFps(): Promise<void> {
           </thead>
           <tbody>
             <tr
-              v-for="(fp, i) in functions"
-              :key="fp.id"
-              :data-source="fp.source"
+              v-for="row in displayedRows"
+              :key="row.fp.id"
+              :data-source="row.fp.source"
               :class="{
-                'row-allocator': fp.source === 'allocator',
-                'ai-draft': fp.source === 'claude_draft',
+                'row-allocator': row.fp.source === 'allocator',
+                'ai-draft': row.fp.source === 'claude_draft',
               }"
             >
-              <td>{{ i + 1 }}</td>
+              <td>{{ row.num }}</td>
               <td class="fp-name">
-                <span class="fp-name-text">{{ fp.name || "—" }}</span>
+                <span class="fp-name-text">{{ row.fp.name || "—" }}</span>
                 <span
-                  v-if="fp.description"
+                  v-if="row.fp.description"
                   class="fp-desc"
-                  :title="fp.description"
-                >{{ fp.description }}</span>
+                  :title="row.fp.description"
+                >{{ row.fp.description }}</span>
               </td>
-              <td>{{ fp.subsystem || "—" }}</td>
-              <td>{{ fp.l1_module || "—" }}</td>
-              <td>{{ fp.category }}</td>
-              <td>{{ fp.ufp }}</td>
-              <td>{{ fp.us.toFixed(2) }}</td>
+              <td>{{ row.fp.subsystem || "—" }}</td>
+              <td>{{ row.fp.l1_module || "—" }}</td>
+              <td>{{ row.fp.category }}</td>
+              <td>{{ row.fp.ufp }}</td>
+              <td>{{ row.fp.us.toFixed(2) }}</td>
               <td>
-                <span :class="sourceBadgeClass(fp.source)">{{ sourceLabel(fp.source) }}</span>
+                <span :class="sourceBadgeClass(row.fp.source)">{{ sourceLabel(row.fp.source) }}</span>
               </td>
             </tr>
           </tbody>
         </table>
+        <p
+          v-if="displayedRows.length === 0"
+          class="muted filter-empty"
+        >
+          该模块下暂无功能点。
+        </p>
       </main>
     </div>
 
@@ -517,6 +546,10 @@ async function reloadFps(): Promise<void> {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.filter-empty {
+  padding: var(--space-4);
+  text-align: center;
 }
 .row-allocator {
   background: var(--color-warning-bg);

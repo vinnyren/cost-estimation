@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { FunctionPoint } from "@/api/functions";
 
 const props = defineProps<{
   functions: Pick<FunctionPoint, "id" | "subsystem" | "l1_module" | "category" | "us">[];
 }>();
+
+// select 事件 payload：null = 全部；否则是某个一级模块
+type ModuleSel = { subsystem: string; l1_module: string } | null;
 const emit = defineEmits<{
-  (e: "select", payload: { subsystem: string; l1_module: string }): void;
+  (e: "select", payload: ModuleSel): void;
 }>();
+
+// 选中状态 —— "全部" 或 "subsystem||l1_module"
+const selectedKey = ref<string>("__all__");
 
 const tree = computed(() => {
   const map = new Map<string, Map<string, number>>();
@@ -23,6 +29,20 @@ const tree = computed(() => {
     modules: Array.from(mods.entries()).map(([m, count]) => ({ name: m, count })),
   }));
 });
+
+function keyOf(subsystem: string, l1: string): string {
+  return `${subsystem}||${l1}`;
+}
+
+function selectAll(): void {
+  selectedKey.value = "__all__";
+  emit("select", null);
+}
+
+function selectModule(subsystem: string, l1_module: string): void {
+  selectedKey.value = keyOf(subsystem, l1_module);
+  emit("select", { subsystem, l1_module });
+}
 </script>
 
 <template>
@@ -30,6 +50,16 @@ const tree = computed(() => {
     class="tree"
     aria-label="模块树"
   >
+    <button
+      type="button"
+      class="all-item"
+      :class="{ active: selectedKey === '__all__' }"
+      data-test="all"
+      @click="selectAll"
+    >
+      <span class="leaf-name">全部功能点</span>
+      <span class="count">{{ functions.length }}</span>
+    </button>
     <ul class="tree-root">
       <li
         v-for="sub in tree"
@@ -45,9 +75,10 @@ const tree = computed(() => {
               role="button"
               tabindex="0"
               class="leaf"
-              @click="emit('select', { subsystem: sub.subsystem, l1_module: m.name })"
-              @keydown.enter="emit('select', { subsystem: sub.subsystem, l1_module: m.name })"
-              @keydown.space.prevent="emit('select', { subsystem: sub.subsystem, l1_module: m.name })"
+              :class="{ active: selectedKey === keyOf(sub.subsystem, m.name) }"
+              @click="selectModule(sub.subsystem, m.name)"
+              @keydown.enter="selectModule(sub.subsystem, m.name)"
+              @keydown.space.prevent="selectModule(sub.subsystem, m.name)"
             >
               <span class="leaf-name">{{ m.name }}</span>
               <span class="count">{{ m.count }}</span>
@@ -84,6 +115,28 @@ const tree = computed(() => {
 .tree-leaves {
   padding-left: var(--space-3);
 }
+.all-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: var(--touch-target);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+.all-item:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
 summary {
   font-weight: 600;
   color: var(--color-text-title);
@@ -117,6 +170,18 @@ summary:hover {
   color: var(--color-primary);
   outline: none;
 }
+/* 选中态 —— 比 hover 更实，持续显示当前过滤的模块 */
+.leaf.active,
+.all-item.active {
+  background: var(--color-primary, #165dff);
+  color: #fff;
+  border-color: var(--color-primary, #165dff);
+}
+.leaf.active:hover,
+.all-item.active:hover {
+  background: var(--color-primary, #165dff);
+  color: #fff;
+}
 .leaf-name {
   flex: 1;
   white-space: nowrap;
@@ -137,5 +202,11 @@ summary:hover {
 .leaf:focus .count {
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+.leaf.active .count,
+.all-item.active .count {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: transparent;
+  color: #fff;
 }
 </style>
