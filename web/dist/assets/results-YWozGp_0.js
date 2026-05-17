@@ -1,2 +1,0 @@
-import{h as f,i as u,g as i}from"./vendor-vue-Cct-t9gL.js";const m=f("results",()=>{const l=u(null),s=u(null),e=u(0),t=u(0),n=i(()=>e.value>0&&t.value>e.value);function o(a){l.value=a,e.value=Date.now()}function r(a){s.value=a,e.value=Date.now()}function v(){const a=Date.now();t.value=a>e.value?a:e.value+1}function c(){l.value=null,s.value=null,e.value=0,t.value=0}return{forwardResult:l,reverseResult:s,lastComputedAt:e,paramsChangedAt:t,isStale:n,setForwardResult:o,setReverseResult:r,markParamsChanged:v,clear:c}});export{m as u};
-//# sourceMappingURL=results-YWozGp_0.js.map

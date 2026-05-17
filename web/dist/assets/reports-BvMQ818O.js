@@ -1,0 +1,2 @@
+import{a as s}from"./index-Cw9S74gy.js";const l={excelUrl:e=>`/api/reports/excel/${e}`,download:async(e,a="造价报告.xlsx")=>{const r=await s.raw.get(`/api/reports/excel/${e}`,{responseType:"blob"}),c=new Blob([r.data],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),t=URL.createObjectURL(c),o=document.createElement("a");o.href=t,o.download=a,o.click(),URL.revokeObjectURL(t)}};export{l as r};
+//# sourceMappingURL=reports-BvMQ818O.js.map

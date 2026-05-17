@@ -37,10 +37,12 @@ const makeRouter = () =>
     ],
   });
 
+// stubs.teleport=true 让 <Teleport> 内容就地渲染，使 wrapper.find 能命中
+// （v2.5：菜单 Teleport 到 body 修复表格 overflow 裁剪）
 const mountMenu = (router = makeRouter()) =>
   mount(ProjectActionMenu, {
     props: { projectId: "p1", projectName: "测试项目" },
-    global: { plugins: [router] },
+    global: { plugins: [router], stubs: { teleport: true } },
   });
 
 describe("ProjectActionMenu", () => {

@@ -73,6 +73,9 @@ const mountList = () =>
   mount(ProjectList, {
     global: {
       plugins: [createPinia(), router],
+      // ProjectActionMenu 的菜单 Teleport 到 body — stub 让它就地渲染，
+      // 使 wrapper.find 能命中 action-menu-* 项
+      stubs: { teleport: true },
     },
   });
 

@@ -4,12 +4,10 @@
 // deserve a permanent button on each card. Clicking the trigger toggles a small
 // popover; clicking outside closes it (we register the listener on document).
 //
-// Why this lives in its own component:
-//   - keeps ProjectList card markup focused on data, not chrome;
-//   - lets us test the menu's open/close + action dispatch in isolation
-//     (see web/src/__tests__/ProjectActionMenu.test.ts);
-//   - the same control will be reusable on a future ProjectDetail header.
-import { ref, onMounted, onBeforeUnmount } from "vue";
+// v2.5 fix: 下拉用 <Teleport to="body"> + fixed 定位，避免被项目列表表格的
+// overflow 容器裁剪。位置按 trigger 的 getBoundingClientRect 计算，右对齐；
+// 下方空间不足时翻到上方。
+import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { projectsApi } from "@/api/projects";
 
@@ -22,16 +20,60 @@ const emit = defineEmits<{
 const open = ref(false);
 const router = useRouter();
 const root = ref<HTMLElement | null>(null);
+const menuEl = ref<HTMLElement | null>(null);
+const menuStyle = ref<Record<string, string>>({});
 
-function onOutside(ev: MouseEvent): void {
-  if (!root.value) return;
-  if (!root.value.contains(ev.target as Node)) {
-    open.value = false;
+const MENU_WIDTH = 150;
+const MENU_HEIGHT = 184; // 4 项 ≈ 184px，用于翻转判断
+const VIEWPORT_MARGIN = 8;
+
+function positionMenu(): void {
+  const trigger = root.value?.querySelector(".trigger") as HTMLElement | null;
+  if (!trigger) return;
+  const r = trigger.getBoundingClientRect();
+  // 右对齐 trigger 右边缘
+  let left = r.right - MENU_WIDTH;
+  if (left < VIEWPORT_MARGIN) left = VIEWPORT_MARGIN;
+  // 默认在 trigger 下方；下方空间不足则翻到上方
+  let top = r.bottom + 4;
+  if (top + MENU_HEIGHT > window.innerHeight - VIEWPORT_MARGIN) {
+    top = Math.max(VIEWPORT_MARGIN, r.top - MENU_HEIGHT - 4);
+  }
+  menuStyle.value = {
+    position: "fixed",
+    top: `${top}px`,
+    left: `${left}px`,
+  };
+}
+
+async function toggle(): Promise<void> {
+  open.value = !open.value;
+  if (open.value) {
+    await nextTick();
+    positionMenu();
   }
 }
 
-onMounted(() => document.addEventListener("click", onOutside));
-onBeforeUnmount(() => document.removeEventListener("click", onOutside));
+function onOutside(ev: MouseEvent): void {
+  const target = ev.target as Node;
+  if (root.value?.contains(target)) return;
+  if (menuEl.value?.contains(target)) return;
+  open.value = false;
+}
+
+// fixed 定位的菜单不跟随滚动 — 滚动时直接关闭，避免菜单与行错位
+function onScroll(): void {
+  if (open.value) open.value = false;
+}
+
+onMounted(() => {
+  document.addEventListener("click", onOutside);
+  window.addEventListener("scroll", onScroll, true);
+});
+onBeforeUnmount(() => {
+  document.removeEventListener("click", onOutside);
+  window.removeEventListener("scroll", onScroll, true);
+});
 
 async function onCopy(): Promise<void> {
   open.value = false;
@@ -72,47 +114,51 @@ async function onDelete(): Promise<void> {
       aria-label="项目操作"
       :aria-expanded="open"
       data-testid="action-menu-trigger"
-      @click.stop="open = !open"
+      @click.stop="toggle"
     >
       ⋯
     </button>
-    <ul
-      v-if="open"
-      class="menu"
-      role="menu"
-      data-testid="action-menu"
-      @click.stop
-    >
-      <li
-        role="menuitem"
-        data-testid="action-menu-edit"
-        @click="onEdit"
+    <Teleport to="body">
+      <ul
+        v-if="open"
+        ref="menuEl"
+        class="menu"
+        role="menu"
+        data-testid="action-menu"
+        :style="menuStyle"
+        @click.stop
       >
-        ⚙️ 编辑设定
-      </li>
-      <li
-        role="menuitem"
-        data-testid="action-menu-copy"
-        @click="onCopy"
-      >
-        📋 复制项目
-      </li>
-      <li
-        role="menuitem"
-        data-testid="action-menu-audit"
-        @click="onAudit"
-      >
-        🕒 审计日志
-      </li>
-      <li
-        class="danger"
-        role="menuitem"
-        data-testid="action-menu-delete"
-        @click="onDelete"
-      >
-        🗑️ 删除
-      </li>
-    </ul>
+        <li
+          role="menuitem"
+          data-testid="action-menu-edit"
+          @click="onEdit"
+        >
+          ⚙️ 编辑设定
+        </li>
+        <li
+          role="menuitem"
+          data-testid="action-menu-copy"
+          @click="onCopy"
+        >
+          📋 复制项目
+        </li>
+        <li
+          role="menuitem"
+          data-testid="action-menu-audit"
+          @click="onAudit"
+        >
+          🕒 审计日志
+        </li>
+        <li
+          class="danger"
+          role="menuitem"
+          data-testid="action-menu-delete"
+          @click="onDelete"
+        >
+          🗑️ 删除
+        </li>
+      </ul>
+    </Teleport>
   </div>
 </template>
 
@@ -134,36 +180,39 @@ async function onDelete(): Promise<void> {
   background: var(--color-bg-hover);
   color: var(--color-text-body);
 }
-.menu {
-  position: absolute;
-  right: 0;
-  top: 100%;
+</style>
+
+<style>
+/* 非 scoped — 菜单 Teleport 到 body，scoped 的 [data-v] 属性选择器够不到。 */
+.action-menu-menu-reset,
+ul.menu[data-testid="action-menu"] {
+  position: fixed;
   background: var(--color-bg-elevated, #fff);
   border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: var(--shadow-md, 0 4px 16px rgba(15, 23, 42, 0.16));
   list-style: none;
-  padding: var(--space-1) 0;
-  margin: var(--space-1) 0 0 0;
-  min-width: 140px;
-  z-index: 10;
-  font-size: var(--font-size-sm);
+  padding: var(--space-1, 4px) 0;
+  margin: 0;
+  min-width: 150px;
+  z-index: 2000;
+  font-size: var(--font-size-sm, 13px);
 }
-.menu li {
-  padding: var(--space-2) var(--space-3);
+ul.menu[data-testid="action-menu"] li {
+  padding: var(--space-2, 8px) var(--space-3, 12px);
   cursor: pointer;
-  color: var(--color-text-body);
+  color: var(--color-text-body, #1e293b);
   white-space: nowrap;
 }
-.menu li:hover {
-  background: var(--color-primary-bg);
-  color: var(--color-primary);
+ul.menu[data-testid="action-menu"] li:hover {
+  background: var(--color-primary-bg, #eef3ff);
+  color: var(--color-primary, #165dff);
 }
-.menu li.danger {
-  color: var(--color-danger);
+ul.menu[data-testid="action-menu"] li.danger {
+  color: var(--color-danger, #dc2626);
 }
-.menu li.danger:hover {
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
+ul.menu[data-testid="action-menu"] li.danger:hover {
+  background: var(--color-danger-bg, #fef2f2);
+  color: var(--color-danger, #dc2626);
 }
 </style>
