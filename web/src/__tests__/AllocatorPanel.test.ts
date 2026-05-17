@@ -32,7 +32,6 @@ function fp(over: Partial<FunctionPoint>): FunctionPoint {
     project_id: "p-1",
     category: "EI",
     complexity: "low",
-    fp_kind: "dev",
     ufp: 3,
     us: 3,
     source: "manual",
@@ -41,12 +40,11 @@ function fp(over: Partial<FunctionPoint>): FunctionPoint {
   };
 }
 
-// 两个 dev 模块（财务管理 2 条、电子结算 1 条）+ 一个 ops 模块
+// 三个一级模块 —— 开发 / 运维口径共用同一套（运维不是独立 FP 清单）
 const FPS: FunctionPoint[] = [
-  fp({ id: "d1", l1_module: "财务管理", fp_kind: "dev", us: 30 }),
-  fp({ id: "d2", l1_module: "财务管理", fp_kind: "dev", us: 10 }),
-  fp({ id: "d3", l1_module: "电子结算", fp_kind: "dev", us: 20 }),
-  fp({ id: "o1", l1_module: "运维支持", fp_kind: "ops", us: 5 }),
+  fp({ id: "d1", l1_module: "财务管理", us: 30 }),
+  fp({ id: "d2", l1_module: "财务管理", us: 10 }),
+  fp({ id: "d3", l1_module: "电子结算", us: 20 }),
 ];
 
 const stubReverseResult = {
@@ -82,7 +80,7 @@ describe("AllocatorPanel", () => {
     mockFn(calcApi.allocate).mockResolvedValue(allocateResult);
   });
 
-  it("drafts 从真实 FP 的一级模块生成（dev 口径 2 个模块）", async () => {
+  it("drafts 从真实 FP 的一级模块生成（2 个模块）", async () => {
     const w = mountPanel();
     await flushPromises();
     const rows = w.findAll(".allocator-drafts tbody tr");
@@ -96,15 +94,28 @@ describe("AllocatorPanel", () => {
     expect(Number(firstWeight.value)).toBe(40); // 财务管理 30 + 10
   });
 
-  it("切换到运维口径后重新分组（1 个 ops 模块）", async () => {
+  it("切换运维口径不改变模块列表（开发 / 运维共用同一套）", async () => {
     const w = mountPanel();
     await flushPromises();
-    const opsBtn = w.findAll(".kind-toggle button")[1];
-    await opsBtn.trigger("click");
+    await w.findAll(".kind-toggle button")[1].trigger("click");
     await flushPromises();
     const rows = w.findAll(".allocator-drafts tbody tr");
-    expect(rows).toHaveLength(1);
-    expect(w.text()).toContain("运维支持");
+    expect(rows).toHaveLength(2);
+    expect(w.text()).toContain("财务管理");
+    expect(w.text()).toContain("电子结算");
+  });
+
+  it("运维口径展示参考说明且不渲染写回按钮", async () => {
+    const w = mountPanel();
+    await flushPromises();
+    await w.findAll(".kind-toggle button")[1].trigger("click");
+    await flushPromises();
+    expect(w.text()).toContain("运维基于与开发相同的功能点规模计算");
+    await w.find(".allocator-actions .btn-primary").trigger("click");
+    await flushPromises();
+    expect(
+      w.findAll("button").find((b) => b.text().includes("写回 FP 表")),
+    ).toBeUndefined();
   });
 
   it("生成分摊调 calcApi.allocate（dev 用 scale_adjusted_bands 推荐档）", async () => {
@@ -122,6 +133,16 @@ describe("AllocatorPanel", () => {
     expect(w.emitted("allocated")).toBeTruthy();
   });
 
+  it("运维口径生成分摊用 scale_adjusted_ops_bands 推荐档", async () => {
+    const w = mountPanel();
+    await flushPromises();
+    await w.findAll(".kind-toggle button")[1].trigger("click");
+    await w.find(".allocator-actions .btn-primary").trigger("click");
+    await flushPromises();
+    const arg = mockFn(calcApi.allocate).mock.calls[0][0];
+    expect(arg.target_us).toBe(50); // scale_adjusted_ops_bands.P50
+  });
+
   it("写回按各 FP 现有 US 占比 PATCH 功能点", async () => {
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     const w = mountPanel();
@@ -129,7 +150,6 @@ describe("AllocatorPanel", () => {
     await w.find(".allocator-actions .btn-primary").trigger("click");
     await flushPromises();
 
-    // 找到写回按钮（分摊结果区里的 .btn 非 primary）
     const writeBtn = w
       .findAll("button")
       .find((b) => b.text().includes("写回 FP 表"));
@@ -151,15 +171,11 @@ describe("AllocatorPanel", () => {
     confirmSpy.mockRestore();
   });
 
-  it("运维口径无 FP 时显示提示且不渲染分摊表", async () => {
-    mockFn(functionsApi.list).mockResolvedValue([
-      fp({ id: "d1", l1_module: "财务管理", fp_kind: "dev", us: 30 }),
-    ]);
+  it("项目无功能点时显示提示且不渲染分摊表", async () => {
+    mockFn(functionsApi.list).mockResolvedValue([]);
     const w = mountPanel();
     await flushPromises();
-    await w.findAll(".kind-toggle button")[1].trigger("click");
-    await flushPromises();
-    expect(w.text()).toContain("当前口径暂无功能点");
+    expect(w.text()).toContain("项目暂无功能点");
     expect(w.findAll(".allocator-drafts")).toHaveLength(0);
   });
 });

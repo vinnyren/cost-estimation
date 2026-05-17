@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from "vue";
-import { functionsApi, type FunctionPoint, type FpCategory, type FpComplexity, type FpKind } from "@/api/functions";
+import { functionsApi, type FunctionPoint, type FpCategory, type FpComplexity } from "@/api/functions";
 
 const props = defineProps<{
   open: boolean;
@@ -25,11 +25,6 @@ const COMPLEXITY_OPTIONS: { value: FpComplexity; label: string }[] = [
   { value: "average", label: "中" },
   { value: "high", label: "高" },
 ];
-const KIND_OPTIONS: { value: FpKind; label: string }[] = [
-  { value: "dev", label: "开发" },
-  { value: "ops", label: "运维" },
-];
-
 const name = ref("");
 const description = ref("");
 const subsystem = ref("");
@@ -37,7 +32,6 @@ const l1_module = ref("");
 const l2_module = ref("");
 const category = ref<FpCategory>("EI");
 const complexity = ref<FpComplexity>("low");
-const fpKind = ref<FpKind>("dev");
 
 const submitting = ref(false);
 const errorMsg = ref("");
@@ -53,7 +47,6 @@ function resetForm(): void {
   l2_module.value = "";
   category.value = "EI";
   complexity.value = "low";
-  fpKind.value = "dev";
   errorMsg.value = "";
   validationMsg.value = "";
 }
@@ -66,7 +59,6 @@ function prefillForm(fp: FunctionPoint): void {
   l2_module.value = fp.l2_module ?? "";
   category.value = fp.category;
   complexity.value = fp.complexity;
-  fpKind.value = fp.fp_kind ?? "dev";
   errorMsg.value = "";
   validationMsg.value = "";
 }
@@ -107,7 +99,6 @@ async function onSubmit(): Promise<void> {
     l2_module: l2_module.value.trim() || undefined,
     category: category.value,
     complexity: complexity.value,
-    fp_kind: fpKind.value,
     ufp,
     us: ufp,
     ...(props.editing ? {} : { source: "manual" }),
@@ -201,13 +192,7 @@ async function onSubmit(): Promise<void> {
           </div>
         </div>
 
-        <div class="form-row form-row-4">
-          <div class="form-group">
-            <label for="fp-kind" class="form-label">口径</label>
-            <select id="fp-kind" v-model="fpKind" class="form-input form-select">
-              <option v-for="opt in KIND_OPTIONS" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-            </select>
-          </div>
+        <div class="form-row">
           <div class="form-group">
             <label for="fp-category" class="form-label">类别</label>
             <select id="fp-category" v-model="category" class="form-input form-select">
@@ -279,10 +264,6 @@ async function onSubmit(): Promise<void> {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-}
-
-.form-row-4 {
-  grid-template-columns: repeat(4, 1fr);
 }
 
 .form-group {

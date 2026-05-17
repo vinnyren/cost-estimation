@@ -1,17 +1,19 @@
 <script setup lang="ts">
 /**
- * AllocatorPanel — 反算分摊面板（v2.x 重做）。
+ * AllocatorPanel — 反算分摊面板。
  *
- * 旧版用写死的「前端/后端」假模块。现在改为：
- *   - 模块列表 = 项目真实 FP 的一级模块（l1_module 分组）
- *   - 开发 / 运维口径二选一，分别对应 reverseResult 的 dev / ops 三档
+ * 方法学前提：运维不是独立的功能点清单。后端 forward/reverse 用与开发
+ * 相同的功能点规模计算运维（只换运维生产率 / 费率）。所以这里：
+ *   - 模块列表 = 项目真实 FP 的一级模块（l1_module 分组）—— 开发 / 运维口径共用同一套
+ *   - 开发 / 运维口径只切换目标 US（dev → scale_adjusted_bands；ops → scale_adjusted_ops_bands）
  *   - 「生成分摊」把推荐档目标 US 按权重分到各 l1 模块
- *   - 「写回 FP 表」把每个模块分配的 US 按该模块下各 FP 的现有 US 占比拆下去，
- *     逐条 PATCH function_points.us，让反算结果真正落地
+ *   - 「写回 FP 表」仅开发口径可用：FP 表的 US 是开发规模，运维规模是项目级指标不逐条落地
  */
 import { ref, computed, onMounted } from "vue";
 import { calcApi, type AllocateResult, type ReverseResult, type Band } from "@/api/calc";
-import { functionsApi, type FunctionPoint, type FpKind } from "@/api/functions";
+import { functionsApi, type FunctionPoint } from "@/api/functions";
+
+type AllocKind = "dev" | "ops";
 
 interface DraftRow {
   name: string;
@@ -33,7 +35,7 @@ const emit = defineEmits<{
 const UNGROUPED = "未分组";
 
 const allFps = ref<FunctionPoint[]>([]);
-const kind = ref<FpKind>("dev");
+const kind = ref<AllocKind>("dev");
 const drafts = ref<DraftRow[]>([]);
 const allocResult = ref<AllocateResult | null>(null);
 const allocating = ref(false);
@@ -41,12 +43,7 @@ const writingBack = ref(false);
 const hint = ref<string>("");
 const writeBackBanner = ref<string>("");
 
-/** 当前口径下的 FP（fp_kind 缺省视为 dev）。 */
-const kindFps = computed(() =>
-  allFps.value.filter((fp) => (fp.fp_kind ?? "dev") === kind.value),
-);
-
-/** 当前口径下按 l1_module 分组：模块名 → FP 列表。 */
+/** 按 l1_module 分组：模块名 → FP 列表（开发 / 运维口径共用）。 */
 function groupByModule(fps: FunctionPoint[]): Map<string, FunctionPoint[]> {
   const groups = new Map<string, FunctionPoint[]>();
   for (const fp of fps) {
@@ -58,9 +55,9 @@ function groupByModule(fps: FunctionPoint[]): Map<string, FunctionPoint[]> {
   return groups;
 }
 
-/** 按当前口径重建 drafts —— weight 初值取该模块现有 US 总和，保留真实结构占比。 */
+/** 重建 drafts —— weight 初值取该模块现有 US 总和，保留真实结构占比。 */
 function rebuildDrafts(): void {
-  const groups = groupByModule(kindFps.value);
+  const groups = groupByModule(allFps.value);
   drafts.value = [...groups.entries()].map(([name, fps]) => ({
     name,
     weight: fps.reduce((s, fp) => s + fp.us, 0),
@@ -72,10 +69,13 @@ function rebuildDrafts(): void {
   hint.value = "";
 }
 
-function switchKind(next: FpKind): void {
+/** 切换口径只换目标 US；模块列表不变，已生成的分摊结果清空。 */
+function switchKind(next: AllocKind): void {
   if (kind.value === next) return;
   kind.value = next;
-  rebuildDrafts();
+  allocResult.value = null;
+  writeBackBanner.value = "";
+  hint.value = "";
 }
 
 onMounted(async () => {
@@ -87,10 +87,11 @@ onMounted(async () => {
   rebuildDrafts();
 });
 
-const hasFps = computed(() => kindFps.value.length > 0);
+const hasFps = computed(() => allFps.value.length > 0);
 const canAllocate = computed(
   () => drafts.value.length > 0 && drafts.value.every((d) => d.name.trim()),
 );
+const canWriteBack = computed(() => kind.value === "dev");
 
 function targetUs(): number | null {
   const band: Band = props.reverseResult.recommended_band ?? "P50";
@@ -109,7 +110,10 @@ async function onGenerate(): Promise<void> {
   }
   const us = targetUs();
   if (us === null) {
-    hint.value = "反算结果该口径无可用推荐档 FP，请重算 reverse。";
+    hint.value =
+      kind.value === "ops"
+        ? "反算结果未包含运维口径（项目未启用运维或运维预算为 0）。"
+        : "反算结果该口径无可用推荐档 FP，请重算 reverse。";
     return;
   }
   allocating.value = true;
@@ -137,14 +141,13 @@ async function onGenerate(): Promise<void> {
 }
 
 /**
- * 写回：把每个分摊模块的 US 按该模块下各 FP 现有 US 占比拆下去，逐条 PATCH。
- * 模块现 US 总和为 0 时平均分配。
+ * 写回（仅开发口径）：把每个分摊模块的 US 按该模块下各 FP 现有 US 占比拆下去，
+ * 逐条 PATCH。模块现 US 总和为 0 时平均分配。
  */
 async function onWriteBack(): Promise<void> {
-  if (!allocResult.value) return;
-  const groups = groupByModule(kindFps.value);
+  if (!allocResult.value || !canWriteBack.value) return;
+  const groups = groupByModule(allFps.value);
 
-  // 收集所有 (fpId, 新us) —— 只动当前口径、且模块在分摊结果里的 FP。
   const patches: Array<{ id: string; us: number }> = [];
   for (const item of allocResult.value.items) {
     const fps = groups.get(item.name);
@@ -161,7 +164,7 @@ async function onWriteBack(): Promise<void> {
 
   if (patches.length === 0) {
     writeBackBanner.value = "";
-    hint.value = "没有可写回的功能点（分摊模块与当前口径 FP 模块不匹配）。";
+    hint.value = "没有可写回的功能点（分摊模块与 FP 模块不匹配）。";
     return;
   }
 
@@ -193,7 +196,7 @@ async function onWriteBack(): Promise<void> {
     <div class="allocator-head">
       <div class="section-title">FP 模块反算分摊</div>
       <div class="muted" style="font-size: 12px">
-        模块来自项目真实功能点的一级模块；分摊后可按现有 US 比例写回每条 FP
+        模块来自项目真实功能点的一级模块；开发口径分摊后可按现有 US 比例写回每条 FP
       </div>
     </div>
 
@@ -220,8 +223,13 @@ async function onWriteBack(): Promise<void> {
       </button>
     </div>
 
+    <div v-if="kind === 'ops'" class="banner banner-blue" style="margin-top: 4px">
+      运维基于与开发相同的功能点规模计算 —— 此处展示运维规模在各模块上的分布，
+      仅供参考，不写回 FP 表（FP 表的 US 是开发规模）。
+    </div>
+
     <div v-if="!hasFps" class="banner banner-amber" style="margin-top: 12px">
-      当前口径暂无功能点 —— 可在 FP 编辑页新建 fp_kind={{ kind }} 的功能点
+      项目暂无功能点 —— 请先在 FP 编辑页上传文档让 AI 生成，或手动添加功能点。
     </div>
 
     <template v-else>
@@ -275,7 +283,9 @@ async function onWriteBack(): Promise<void> {
 
     <template v-if="allocResult">
       <div class="section-head" style="margin-top: 20px">
-        <div class="section-title">分摊结果</div>
+        <div class="section-title">
+          分摊结果 · {{ kind === "dev" ? "开发口径" : "运维口径" }}
+        </div>
       </div>
       <table class="table allocator-result">
         <thead>
@@ -304,7 +314,7 @@ async function onWriteBack(): Promise<void> {
         {{ allocResult.validation.error_pct <= 1 ? "≤ 1%" : "⚠ 大于 1%" }}
       </div>
 
-      <div class="allocator-actions" style="margin-top: 12px">
+      <div v-if="canWriteBack" class="allocator-actions" style="margin-top: 12px">
         <div style="flex: 1" />
         <button
           class="btn"
@@ -313,6 +323,9 @@ async function onWriteBack(): Promise<void> {
         >
           {{ writingBack ? "写回中…" : "↩ 写回 FP 表" }}
         </button>
+      </div>
+      <div v-else class="muted" style="margin-top: 12px; font-size: 12px">
+        运维口径分摊仅供参考，不提供写回（运维规模为项目级指标，不逐条落到 FP）。
       </div>
 
       <div v-if="writeBackBanner" class="banner banner-green" style="margin-top: 12px">
