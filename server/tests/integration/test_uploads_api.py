@@ -44,3 +44,26 @@ async def test_upload_then_list(client_factory, tmp_data_dir):
         r = await c.get(f"/api/projects/{pid}/uploads", headers=H)
         assert r.status_code == 200
         assert len(r.json()["data"]) == 1
+
+
+async def test_get_parsed_text(client_factory, tmp_data_dir):
+    """plugin /cost 用 GET uploads/{id}/parsed 拿预解析纯文本做 AI 提取。"""
+    async with await client_factory() as c:
+        pid = await _make_project(c)
+        r = await c.post(f"/api/projects/{pid}/uploads", headers=H,
+                          files={"file": ("spec.txt", b"hello parsed world", "text/plain")})
+        upload_id = r.json()["data"]["id"]
+        r = await c.get(f"/api/projects/{pid}/uploads/{upload_id}/parsed", headers=H)
+        assert r.status_code == 200
+        data = r.json()["data"]
+        assert data["upload_id"] == upload_id
+        assert data["filename"] == "spec.txt"
+        assert "hello parsed world" in data["parsed_text"]
+
+
+async def test_get_parsed_text_404_for_unknown_upload(client_factory, tmp_data_dir):
+    async with await client_factory() as c:
+        pid = await _make_project(c)
+        r = await c.get(f"/api/projects/{pid}/uploads/99999/parsed", headers=H)
+        assert r.status_code == 404
+        assert r.json()["detail"]["error"]["code"] == "UPLOAD_NOT_FOUND"

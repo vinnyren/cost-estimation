@@ -108,6 +108,18 @@ def list_for_project(db: Session, project_id: str) -> list[Upload]:
     return db.query(Upload).filter_by(project_id=project_id).order_by(Upload.id.desc()).all()
 
 
+def get_upload(db: Session, project_id: str, upload_id: int) -> Upload | None:
+    return db.query(Upload).filter_by(id=upload_id, project_id=project_id).first()
+
+
+def read_parsed_text(rec: Upload) -> str | None:
+    """读取 upload 的预解析纯文本；文件不存在返回 None。"""
+    fp = resolve_parsed_path(rec)
+    if not fp.exists():
+        return None
+    return fp.read_text(encoding="utf-8", errors="ignore")
+
+
 def delete_upload(db: Session, project_id: str, upload_id: int) -> bool:
     """v2.5 — 删除上传记录 + 物理文件（解析文本 + 原始文件）。
 
