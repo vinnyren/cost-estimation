@@ -39,24 +39,25 @@ async function createProjectWithUpload(): Promise<string> {
   return pid;
 }
 
-test("v2.5 上传文件列表 + 删除", async ({ page }) => {
+test("v2.5 已上传文件主页面区块 + 删除", async ({ page }) => {
   const pid = await createProjectWithUpload();
   await page.goto(`/projects/${pid}/functions`);
   await page.waitForLoadState("networkidle");
 
-  // 点 "已上传文件" 按钮
-  await page.locator("button", { hasText: "已上传文件" }).click();
-  await expect(page.locator(".upload-modal")).toBeVisible();
+  // 上传文件区块直接在主页面渲染（无需点按钮）
+  const section = page.locator(".upload-section");
+  await expect(section).toBeVisible();
+  await expect(section).toContainText("已上传文件");
 
-  // 表格有 1 行
-  await expect(page.locator(".upload-modal table tbody tr")).toHaveCount(1);
-  await expect(page.locator(".upload-modal")).toContainText("test.txt");
+  // 表格有 1 行，含文件名
+  await expect(section.locator("table tbody tr")).toHaveCount(1);
+  await expect(section).toContainText("test.txt");
 
   // 删除 — auto accept confirm
   page.once("dialog", (d) => d.accept());
-  await page.locator(".upload-modal button", { hasText: "删除" }).click();
+  await section.locator("button", { hasText: "删除" }).click();
   await page.waitForLoadState("networkidle");
 
-  // 空状态
-  await expect(page.locator(".upload-modal")).toContainText("暂无上传文件");
+  // 0 个文件后整块不再渲染
+  await expect(page.locator(".upload-section")).toHaveCount(0);
 });

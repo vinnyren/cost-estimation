@@ -17,7 +17,11 @@ vi.mock("@/api/functions", () => ({
 }));
 
 vi.mock("@/api/uploads", () => ({
-  uploadsApi: { upload: vi.fn() },
+  uploadsApi: {
+    upload: vi.fn(),
+    list: vi.fn().mockResolvedValue([]),
+    remove: vi.fn(),
+  },
 }));
 
 const router = createRouter({

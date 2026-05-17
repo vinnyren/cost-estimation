@@ -21,7 +21,7 @@ import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import EmptyState from "@/components/status/EmptyState.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import AiTaskPanel from "@/components/fp/AiTaskPanel.vue";
-import UploadListModal from "@/components/fp/UploadListModal.vue";
+import UploadListSection from "@/components/fp/UploadListSection.vue";
 
 const props = defineProps<{ projectId: string }>();
 
@@ -38,8 +38,7 @@ const historyOpen = ref(false);
 const snapshots = ref<FpSnapshotMeta[]>([]);
 const restoring = ref<number | null>(null);
 const aiModalOpen = ref(false);
-const uploadModalOpen = ref(false);
-const uploadCount = ref(0);
+const uploadSection = ref<{ reload: () => Promise<void> } | null>(null);
 
 // GAP-A: AI Plugin polling state. 上传完成后告诉用户去 Claude Code 跑 /cost；
 // 同时每 30s 轮询一次 FP 列表，发现 claude_draft 行数增加就停止并提示审核。
@@ -56,10 +55,6 @@ const isError = computed(() => !loading.value && error.value !== null);
 
 onMounted(async () => {
   await load();
-  try {
-    const list = await uploadsApi.list(props.projectId);
-    uploadCount.value = list.length;
-  } catch { /* silent — fallback to 0 */ }
 });
 
 async function load(): Promise<void> {
@@ -87,12 +82,13 @@ async function onFileChange(e: Event): Promise<void> {
   try {
     await uploadsApi.upload(props.projectId, file);
     // GAP-A: AI 提取走 Plugin 模式（Claude Code /cost），不再阻塞用户。
-    // 弹窗保留以兼容现有 e2e 与 vitest 断言；同时开启 polling，等 AI 写入。
+    // 同时开启 polling，等 AI 写入；并刷新主页面的已上传文件区块。
     window.alert(
       "已上传。在 Claude Code 终端运行 /cost 让 AI 提取 FP 草稿；或继续手动添加。",
     );
     aiPollHint.value =
       "已上传。在 Claude Code 终端运行 /cost 让 AI 提取 FP 草稿；或继续手动添加。";
+    await uploadSection.value?.reload();
     startAiPolling();
   } catch (err: unknown) {
     error.value = err instanceof Error ? err.message : "上传失败";
@@ -282,13 +278,6 @@ async function reloadFps(): Promise<void> {
         </button>
         <button
           type="button"
-          class="btn"
-          @click="uploadModalOpen = true"
-        >
-          📁 已上传文件 ({{ uploadCount }})
-        </button>
-        <button
-          type="button"
           class="btn btn-ghost"
           @click="router.push(`/projects/${projectId}/edit`)"
         >
@@ -310,6 +299,11 @@ async function reloadFps(): Promise<void> {
         </button>
       </div>
     </header>
+
+    <UploadListSection
+      ref="uploadSection"
+      :project-id="projectId"
+    />
 
     <p
       v-if="aiPollHint && (isEmpty || isError)"
@@ -435,11 +429,6 @@ async function reloadFps(): Promise<void> {
     <AiTaskPanel
       v-model:open="aiModalOpen"
       :project-id="projectId"
-    />
-    <UploadListModal
-      v-model:open="uploadModalOpen"
-      :project-id="projectId"
-      @refreshed="uploadCount = $event"
     />
   </section>
 </template>
