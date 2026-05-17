@@ -12,20 +12,22 @@ from ..db.models import AiTask
 
 
 def create_task(db: Session, project_id: str, kind: str) -> AiTask:
-    """v2.5 fix: 30s 去重窗口 — 避免 UI + plugin 双创建同一 (project_id, kind) task。
+    """v2.5 fix: stub 去重 — 避免 UI + plugin 双创建同一 (project_id, kind) task。
 
     UI 点 "新建提取任务" → 创建 task A → /start 起 claude → plugin v2.4
     自己 POST /api/ai-tasks 又创建 task B（plugin 不读 $TASK_ID env）。
-    这里把 30s 内、相同 (project_id, kind) 的 queued/running task 视为同一次
-    操作，直接复用，让 UI 和 plugin 操作同一行。
+
+    去重判据是「progress_pct <= 1」而非时间窗口：UI 创建的 stub 在 plugin
+    真正接管前一直停在 progress 0~1（/start 写 1.0），所以只要存在这样的
+    queued/running stub 就复用它。claude 启动慢、plugin 几分钟后才 POST 也
+    能命中 —— 比固定 30s 窗口稳。stub 一旦拿到真实进度 (>1) 或被自检翻
+    failed，就不再匹配，下次是全新一轮。
     """
-    from datetime import datetime, timedelta
-    cutoff = datetime.utcnow() - timedelta(seconds=30)
     existing = (db.query(AiTask)
                 .filter(AiTask.project_id == project_id,
                         AiTask.kind == kind,
                         AiTask.status.in_(("queued", "running")),
-                        AiTask.created_at >= cutoff)
+                        AiTask.progress_pct <= 1.0)
                 .order_by(AiTask.created_at.desc())
                 .first())
     if existing:

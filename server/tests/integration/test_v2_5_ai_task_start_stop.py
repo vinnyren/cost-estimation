@@ -61,8 +61,8 @@ async def test_stop_task_calls_kill(client_factory, db_session):
 
 
 @pytest.mark.asyncio
-async def test_create_task_dedup_within_30s_window(client_factory, db_session):
-    """/qa: UI 和 plugin 同时 POST /api/ai-tasks 同 (project_id, kind) 应复用同一行。"""
+async def test_create_task_dedup_reuses_stub(client_factory, db_session):
+    """/qa: UI 和 plugin 都 POST 同 (project_id, kind)，progress<=1 的 stub 应复用。"""
     _seed(db_session, pid="p-dedup")
     async with await client_factory(seed_csbmk=False) as client:
         r1 = await client.post(
@@ -73,15 +73,40 @@ async def test_create_task_dedup_within_30s_window(client_factory, db_session):
         assert r1.status_code == 201
         task_id_1 = r1.json()["id"]
 
-        # 模拟 plugin POST 同 (project_id, kind) 应复用
+        # 模拟 plugin POST 同 (project_id, kind) — task 1 还是 stub (progress 0) → 复用
         r2 = await client.post(
             "/api/ai-tasks",
             json={"project_id": "p-dedup", "kind": "extract"},
             headers=H,
         )
         assert r2.status_code == 201
-        task_id_2 = r2.json()["id"]
-        assert task_id_1 == task_id_2, "30s 内同 (project_id, kind) 应复用同一 task"
+        assert r2.json()["id"] == task_id_1, "progress<=1 的 stub 应被复用"
+
+
+@pytest.mark.asyncio
+async def test_create_task_no_dedup_after_real_progress(client_factory, db_session):
+    """/qa: stub 拿到真实进度 (>1) 后，再 POST 应开新一轮 task。"""
+    _seed(db_session, pid="p-dedup-2")
+    async with await client_factory(seed_csbmk=False) as client:
+        r1 = await client.post(
+            "/api/ai-tasks",
+            json={"project_id": "p-dedup-2", "kind": "extract"},
+            headers=H,
+        )
+        task_id_1 = r1.json()["id"]
+        # plugin 推进到真实进度
+        await client.patch(
+            f"/api/ai-tasks/{task_id_1}",
+            json={"status": "running", "progress_pct": 30},
+            headers=H,
+        )
+        # 再 POST → 不复用（task 1 progress>1），开新 task
+        r2 = await client.post(
+            "/api/ai-tasks",
+            json={"project_id": "p-dedup-2", "kind": "extract"},
+            headers=H,
+        )
+        assert r2.json()["id"] != task_id_1, "progress>1 的 task 不应被复用"
 
 
 @pytest.mark.asyncio
