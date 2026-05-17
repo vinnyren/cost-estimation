@@ -148,7 +148,7 @@ async function onWriteBack(): Promise<void> {
   }
 
   const ok = window.confirm(
-    `将按分摊结果更新 ${patches.length} 条功能点的 US，是否继续？`,
+    `将按分摊结果更新 ${patches.length} 条功能点的规模，是否继续？`,
   );
   if (!ok) return;
 
@@ -175,7 +175,7 @@ async function onWriteBack(): Promise<void> {
     <div class="allocator-head">
       <div class="section-title">FP 模块反算分摊</div>
       <div class="muted" style="font-size: 12px">
-        模块来自项目真实功能点的一级模块；分摊后可按现有 US 比例写回每条 FP，
+        模块来自项目真实功能点的一级模块；分摊后可按现有规模比例写回每条 FP，
         写回后正向计算可精确复现反算目标
       </div>
     </div>
@@ -189,7 +189,7 @@ async function onWriteBack(): Promise<void> {
         <thead>
           <tr>
             <th>一级模块</th>
-            <th style="width: 200px">权重（现有 US 总和）</th>
+            <th style="width: 200px">权重（现有规模合计）</th>
             <th style="width: 110px">锁定 FP</th>
           </tr>
         </thead>
@@ -241,7 +241,7 @@ async function onWriteBack(): Promise<void> {
         <thead>
           <tr>
             <th>模块</th>
-            <th style="text-align: right">分配 FP (US)</th>
+            <th style="text-align: right">分配规模</th>
             <th style="width: 80px">锁定</th>
           </tr>
         </thead>
@@ -258,7 +258,7 @@ async function onWriteBack(): Promise<void> {
       </table>
       <div class="banner banner-green" style="margin-top: 12px">
         ✓ 双向一致性校验
-        · 反算总 US <b class="mono">{{ allocResult.validation.recalc_total_us.toFixed(2) }}</b>
+        · 反算总规模 <b class="mono">{{ allocResult.validation.recalc_total_us.toFixed(2) }}</b>
         · 调整后 <b class="mono">{{ allocResult.validation.recalc_total_adjusted.toFixed(2) }}</b>
         · 误差 <b>{{ allocResult.validation.error_pct.toFixed(2) }}%</b>
         {{ allocResult.validation.error_pct <= 1 ? "≤ 1%" : "⚠ 大于 1%" }}

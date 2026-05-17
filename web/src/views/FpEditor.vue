@@ -442,7 +442,7 @@ async function onFpSaved(): Promise<void> {
                 UFP
               </th>
               <th scope="col">
-                US
+                规模
               </th>
               <th scope="col">
                 来源

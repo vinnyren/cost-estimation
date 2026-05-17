@@ -71,7 +71,7 @@ const reverseTiers = computed(() => {
     recommended: r.recommended_band === k,
     unit: "fp" as const,
     extras: [
-      ["未调整规模 US", `${r.scale_unadjusted_bands[k].toFixed(2)} FP`],
+      ["未调整规模", `${r.scale_unadjusted_bands[k].toFixed(2)} FP`],
     ] as Array<[string, string]>,
   }));
 });
@@ -86,7 +86,7 @@ function onAllocated(res: AllocateResult) {
 }
 
 function onFpUpdated(count: number) {
-  fpUpdatedMsg.value = `分摊结果已写回 ${count} 条功能点的 US。`;
+  fpUpdatedMsg.value = `分摊结果已写回 ${count} 条功能点的规模。`;
 }
 
 onMounted(loadAndCompute);
