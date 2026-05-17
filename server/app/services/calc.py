@@ -100,7 +100,6 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
         target_total=payload["target_total"],
         other_cost=payload.get("other_cost", proj.other_cost or 0.0),
         include_ops=payload.get("include_ops", proj.include_ops or False),
-        alpha_dev=payload.get("alpha_dev", proj.alpha_dev or 1.0),
         dev_factor=dev_factor,
         ops_factor=ops_factor,
     )

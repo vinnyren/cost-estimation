@@ -76,23 +76,6 @@ const reverseTiers = computed(() => {
   }));
 });
 
-// 运维口径反算三档 —— 后端 scale_*_ops_bands，之前前端漏渲染
-const reverseOpsTiers = computed(() => {
-  if (!reverseResult.value) return [];
-  const r = reverseResult.value;
-  return (["P10", "P50", "P90"] as const).map((k) => ({
-    key: k,
-    label: REVERSE_BAND_LABEL[k],
-    cost: 0,
-    fp: r.scale_adjusted_ops_bands[k],
-    recommended: r.recommended_band === k,
-    unit: "fp" as const,
-    extras: [
-      ["未调整规模 US", `${r.scale_unadjusted_ops_bands[k].toFixed(2)} FP`],
-    ] as Array<[string, string]>,
-  }));
-});
-
 // allocResult stores the latest AllocateResult emitted by AllocatorPanel
 const allocResult = ref<AllocateResult | null>(null);
 // fpUpdatedMsg shows a brief confirmation when AllocatorPanel writes分摊结果回 FP 表
@@ -353,7 +336,7 @@ function fmtWan(n: number): string {
         >
           反算输入
         </div>
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px">
           <div
             class="field"
             style="margin-bottom: 0"
@@ -390,18 +373,6 @@ function fmtWan(n: number): string {
               style="background: var(--surface-sunken)"
             >
           </div>
-          <div
-            class="field"
-            style="margin-bottom: 0"
-          >
-            <label class="field-label">α 开发占比</label>
-            <input
-              class="field-input mono"
-              :value="(project?.alpha_dev ?? 1.0).toFixed(3)"
-              disabled
-              style="background: var(--surface-sunken)"
-            >
-          </div>
         </div>
         <div style="margin-top: 14px; display: flex; gap: 8px">
           <button
@@ -415,7 +386,7 @@ function fmtWan(n: number): string {
       </div>
 
       <template v-if="hasReverse">
-        <!-- 预算拆分：开发 / 运维 按 α 占比分配 -->
+        <!-- 成本拆分：单一规模下按生产率/费率反推的开发 / 运维占比 -->
         <div
           class="card"
           style="padding: 20px"
@@ -424,42 +395,31 @@ function fmtWan(n: number): string {
             class="section-title"
             style="margin-bottom: 14px"
           >
-            预算拆分（按 α 开发占比 {{ (project?.alpha_dev ?? 1).toFixed(2) }}）
+            成本拆分（按规模反推的开发 / 运维占比 · 推荐档）
           </div>
           <div class="budget-split">
             <div class="budget-cell">
-              <div class="budget-label">开发预算</div>
+              <div class="budget-label">开发成本</div>
               <div class="budget-value">{{ fmtWan(reverseResult!.budget_for_dev) }} 万元</div>
               <div class="muted mono">{{ Math.round(reverseResult!.budget_for_dev).toLocaleString() }} 元</div>
             </div>
             <div class="budget-cell">
-              <div class="budget-label">运维预算</div>
+              <div class="budget-label">运维成本</div>
               <div class="budget-value">{{ fmtWan(reverseResult!.budget_for_ops) }} 万元</div>
               <div class="muted mono">{{ Math.round(reverseResult!.budget_for_ops).toLocaleString() }} 元</div>
             </div>
           </div>
         </div>
 
-        <!-- 开发功能点三档 -->
+        <!-- 功能点规模三档（开发与运维共用同一规模）-->
         <div>
           <div
             class="section-title"
             style="margin-bottom: 10px"
           >
-            ① 开发功能点 · 反算三档
+            功能点规模 · 反算三档
           </div>
           <ResultTrio :tiers="reverseTiers" />
-        </div>
-
-        <!-- 运维功能点三档 -->
-        <div>
-          <div
-            class="section-title"
-            style="margin-bottom: 10px"
-          >
-            ② 运维功能点 · 反算三档
-          </div>
-          <ResultTrio :tiers="reverseOpsTiers" />
         </div>
       </template>
 

@@ -134,7 +134,7 @@ describe("ResultView", () => {
     expect(recommended.text()).toContain("P50");
   });
 
-  it("reverse 模式：显示 4 列反算输入区 + 反算按钮 (v2.4)", async () => {
+  it("reverse 模式：显示 3 列反算输入区 + 反算按钮", async () => {
     vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
     router.push("/projects/2/result");
     await router.isReady();
@@ -144,12 +144,12 @@ describe("ResultView", () => {
     });
     await flushPromises();
     await flushPromises();
-    // v2.4 — 4 列 grid 代替原 fieldset
+    // 单一规模模型 — α 开发占比不再是输入，反算输入只剩 3 列
     expect(w.text()).toContain("反算输入");
     expect(w.text()).toContain("目标总造价");
     expect(w.text()).toContain("其他费用");
     expect(w.text()).toContain("可用预算");
-    expect(w.text()).toContain("α 开发占比");
+    expect(w.text()).not.toContain("α 开发占比");
     const buttons = w.findAll("button");
     const reverseBtn = buttons.find((b) => b.text() === "反算");
     expect(reverseBtn).toBeDefined();
@@ -257,8 +257,6 @@ describe("ResultView", () => {
       budget_for_ops: 0,
       scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
-      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
-      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
       cf_used: 1.25,
       recommended_band: "P50" as const,
     });
@@ -308,8 +306,6 @@ describe("ResultView", () => {
       budget_for_ops: 0,
       scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
-      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
-      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
       cf_used: 1.25,
       recommended_band: "P50" as const,
     });
@@ -345,8 +341,6 @@ describe("ResultView", () => {
       budget_for_ops: 0,
       scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
-      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
-      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
       cf_used: 1.21,
       recommended_band: "P50" as const,
     });
@@ -400,8 +394,6 @@ describe("ResultView", () => {
       budget_for_ops: 0,
       scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
-      scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
-      scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
       cf_used: 1.21,
       recommended_band: "P50" as const,
     });

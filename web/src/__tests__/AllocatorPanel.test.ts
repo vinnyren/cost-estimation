@@ -40,7 +40,7 @@ function fp(over: Partial<FunctionPoint>): FunctionPoint {
   };
 }
 
-// 三个一级模块 —— 开发 / 运维口径共用同一套（运维不是独立 FP 清单）
+// 两个一级模块（财务管理 30+10，电子结算 20）
 const FPS: FunctionPoint[] = [
   fp({ id: "d1", l1_module: "财务管理", us: 30 }),
   fp({ id: "d2", l1_module: "财务管理", us: 10 }),
@@ -52,8 +52,6 @@ const stubReverseResult = {
   budget_for_ops: 200000,
   scale_adjusted_bands: { P10: 360, P50: 300, P90: 250 },
   scale_unadjusted_bands: { P10: 297, P50: 275, P90: 252 },
-  scale_adjusted_ops_bands: { P10: 60, P50: 50, P90: 40 },
-  scale_unadjusted_ops_bands: { P10: 55, P50: 45, P90: 35 },
   cf_used: 1.21,
   recommended_band: "P50" as const,
 };
@@ -94,31 +92,7 @@ describe("AllocatorPanel", () => {
     expect(Number(firstWeight.value)).toBe(40); // 财务管理 30 + 10
   });
 
-  it("切换运维口径不改变模块列表（开发 / 运维共用同一套）", async () => {
-    const w = mountPanel();
-    await flushPromises();
-    await w.findAll(".kind-toggle button")[1].trigger("click");
-    await flushPromises();
-    const rows = w.findAll(".allocator-drafts tbody tr");
-    expect(rows).toHaveLength(2);
-    expect(w.text()).toContain("财务管理");
-    expect(w.text()).toContain("电子结算");
-  });
-
-  it("运维口径展示参考说明且不渲染写回按钮", async () => {
-    const w = mountPanel();
-    await flushPromises();
-    await w.findAll(".kind-toggle button")[1].trigger("click");
-    await flushPromises();
-    expect(w.text()).toContain("运维基于与开发相同的功能点规模计算");
-    await w.find(".allocator-actions .btn-primary").trigger("click");
-    await flushPromises();
-    expect(
-      w.findAll("button").find((b) => b.text().includes("写回 FP 表")),
-    ).toBeUndefined();
-  });
-
-  it("生成分摊调 calcApi.allocate（dev 用 scale_adjusted_bands 推荐档）", async () => {
+  it("生成分摊调 calcApi.allocate（用 scale_adjusted_bands 推荐档）", async () => {
     const w = mountPanel();
     await flushPromises();
     await w.find(".allocator-actions .btn-primary").trigger("click");
@@ -131,16 +105,6 @@ describe("AllocatorPanel", () => {
       "电子结算",
     ]);
     expect(w.emitted("allocated")).toBeTruthy();
-  });
-
-  it("运维口径生成分摊用 scale_adjusted_ops_bands 推荐档", async () => {
-    const w = mountPanel();
-    await flushPromises();
-    await w.findAll(".kind-toggle button")[1].trigger("click");
-    await w.find(".allocator-actions .btn-primary").trigger("click");
-    await flushPromises();
-    const arg = mockFn(calcApi.allocate).mock.calls[0][0];
-    expect(arg.target_us).toBe(50); // scale_adjusted_ops_bands.P50
   });
 
   it("写回按各 FP 现有 US 占比 PATCH 功能点", async () => {

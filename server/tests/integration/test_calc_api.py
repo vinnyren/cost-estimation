@@ -31,7 +31,6 @@ async def test_reverse_endpoint_three_bands(client_factory):
                          headers={**H, "Content-Type": "application/json"},
                          json={"project_id": pid, "target_total": 500000,
                                "other_cost": 0, "include_ops": False,
-                               "alpha_dev": 1.0,
                                "dev_factor": 1.0, "ops_factor": 1.0})
         assert r.status_code == 200
         data = r.json()["data"]

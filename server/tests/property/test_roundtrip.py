@@ -21,13 +21,17 @@ def _ctx():
 
 
 @given(target=st.floats(min_value=10000, max_value=100_000_000),
-       factor=st.floats(min_value=0.5, max_value=2.0))
+       factor=st.floats(min_value=0.5, max_value=2.0),
+       include_ops=st.booleans())
 @settings(max_examples=100, deadline=None)
-def test_reverse_then_forward_p50_recovers_target(target, factor):
-    """反推 P50 → 正向 P50 的总费用应接近 target（误差 ≤ 1%）。"""
+def test_reverse_then_forward_p50_recovers_target(target, factor, include_ops):
+    """反推 P50 → 正向 P50 的总费用应接近 target（误差 ≤ 1%）。
+
+    单一规模模型下，开发与运维共用同一个规模，dev+ops 也必须能精确复现目标。
+    """
     rev_inp = ReverseInput(
         target_total=target, other_cost=0,
-        include_ops=False, alpha_dev=1.0,
+        include_ops=include_ops,
         dev_factor=factor, ops_factor=1.0,
     )
     rev = calculate_reverse(_ctx(), rev_inp)
@@ -39,7 +43,7 @@ def test_reverse_then_forward_p50_recovers_target(target, factor):
     fwd_inp = ForwardInput(
         items=[FpItem(us=us_p50)],
         dev_factor=factor, ops_factor=1.0,
-        include_dev=True, include_ops=False, other_cost=0,
+        include_dev=True, include_ops=include_ops, other_cost=0,
     )
     fwd = calculate_forward(_ctx(), fwd_inp)
     error = abs(fwd.cost_total_yuan["P50"] - target) / target

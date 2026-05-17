@@ -20,8 +20,6 @@ const sampleReverse = (): ReverseResult => ({
   budget_for_ops: 0,
   scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
   scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
-  scale_adjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
-  scale_unadjusted_ops_bands: { P10: 0, P50: 0, P90: 0 },
   cf_used: 1.25,
   recommended_band: "P50",
 });

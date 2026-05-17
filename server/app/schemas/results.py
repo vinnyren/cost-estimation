@@ -42,11 +42,10 @@ class CalcReverseRequest(BaseModel):
     target_total: float = Field(gt=0)
     other_cost: float = Field(default=0.0, ge=0)
     include_ops: bool = False
-    alpha_dev: float = Field(default=1.0, gt=0)
     dev_factor: float = Field(default=1.0, gt=0)
     ops_factor: float = Field(default=1.0, gt=0)
 
-    @field_validator("target_total", "other_cost", "alpha_dev",
+    @field_validator("target_total", "other_cost",
                      "dev_factor", "ops_factor")
     @classmethod
     def _f(cls, v: float) -> float:

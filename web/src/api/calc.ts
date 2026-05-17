@@ -50,15 +50,14 @@ export interface ForwardResult {
  *
  * 三档语义见 server 类注释：
  * - P10 乐观 / P50 中位 / P90 保守。
- * - scale_adjusted_bands 为开发口径调整后规模（FP）。
+ * - 单一规模模型：scale_*_bands 为开发与运维共用的功能点规模（FP）。
+ * - budget_for_dev / budget_for_ops 是该规模下推导出的成本拆分（推荐档）。
  */
 export interface ReverseResult {
   budget_for_dev: number;
   budget_for_ops: number;
   scale_adjusted_bands: BandValues;
   scale_unadjusted_bands: BandValues;
-  scale_adjusted_ops_bands: BandValues;
-  scale_unadjusted_ops_bands: BandValues;
   cf_used: number;
   recommended_band: Band;
 }
