@@ -148,12 +148,20 @@ def spawn_claude_extract(
         "--allowed-tools",
         "Bash Read",
     ]
+    # 注入 NO_PROXY：环境若配了 http_proxy（如公司代理），plugin 的 curl 不带
+    # --noproxy 会把 127.0.0.1 也走代理 → 502。把 localhost 加进 NO_PROXY 让
+    # curl 绕过代理直连本地后端。保留用户已有的 NO_PROXY 条目。
+    _local_hosts = "127.0.0.1,localhost"
+    _existing_np = os.environ.get("NO_PROXY") or os.environ.get("no_proxy") or ""
+    _no_proxy = f"{_existing_np},{_local_hosts}".strip(",") if _existing_np else _local_hosts
     env = {
         **os.environ,
         "BASE": base_url,
         "TOKEN": token,
         "PROJECT_ID": project_id,
         "TASK_ID": task_id,
+        "NO_PROXY": _no_proxy,
+        "no_proxy": _no_proxy,
     }
     log_path = Path(os.environ.get("COST_DATA_DIR", "/tmp")) / f"ai-task-{task_id}.log"
     try:
