@@ -88,7 +88,7 @@ onMounted(load);
           <td>
             <button
               type="button"
-              class="btn btn-sm btn-ghost btn-danger"
+              class="btn btn-sm btn-ghost upload-del-btn"
               @click="onRemove(r)"
             >
               删除
@@ -179,8 +179,12 @@ onMounted(load);
 .mono {
   font-family: var(--font-mono, monospace);
 }
-.btn-danger {
-  color: var(--color-danger, var(--red, #dc2626));
+/* 不复用全局 .btn-danger（红底白字）— 这里要的是 ghost 按钮 + 红字 */
+.upload-del-btn {
+  color: var(--red, #dc2626);
+}
+.upload-del-btn:hover {
+  background: var(--color-danger-bg, #fef2f2);
 }
 .upload-hint {
   margin: var(--space-2) 0 0;

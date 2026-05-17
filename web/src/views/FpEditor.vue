@@ -373,6 +373,9 @@ async function reloadFps(): Promise<void> {
                 #
               </th>
               <th scope="col">
+                功能点
+              </th>
+              <th scope="col">
                 子系统
               </th>
               <th scope="col">
@@ -403,8 +406,16 @@ async function reloadFps(): Promise<void> {
               }"
             >
               <td>{{ i + 1 }}</td>
-              <td>{{ fp.subsystem }}</td>
-              <td>{{ fp.l1_module }}</td>
+              <td class="fp-name">
+                <span class="fp-name-text">{{ fp.name || "—" }}</span>
+                <span
+                  v-if="fp.description"
+                  class="fp-desc"
+                  :title="fp.description"
+                >{{ fp.description }}</span>
+              </td>
+              <td>{{ fp.subsystem || "—" }}</td>
+              <td>{{ fp.l1_module || "—" }}</td>
               <td>{{ fp.category }}</td>
               <td>{{ fp.ufp }}</td>
               <td>{{ fp.us.toFixed(2) }}</td>
@@ -494,6 +505,22 @@ async function reloadFps(): Promise<void> {
 .grid-body table.data-table {
   border: none;
   box-shadow: none;
+}
+.fp-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 360px;
+}
+.fp-name-text {
+  font-weight: 600;
+}
+.fp-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .row-allocator {
   background: var(--color-warning-bg);

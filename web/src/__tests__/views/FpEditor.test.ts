@@ -82,6 +82,7 @@ describe("FpEditor", () => {
         project_id: "p-1",
         subsystem: "S1",
         l1_module: "M1",
+        name: "优惠劵批量核销",
         description: "d",
         category: "EI",
         complexity: "low",
@@ -131,6 +132,8 @@ describe("FpEditor", () => {
     expect(w.text()).toContain("手工");
     expect(w.text()).toContain("AI 提取");
     expect(w.text()).toContain("预算倒推");
+    // 功能点名称列渲染
+    expect(w.text()).toContain("优惠劵批量核销");
   });
 
   it("点击「参数管理」→ 路由跳 param-manager", async () => {
