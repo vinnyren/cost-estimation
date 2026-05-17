@@ -478,6 +478,10 @@ async function onFpSaved(): Promise<void> {
               <td>{{ row.fp.us.toFixed(2) }}</td>
               <td>
                 <span :class="sourceBadgeClass(row.fp.source)">{{ sourceLabel(row.fp.source) }}</span>
+                <span
+                  v-if="(row.fp.fp_kind ?? 'dev') === 'ops'"
+                  class="badge badge-data fp-kind-badge"
+                >运维</span>
               </td>
               <td class="fp-ops">
                 <button type="button" class="btn btn-sm" @click="openEditFp(row.fp)">编辑</button>
@@ -699,5 +703,8 @@ async function onFpSaved(): Promise<void> {
 }
 .fp-del-btn {
   color: var(--red, #dc2626);
+}
+.fp-kind-badge {
+  margin-left: 4px;
 }
 </style>

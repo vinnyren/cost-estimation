@@ -95,9 +95,15 @@ const reverseOpsTiers = computed(() => {
 
 // allocResult stores the latest AllocateResult emitted by AllocatorPanel
 const allocResult = ref<AllocateResult | null>(null);
+// fpUpdatedMsg shows a brief confirmation when AllocatorPanel writes分摊结果回 FP 表
+const fpUpdatedMsg = ref<string | null>(null);
 
 function onAllocated(res: AllocateResult) {
   allocResult.value = res;
+}
+
+function onFpUpdated(count: number) {
+  fpUpdatedMsg.value = `分摊结果已写回 ${count} 条功能点的 US。`;
 }
 
 onMounted(loadAndCompute);
@@ -462,7 +468,16 @@ function fmtWan(n: number): string {
         :reverse-result="reverseResult"
         :project-id="projectId"
         @allocated="onAllocated"
+        @fp-updated="onFpUpdated"
       />
+
+      <div
+        v-if="fpUpdatedMsg"
+        class="banner banner-green"
+        role="status"
+      >
+        ✓ {{ fpUpdatedMsg }}
+      </div>
     </div>
 
     <footer

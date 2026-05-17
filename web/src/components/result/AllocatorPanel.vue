@@ -1,6 +1,17 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { calcApi, type AllocateResult, type ReverseResult } from "@/api/calc";
+/**
+ * AllocatorPanel — 反算分摊面板（v2.x 重做）。
+ *
+ * 旧版用写死的「前端/后端」假模块。现在改为：
+ *   - 模块列表 = 项目真实 FP 的一级模块（l1_module 分组）
+ *   - 开发 / 运维口径二选一，分别对应 reverseResult 的 dev / ops 三档
+ *   - 「生成分摊」把推荐档目标 US 按权重分到各 l1 模块
+ *   - 「写回 FP 表」把每个模块分配的 US 按该模块下各 FP 的现有 US 占比拆下去，
+ *     逐条 PATCH function_points.us，让反算结果真正落地
+ */
+import { ref, computed, onMounted } from "vue";
+import { calcApi, type AllocateResult, type ReverseResult, type Band } from "@/api/calc";
+import { functionsApi, type FunctionPoint, type FpKind } from "@/api/functions";
 
 interface DraftRow {
   name: string;
@@ -16,42 +27,98 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   allocated: [result: AllocateResult];
+  "fp-updated": [count: number];
 }>();
 
-const drafts = ref<DraftRow[]>([
-  { name: "前端", weight: 1.0, locked: false, locked_us: 0 },
-  { name: "后端", weight: 1.5, locked: false, locked_us: 0 },
-]);
+const UNGROUPED = "未分组";
+
+const allFps = ref<FunctionPoint[]>([]);
+const kind = ref<FpKind>("dev");
+const drafts = ref<DraftRow[]>([]);
 const allocResult = ref<AllocateResult | null>(null);
 const allocating = ref(false);
+const writingBack = ref(false);
 const hint = ref<string>("");
+const writeBackBanner = ref<string>("");
 
-function addRow() {
-  drafts.value.push({ name: `模块 ${drafts.value.length + 1}`, weight: 1.0, locked: false, locked_us: 0 });
+/** 当前口径下的 FP（fp_kind 缺省视为 dev）。 */
+const kindFps = computed(() =>
+  allFps.value.filter((fp) => (fp.fp_kind ?? "dev") === kind.value),
+);
+
+/** 当前口径下按 l1_module 分组：模块名 → FP 列表。 */
+function groupByModule(fps: FunctionPoint[]): Map<string, FunctionPoint[]> {
+  const groups = new Map<string, FunctionPoint[]>();
+  for (const fp of fps) {
+    const mod = fp.l1_module?.trim() || UNGROUPED;
+    const list = groups.get(mod) ?? [];
+    list.push(fp);
+    groups.set(mod, list);
+  }
+  return groups;
 }
-function removeRow(idx: number) {
-  drafts.value.splice(idx, 1);
+
+/** 按当前口径重建 drafts —— weight 初值取该模块现有 US 总和，保留真实结构占比。 */
+function rebuildDrafts(): void {
+  const groups = groupByModule(kindFps.value);
+  drafts.value = [...groups.entries()].map(([name, fps]) => ({
+    name,
+    weight: fps.reduce((s, fp) => s + fp.us, 0),
+    locked: false,
+    locked_us: 0,
+  }));
+  allocResult.value = null;
+  writeBackBanner.value = "";
+  hint.value = "";
 }
 
-const canAllocate = computed(() => drafts.value.length > 0 && drafts.value.every((d) => d.name.trim()));
+function switchKind(next: FpKind): void {
+  if (kind.value === next) return;
+  kind.value = next;
+  rebuildDrafts();
+}
 
-async function onGenerate() {
+onMounted(async () => {
+  try {
+    allFps.value = await functionsApi.list(props.projectId);
+  } catch (e: unknown) {
+    hint.value = e instanceof Error ? e.message : "功能点加载失败";
+  }
+  rebuildDrafts();
+});
+
+const hasFps = computed(() => kindFps.value.length > 0);
+const canAllocate = computed(
+  () => drafts.value.length > 0 && drafts.value.every((d) => d.name.trim()),
+);
+
+function targetUs(): number | null {
+  const band: Band = props.reverseResult.recommended_band ?? "P50";
+  const bands =
+    kind.value === "dev"
+      ? props.reverseResult.scale_adjusted_bands
+      : props.reverseResult.scale_adjusted_ops_bands;
+  const us = bands?.[band];
+  return us && us > 0 ? us : null;
+}
+
+async function onGenerate(): Promise<void> {
   if (!canAllocate.value) {
     hint.value = "请确保所有模块都填写名称。";
     return;
   }
-  const band = props.reverseResult.recommended_band ?? "P50";
-  const targetUs = props.reverseResult.scale_adjusted_bands?.[band];
-  if (!targetUs || targetUs <= 0) {
-    hint.value = "反向结果无可用推荐档 FP，请重算 reverse。";
+  const us = targetUs();
+  if (us === null) {
+    hint.value = "反算结果该口径无可用推荐档 FP，请重算 reverse。";
     return;
   }
   allocating.value = true;
   hint.value = "";
+  writeBackBanner.value = "";
   try {
     const res = await calcApi.allocate({
       project_id: props.projectId,
-      target_us: targetUs,
+      target_us: us,
       cf: props.reverseResult.cf_used,
       drafts: drafts.value.map((d) => ({
         name: d.name,
@@ -68,48 +135,141 @@ async function onGenerate() {
     allocating.value = false;
   }
 }
+
+/**
+ * 写回：把每个分摊模块的 US 按该模块下各 FP 现有 US 占比拆下去，逐条 PATCH。
+ * 模块现 US 总和为 0 时平均分配。
+ */
+async function onWriteBack(): Promise<void> {
+  if (!allocResult.value) return;
+  const groups = groupByModule(kindFps.value);
+
+  // 收集所有 (fpId, 新us) —— 只动当前口径、且模块在分摊结果里的 FP。
+  const patches: Array<{ id: string; us: number }> = [];
+  for (const item of allocResult.value.items) {
+    const fps = groups.get(item.name);
+    if (!fps || fps.length === 0) continue;
+    const moduleTotal = fps.reduce((s, fp) => s + fp.us, 0);
+    for (const fp of fps) {
+      const newUs =
+        moduleTotal > 0
+          ? item.us * (fp.us / moduleTotal)
+          : item.us / fps.length;
+      patches.push({ id: fp.id, us: newUs });
+    }
+  }
+
+  if (patches.length === 0) {
+    writeBackBanner.value = "";
+    hint.value = "没有可写回的功能点（分摊模块与当前口径 FP 模块不匹配）。";
+    return;
+  }
+
+  const ok = window.confirm(
+    `将按分摊结果更新 ${patches.length} 条功能点的 US，是否继续？`,
+  );
+  if (!ok) return;
+
+  writingBack.value = true;
+  hint.value = "";
+  try {
+    await Promise.all(
+      patches.map((p) => functionsApi.patch(props.projectId, p.id, { us: p.us })),
+    );
+    // 写回后刷新本地 FP 缓存，让占比基于最新值（重复写回时正确）。
+    allFps.value = await functionsApi.list(props.projectId);
+    writeBackBanner.value = `已写回 ${patches.length} 条 FP`;
+    emit("fp-updated", patches.length);
+  } catch (e: unknown) {
+    hint.value = e instanceof Error ? e.message : "写回失败";
+  } finally {
+    writingBack.value = false;
+  }
+}
 </script>
 
 <template>
   <div class="card allocator-panel">
     <div class="allocator-head">
-      <div class="section-title">AI 模块分摊</div>
-      <div class="muted" style="font-size: 12px">权重决定模块 FP 占比；锁定模块按 locked_us 固定值不参与分摊</div>
+      <div class="section-title">FP 模块反算分摊</div>
+      <div class="muted" style="font-size: 12px">
+        模块来自项目真实功能点的一级模块；分摊后可按现有 US 比例写回每条 FP
+      </div>
     </div>
 
-    <table class="table allocator-drafts">
-      <thead>
-        <tr>
-          <th>模块名</th>
-          <th style="width: 200px">权重</th>
-          <th style="width: 110px">锁定 FP</th>
-          <th style="width: 40px"></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(d, idx) in drafts" :key="idx">
-          <td><input class="field-input" v-model="d.name" /></td>
-          <td>
-            <input type="range" min="0.5" max="3" step="0.1" v-model.number="d.weight" style="width: 100%" />
-            <span class="mono muted" style="font-size: 11px">{{ d.weight.toFixed(1) }}</span>
-          </td>
-          <td>
-            <input class="field-input mono" type="number" min="0" step="0.5" v-model.number="d.locked_us" placeholder="0" />
-          </td>
-          <td>
-            <button class="btn btn-sm btn-ghost" @click="removeRow(idx)" aria-label="删除">✕</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-
-    <div class="allocator-actions">
-      <button class="btn btn-ghost" @click="addRow">+ 新增模块</button>
-      <div style="flex: 1" />
-      <button class="btn btn-primary" :disabled="!canAllocate || allocating" @click="onGenerate">
-        {{ allocating ? "生成中…" : "✨ 生成分摊" }}
+    <div class="kind-toggle" role="tablist" aria-label="分摊口径">
+      <button
+        type="button"
+        class="btn btn-sm"
+        :class="kind === 'dev' ? 'btn-primary' : 'btn-ghost'"
+        role="tab"
+        :aria-selected="kind === 'dev'"
+        @click="switchKind('dev')"
+      >
+        开发
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm"
+        :class="kind === 'ops' ? 'btn-primary' : 'btn-ghost'"
+        role="tab"
+        :aria-selected="kind === 'ops'"
+        @click="switchKind('ops')"
+      >
+        运维
       </button>
     </div>
+
+    <div v-if="!hasFps" class="banner banner-amber" style="margin-top: 12px">
+      当前口径暂无功能点 —— 可在 FP 编辑页新建 fp_kind={{ kind }} 的功能点
+    </div>
+
+    <template v-else>
+      <table class="table allocator-drafts">
+        <thead>
+          <tr>
+            <th>一级模块</th>
+            <th style="width: 200px">权重（现有 US 总和）</th>
+            <th style="width: 110px">锁定 FP</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(d, idx) in drafts" :key="idx">
+            <td><b>{{ d.name }}</b></td>
+            <td>
+              <input
+                class="field-input mono"
+                type="number"
+                min="0"
+                step="0.5"
+                v-model.number="d.weight"
+              />
+            </td>
+            <td>
+              <input
+                class="field-input mono"
+                type="number"
+                min="0"
+                step="0.5"
+                v-model.number="d.locked_us"
+                placeholder="0"
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="allocator-actions">
+        <div style="flex: 1" />
+        <button
+          class="btn btn-primary"
+          :disabled="!canAllocate || allocating"
+          @click="onGenerate"
+        >
+          {{ allocating ? "生成中…" : "✨ 生成分摊" }}
+        </button>
+      </div>
+    </template>
 
     <div v-if="hint" class="banner banner-amber" style="margin-top: 12px">{{ hint }}</div>
 
@@ -117,7 +277,7 @@ async function onGenerate() {
       <div class="section-head" style="margin-top: 20px">
         <div class="section-title">分摊结果</div>
       </div>
-      <table class="table">
+      <table class="table allocator-result">
         <thead>
           <tr>
             <th>模块</th>
@@ -143,6 +303,21 @@ async function onGenerate() {
         · 误差 <b>{{ allocResult.validation.error_pct.toFixed(2) }}%</b>
         {{ allocResult.validation.error_pct <= 1 ? "≤ 1%" : "⚠ 大于 1%" }}
       </div>
+
+      <div class="allocator-actions" style="margin-top: 12px">
+        <div style="flex: 1" />
+        <button
+          class="btn"
+          :disabled="writingBack"
+          @click="onWriteBack"
+        >
+          {{ writingBack ? "写回中…" : "↩ 写回 FP 表" }}
+        </button>
+      </div>
+
+      <div v-if="writeBackBanner" class="banner banner-green" style="margin-top: 12px">
+        ✓ {{ writeBackBanner }}
+      </div>
     </template>
   </div>
 </template>
@@ -150,6 +325,7 @@ async function onGenerate() {
 <style scoped>
 .allocator-panel { padding: 20px; margin-top: 16px; }
 .allocator-head { margin-bottom: 14px; }
+.kind-toggle { display: flex; gap: 6px; margin-bottom: 12px; }
 .allocator-drafts { margin-bottom: 12px; }
 .allocator-drafts .field-input { height: 30px; font-size: 12px; }
 .allocator-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }

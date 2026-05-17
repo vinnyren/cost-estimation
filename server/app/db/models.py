@@ -107,6 +107,8 @@ class FunctionPoint(Base):
     name = Column(String)
     category = Column(String, nullable=False)  # EI|EO|EQ|ILF|EIF
     complexity = Column(String, nullable=False)  # low|average|high
+    # fp_kind 区分开发 / 运维功能点 —— 反算分摊按口径拆分目标 US 时用它过滤。
+    fp_kind = Column(String, nullable=False, server_default="dev")  # dev|ops
     ufp = Column(Float, nullable=False)
     reuse_level = Column(String)
     modify_type = Column(String)

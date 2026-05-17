@@ -6,6 +6,35 @@ import ResultView from "@/views/ResultView.vue";
 import { projectsApi } from "@/api/projects";
 import { calcApi } from "@/api/calc";
 import { reportsApi } from "@/api/reports";
+import { functionsApi, type FunctionPoint } from "@/api/functions";
+
+// AllocatorPanel 现在从真实 FP 的 l1_module 生成 drafts —— 提供 dev FP fixture。
+const allocFps: FunctionPoint[] = [
+  {
+    id: "afp-1",
+    project_id: "p-2",
+    l1_module: "前端",
+    category: "EI",
+    complexity: "low",
+    fp_kind: "dev",
+    ufp: 3,
+    us: 3,
+    source: "manual",
+    version: 1,
+  },
+  {
+    id: "afp-2",
+    project_id: "p-2",
+    l1_module: "后端",
+    category: "ILF",
+    complexity: "average",
+    fp_kind: "dev",
+    ufp: 10,
+    us: 10,
+    source: "manual",
+    version: 1,
+  },
+];
 
 vi.mock("@/api/projects", () => ({
   projectsApi: {
@@ -35,6 +64,18 @@ vi.mock("@/api/reports", () => ({
   reportsApi: {
     excelUrl: (id: string) => `/api/reports/excel/${id}`,
     download: vi.fn(),
+  },
+}));
+
+vi.mock("@/api/functions", () => ({
+  functionsApi: {
+    list: vi.fn().mockResolvedValue([]),
+    patch: vi.fn(),
+    create: vi.fn(),
+    remove: vi.fn(),
+    bulk: vi.fn(),
+    snapshots: vi.fn(),
+    restore: vi.fn(),
   },
 }));
 
@@ -250,6 +291,7 @@ describe("ResultView", () => {
 
   it("reverse 模式：allocator panel 仅在反算结果出现后渲染", async () => {
     vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
+    vi.mocked(functionsApi.list).mockResolvedValue(allocFps);
     router.push("/projects/2/result");
     await router.isReady();
     const w = mount(ResultView, {
@@ -259,7 +301,7 @@ describe("ResultView", () => {
     await flushPromises();
     await flushPromises();
     // 反算前 — 没有 panel
-    expect(w.text()).not.toContain("AI 模块分摊");
+    expect(w.text()).not.toContain("FP 模块反算分摊");
     // 反算后 — panel 出现
     vi.mocked(calcApi.reverse).mockResolvedValueOnce({
       budget_for_dev: 950_000,
@@ -276,7 +318,7 @@ describe("ResultView", () => {
     await reverseBtn!.trigger("click");
     await flushPromises();
     await flushPromises();
-    expect(w.text()).toContain("AI 模块分摊");
+    expect(w.text()).toContain("FP 模块反算分摊");
     // AllocatorPanel button text
     const allocBtn = w.findAll("button").find((b) => b.text().includes("生成分摊"));
     expect(allocBtn).toBeDefined();
@@ -308,6 +350,7 @@ describe("ResultView", () => {
       cf_used: 1.21,
       recommended_band: "P50" as const,
     });
+    vi.mocked(functionsApi.list).mockResolvedValue(allocFps);
     vi.mocked(calcApi.allocate).mockResolvedValueOnce({
       items: [
         { name: "前端", us: 66.12, locked: false, audit_tag: "budget_derived" },
@@ -362,6 +405,7 @@ describe("ResultView", () => {
       cf_used: 1.21,
       recommended_band: "P50" as const,
     });
+    vi.mocked(functionsApi.list).mockResolvedValue(allocFps);
     vi.mocked(calcApi.allocate).mockRejectedValueOnce(new Error("分摊服务不可用"));
 
     router.push("/projects/2/result");

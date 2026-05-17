@@ -4,6 +4,7 @@ export type FpCategory = "EI" | "EO" | "EQ" | "ILF" | "EIF";
 export type FpComplexity = "low" | "average" | "high";
 export type FpReuseLevel = "low" | "high";
 export type FpModifyType = "new" | "modify" | "delete";
+export type FpKind = "dev" | "ops";
 export type FpSource =
   | "manual"
   | "imported"
@@ -21,6 +22,7 @@ export interface FunctionPoint {
   name?: string;
   category: FpCategory;
   complexity: FpComplexity;
+  fp_kind?: FpKind;
   ufp: number;
   reuse_level?: FpReuseLevel;
   modify_type?: FpModifyType;

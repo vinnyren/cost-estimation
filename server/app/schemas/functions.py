@@ -12,6 +12,8 @@ class FunctionPointBase(BaseModel):
     name: Optional[str] = None
     category: Literal["EI", "EO", "EQ", "ILF", "EIF"]
     complexity: Literal["low", "average", "high"]
+    # dev = 开发功能点 / ops = 运维功能点。默认 dev 兼容历史数据。
+    fp_kind: Literal["dev", "ops"] = "dev"
     # ufp / us 必须 ≥ 0 — 负值会让 forward calc 产出负造价，业务无意义
     # （ISSUE-021 round 3 QA：曾有 ufp=-5 通过 schema → cost_dev_yuan 也是负）
     ufp: float = Field(ge=0)
@@ -54,6 +56,7 @@ class FunctionPointPatch(BaseModel):
     name: Optional[str] = None
     category: Optional[Literal["EI", "EO", "EQ", "ILF", "EIF"]] = None
     complexity: Optional[Literal["low", "average", "high"]] = None
+    fp_kind: Optional[Literal["dev", "ops"]] = None
     ufp: Optional[float] = Field(default=None, ge=0)
     us: Optional[float] = Field(default=None, ge=0)
     locked: Optional[bool] = None

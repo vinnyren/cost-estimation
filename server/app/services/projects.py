@@ -123,6 +123,7 @@ def copy_project(db: Session, src_id: str, new_name: str) -> ProjectORM:
             name=fp.name,
             category=fp.category,
             complexity=fp.complexity,
+            fp_kind=fp.fp_kind,
             ufp=fp.ufp,
             reuse_level=fp.reuse_level,
             modify_type=fp.modify_type,

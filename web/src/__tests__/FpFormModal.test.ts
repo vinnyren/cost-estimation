@@ -125,6 +125,39 @@ describe("FpFormModal", () => {
     expect(ufpDisplay.text()).toBe("3");
   });
 
+  it("新增模式默认口径 dev，可选运维 → payload.fp_kind 为 ops", async () => {
+    const w = mount(FpFormModal, {
+      props: { open: true, projectId: "p-1", editing: null },
+    });
+
+    const kindSelect = w.find("#fp-kind");
+    expect(kindSelect.exists()).toBe(true);
+    expect((kindSelect.element as HTMLSelectElement).value).toBe("dev");
+
+    await w.find("#fp-name").setValue("运维功能点");
+    await kindSelect.setValue("ops");
+    await w.find("form").trigger("submit");
+    await flushPromises();
+
+    expect(functionsApi.create).toHaveBeenCalledOnce();
+    const payload = (functionsApi.create as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(payload.fp_kind).toBe("ops");
+  });
+
+  it("编辑模式预填 fp_kind（ops FP 预填为运维）", async () => {
+    const w = mount(FpFormModal, {
+      props: {
+        open: true,
+        projectId: "p-1",
+        editing: { ...mockFp, fp_kind: "ops" },
+      },
+    });
+    await flushPromises();
+
+    const kindSelect = w.find("#fp-kind").element as HTMLSelectElement;
+    expect(kindSelect.value).toBe("ops");
+  });
+
   it("API 失败时显示错误 banner", async () => {
     (functionsApi.create as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error("服务器错误"),
