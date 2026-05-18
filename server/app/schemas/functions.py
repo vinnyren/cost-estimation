@@ -27,7 +27,8 @@ class FunctionPointBase(BaseModel):
     # v2.0 T6 — "copied" 标记由 /projects/{id}/copy 写入，提示该 FP 来源于另一个
     # 项目的副本（与 manual 区分以便日后审计/统计）。
     source: Optional[
-        Literal["manual", "imported", "ai_extracted", "claude_draft", "allocator", "copied"]
+        Literal["manual", "imported", "ai_extracted", "claude_draft",
+                "allocator", "copied", "reverse_draft"]
     ] = "manual"
     locked: bool = False
     notes: Optional[str] = None

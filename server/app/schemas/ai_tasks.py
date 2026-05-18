@@ -6,7 +6,7 @@ from datetime import datetime
 
 class AiTaskCreate(BaseModel):
     project_id: str
-    kind: Literal["extract", "allocate"]
+    kind: Literal["extract", "allocate", "reverse_fill"]
 
 
 class AiTaskUpdate(BaseModel):

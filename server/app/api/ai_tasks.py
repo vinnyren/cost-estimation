@@ -59,7 +59,10 @@ def start_task(task_id: str, db: Session = Depends(get_db)):
 
     base_url = os.environ.get("COST_BASE_URL", "http://127.0.0.1:8788")
     token = os.environ.get("COST_AUTH_TOKEN", "")
-    pid = svc.spawn_claude_extract(t.id, t.project_id, base_url, token)
+    if t.kind == "reverse_fill":
+        pid = svc.spawn_claude_reverse_fill(t.id, t.project_id, base_url, token)
+    else:
+        pid = svc.spawn_claude_extract(t.id, t.project_id, base_url, token)
     if pid is None:
         raise HTTPException(500, detail={"error": {
             "code": "CLAUDE_CLI_UNAVAILABLE",

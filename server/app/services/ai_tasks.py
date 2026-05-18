@@ -196,6 +196,69 @@ def spawn_claude_extract(
     return proc.pid
 
 
+def spawn_claude_reverse_fill(
+    task_id: str,
+    project_id: str,
+    base_url: str,
+    token: str,
+) -> int | None:
+    """v2.8 — 后台 spawn `claude --print` 跑 /cost-estimation:cost-fill <project_id>.
+
+    与 spawn_claude_extract 同构（env vars + stdin 喂命令），仅命令不同：
+    cost-fill 命令读反算模块树缺口、生成补全 FP 草稿写回 FP 表。
+    Returns subprocess PID; None if claude CLI 不在 PATH 中。
+    """
+    claude_bin = shutil.which("claude")
+    if not claude_bin:
+        return None
+
+    cmd = [
+        claude_bin,
+        "--print",
+        "--allowed-tools",
+        "Bash Read",
+    ]
+    _local_hosts = "127.0.0.1,localhost"
+    _existing_np = os.environ.get("NO_PROXY") or os.environ.get("no_proxy") or ""
+    _no_proxy = f"{_existing_np},{_local_hosts}".strip(",") if _existing_np else _local_hosts
+    env = {
+        **os.environ,
+        "BASE": base_url,
+        "TOKEN": token,
+        "PROJECT_ID": project_id,
+        "TASK_ID": task_id,
+        "NO_PROXY": _no_proxy,
+        "no_proxy": _no_proxy,
+    }
+    log_path = Path(os.environ.get("COST_DATA_DIR", "/tmp")) / f"ai-task-{task_id}.log"
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_fh = open(log_path, "w")  # noqa: SIM115
+    except OSError:
+        log_fh = subprocess.DEVNULL  # type: ignore[assignment]
+
+    proc = subprocess.Popen(
+        cmd,
+        env=env,
+        stdin=subprocess.PIPE,
+        stdout=log_fh,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    try:
+        assert proc.stdin is not None
+        proc.stdin.write(f"/cost-estimation:cost-fill {project_id}\n".encode())
+        proc.stdin.close()
+    except (BrokenPipeError, OSError):
+        pass
+    if log_fh is not subprocess.DEVNULL:
+        try:
+            log_fh.close()
+        except OSError:
+            pass
+    return proc.pid
+
+
 def stop_claude_subprocess(pid: int) -> bool:
     """v2.5 — kill 后台 claude 进程 + 其派生 curl/jq 等子进程。
 
