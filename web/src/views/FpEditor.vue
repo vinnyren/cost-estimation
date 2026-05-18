@@ -42,10 +42,15 @@ const restoring = ref<number | null>(null);
 const aiModalOpen = ref(false);
 const uploadSection = ref<{ reload: () => Promise<void> } | null>(null);
 
-// GAP-A: AI Plugin polling state. 上传完成后告诉用户去 Claude Code 跑 /cost；
+// GAP-A: AI Plugin polling state. 上传完成后引导用户发起 AI 提取；
 // 同时每 30s 轮询一次 FP 列表，发现 claude_draft 行数增加就停止并提示审核。
 const fpFormOpen = ref(false);
 const editingFp = ref<FunctionPoint | null>(null);
+
+// 上传成功后的引导文案 —— 优先引导用户用「AI 任务面板」一键发起提取。
+const UPLOADED_HINT =
+  "已上传。点右上角「🤖 AI 任务面板」即可发起 AI 提取任务，" +
+  "或在 Claude Code 终端运行 /cost-estimation:cost；也可继续手动添加。";
 
 const aiPollHint = ref<string>("");
 const aiPolling = ref(false);
@@ -106,13 +111,10 @@ async function onFileChange(e: Event): Promise<void> {
   uploading.value = true;
   try {
     await uploadsApi.upload(props.projectId, file);
-    // GAP-A: AI 提取走 Plugin 模式（Claude Code /cost），不再阻塞用户。
+    // GAP-A: AI 提取可在「AI 任务面板」一键发起，也可走 Claude Code 终端。
     // 同时开启 polling，等 AI 写入；并刷新主页面的已上传文件区块。
-    window.alert(
-      "已上传。在 Claude Code 终端运行 /cost 让 AI 提取 FP 草稿；或继续手动添加。",
-    );
-    aiPollHint.value =
-      "已上传。在 Claude Code 终端运行 /cost 让 AI 提取 FP 草稿；或继续手动添加。";
+    window.alert(UPLOADED_HINT);
+    aiPollHint.value = UPLOADED_HINT;
     await uploadSection.value?.reload();
     startAiPolling();
   } catch (err: unknown) {
@@ -366,6 +368,13 @@ async function onFpSaved(): Promise<void> {
     >
       <span>{{ aiPollHint }}</span>
       <button
+        type="button"
+        class="btn-link"
+        @click="aiModalOpen = true"
+      >
+        打开 AI 任务面板
+      </button>
+      <button
         v-if="aiPolling"
         type="button"
         class="btn-link"
@@ -414,6 +423,13 @@ async function onFpSaved(): Promise<void> {
           role="status"
         >
           <span>{{ aiPollHint }}</span>
+          <button
+            type="button"
+            class="btn-link"
+            @click="aiModalOpen = true"
+          >
+            打开 AI 任务面板
+          </button>
           <button
             v-if="aiPolling"
             type="button"
