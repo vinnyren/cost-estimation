@@ -50,9 +50,9 @@ async def test_evil_fp_name_does_not_become_formula(client_factory, tmp_data_dir
     async with await client_factory() as client:
         pid = await _make_project_with_evil_fp(client, evil)
         wb = await _download_xlsx(client, pid)
-        ws = wb["功能点计数表"]
-        # name 在第 6 列（i=2 行第一条）
-        cell = ws.cell(2, 6)
+        ws = wb["系统功能点明细表"]
+        # 功能点计数项名称在第 6 列；表头 3 行，首条数据在第 4 行
+        cell = ws.cell(4, 6)
         assert cell.data_type != "f", (
             f"FP name {evil!r} was written as Excel FORMULA "
             f"(data_type=f, value={cell.value!r}) — formula injection guard broken"
@@ -67,15 +67,15 @@ async def test_normal_fp_name_unchanged(client_factory, tmp_data_dir):
     async with await client_factory() as client:
         pid = await _make_project_with_evil_fp(client, "用户登录")
         wb = await _download_xlsx(client, pid)
-        ws = wb["功能点计数表"]
-        cell = ws.cell(2, 6)
+        ws = wb["系统功能点明细表"]
+        cell = ws.cell(4, 6)
         assert cell.value == "用户登录"
         assert cell.data_type != "f"
 
 
 async def test_evil_project_name_in_cover_sheet(client_factory, tmp_data_dir):
-    """A3 「项目名称：xxx」形式：因为前缀已经是中文文字，xxx 即使是 = 开头也
-    不会触发，但 _safe_text 仍然包了一层做纵深防御 — 测试结果即「不当公式」。"""
+    """封面表项目名称单元格：name 即使以 = 开头也不能成为公式。
+    _safe_text 在写入前加单引号做纵深防御。"""
     async with await client_factory() as client:
         rp = await client.post("/api/projects", headers=H, json={
             "name": "=evil-name-here", "project_type": "dev_only", "phase": "bidding",
@@ -90,6 +90,6 @@ async def test_evil_project_name_in_cover_sheet(client_factory, tmp_data_dir):
                               "ufp": 3, "us": 3, "source": "manual"}]},
         )
         wb = await _download_xlsx(client, pid)
-        cover = wb["封面声明"]
-        a3 = cover["A3"]
-        assert a3.data_type != "f"
+        cover = wb["封面"]
+        # 封面表「项目名称」值在 B3
+        assert cover["B3"].data_type != "f"

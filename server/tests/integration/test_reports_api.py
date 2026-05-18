@@ -26,14 +26,19 @@ async def test_download_excel(client_factory, tmp_data_dir):
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("application/vnd.openxmlformats")
         wb = load_workbook(BytesIO(r.content))
-        # 必备 7 Sheet
-        for s in ["封面声明", "评估结果摘要", "评估报告书", "调整因子表",
-                  "功能点计数表", "详细计算过程", "参数附录"]:
+        for s in ["封面", "评估结果汇总", "模块功能点及费用分项统计表",
+                  "系统功能点明细表", "评估报告书", "调整因子表"]:
             assert s in wb.sheetnames
-        # 摘要值
-        summary = wb["评估结果摘要"]
-        # us=4 * cf=1.21 = 4.84
-        assert summary["C2"].value == 4.84
+        # 评估结果汇总：调整后规模 S = us 4 × cf 1.21 = 4.84（在 D 列）
+        ws = wb["评估结果汇总"]
+        d_vals = [ws.cell(row=row, column=4).value
+                  for row in range(1, ws.max_row + 1)]
+        assert 4.84 in d_vals
+        # 评估报告书必须有叙述内容（修复旧版空白 sheet）
+        narr = wb["评估报告书"]
+        narr_text = "\n".join(str(narr.cell(r, 1).value or "")
+                              for r in range(1, narr.max_row + 1))
+        assert "项目概述" in narr_text and "评估结论" in narr_text
 
 
 async def test_reverse_report_total_matches_target(client_factory, tmp_data_dir):
@@ -54,13 +59,13 @@ async def test_reverse_report_total_matches_target(client_factory, tmp_data_dir)
         r = await c.get(f"/api/reports/excel/{pid}", headers=H)
         assert r.status_code == 200
         wb = load_workbook(BytesIO(r.content))
-        summary = wb["评估结果摘要"]
-        # 摘要表 C 列里应出现总费用 ≈ 88 万元（反算口径下 forward 复现目标）
-        c_vals = [summary.cell(row=row, column=3).value
-                  for row in range(1, summary.max_row + 1)]
-        nums = [v for v in c_vals if isinstance(v, (int, float))]
+        ws = wb["评估结果汇总"]
+        # 汇总表 D 列（评估结果）里应出现评估总造价 ≈ 88 万元
+        d_vals = [ws.cell(row=row, column=4).value
+                  for row in range(1, ws.max_row + 1)]
+        nums = [v for v in d_vals if isinstance(v, (int, float))]
         assert any(abs(v - 88.0) < 0.5 for v in nums), \
-            f"总费用应 ≈ 88 万元，摘要 C 列实际为 {nums}"
+            f"评估总造价应 ≈ 88 万元，汇总 D 列实际为 {nums}"
 
 
 async def test_download_no_fp_returns_400(client_factory, tmp_data_dir):

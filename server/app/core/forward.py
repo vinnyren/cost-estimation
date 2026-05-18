@@ -62,6 +62,8 @@ def calculate_forward(ctx: EvaluationContext, inp: ForwardInput) -> ForwardResul
         "s_adjusted": s,
         "pdr_p50": ctx.pdr_dev("P50") if inp.include_dev else 0.0,
         "dev_factor": inp.dev_factor,
+        "ops_factor": inp.ops_factor,
+        "pm": pm,
         "eff_pm_p50": eff_pm_p50,
         "eff_hours_p50": eff_dev["P50"],
         "f_city": rate_dev,

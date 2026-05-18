@@ -97,7 +97,6 @@ def tmp_data_dir(monkeypatch, tmp_path):
     import app.config as cfg
     import app.db.session as db_session
     import app.deps as deps
-    import app.exporters.excel as excel_mod
     import app.main as main_mod
     import app.services.params as params_mod
     import app.services.projects as projects_mod
@@ -114,7 +113,7 @@ def tmp_data_dir(monkeypatch, tmp_path):
 
     # 把其余模块的 settings 引用也指向 target，覆盖 test_config_paths.py
     # 之前 reload 后产生的「分叉」状态。monkeypatch 会在 teardown 还原。
-    for mod in (cfg, db_session, deps, excel_mod, main_mod,
+    for mod in (cfg, db_session, deps, main_mod,
                 params_mod, projects_mod, reports_mod):
         if getattr(mod, "settings", None) is not target:
             monkeypatch.setattr(mod, "settings", target)

@@ -1,73 +1,105 @@
-from pathlib import Path
-import importlib
-import pytest
+from types import SimpleNamespace
+
 from openpyxl import load_workbook
 
-TEMPLATE = Path(__file__).parent.parent.parent / "templates" / "report-v1.xlsx"
+from app.exporters.excel import _safe_text
+from app.exporters.report_builder import build_report
+
+_SHEETS = ["封面", "评估结果汇总", "模块功能点及费用分项统计表",
+           "系统功能点明细表", "评估报告书", "调整因子表"]
 
 
-def _excel_module():
-    """Re-import每次拿到当前 app.exporters.excel 模块，避免被 integration 测试重载替换后类不匹配。"""
-    return importlib.import_module("app.exporters.excel")
+def _project():
+    return SimpleNamespace(
+        id="prj-test", name="测试项目", client="甲方", evaluator="乙方",
+        phase="bidding", city="北京", industry="电子政务",
+        basis_data_ver="CSBMK®-202510")
 
 
-def test_render_creates_valid_excel(tmp_path):
-    excel = _excel_module()
-    out = tmp_path / "report.xlsx"
-    excel.render(
-        TEMPLATE, out,
-        project_name="测试项目", project_overview="项目概述文本",
-        scale_adjusted=332.75,
-        effort_dev={"P10": 678, "P50": 2236, "P90": 5773},
-        cost_dev={"P10": 126237, "P50": 415565, "P90": 1067711},
-        cost_total_p50_yuan=489180,
-        functions=[{"name": "门户首页", "category": "EQ", "ufp": 4, "us": 4}],
-        factors=[{"category": "开发", "name": "应用类型", "value": 1.0}],
-        steps=[{"step": "1", "desc": "求和", "formula": "Σ us", "result": 275}],
-        params=[{"key": "city", "value": "北京", "source": "user"}],
-    )
-    wb = load_workbook(out)
-    # Sheet 数齐全
-    for s in excel.REQUIRED_SHEETS:
-        assert s in wb.sheetnames
-    # 命名区域值正确
-    summary = wb["评估结果摘要"]
-    assert summary["C2"].value == 332.75
-    assert summary["C9"].value == round(489180 / 10000, 4)
+def _fp(**over):
+    base = dict(subsystem="软件开发", l1_module="电子结算", l2_module="资金管理",
+                name="客户账户查询", description="查询账户", category="ILF",
+                ufp=35, us=35, reuse_level="低", modify_type="新增",
+                source="manual", notes="")
+    base.update(over)
+    return SimpleNamespace(**base)
 
 
-def test_render_broken_template_raises(tmp_path):
-    excel = _excel_module()
-    from openpyxl import Workbook
-    bad = tmp_path / "bad.xlsx"
-    Workbook().save(str(bad))  # 没有任何必备 sheet
-    out = tmp_path / "out.xlsx"
-    with pytest.raises(excel.TemplateBrokenError, match="missing sheets"):
-        excel.render(bad, out, project_name="x", project_overview="",
-                     scale_adjusted=0, effort_dev={"P10": 0, "P50": 0, "P90": 0},
-                     cost_dev={"P10": 0, "P50": 0, "P90": 0}, cost_total_p50_yuan=0,
-                     functions=[], factors=[], steps=[], params=[])
+def _figures():
+    return {
+        "scale_us": 70.0,
+        "scale_adjusted": 84.7,
+        "cf_used": 1.21,
+        "effort_dev": {"P10": 200.0, "P50": 540.0, "P90": 1300.0},
+        "cost_dev": {"P10": 37000.0, "P50": 100000.0, "P90": 240000.0},
+        "cost_ops": {"P10": 0.0, "P50": 0.0, "P90": 0.0},
+        "cost_total": {"P10": 37000.0, "P50": 100000.0, "P90": 240000.0},
+        "cost_total_p50_yuan": 100000.0,
+        "dev_factor": 0.95,
+        "rate_dev": 32198.0,
+        "hours_per_pm": 174.0,
+        "other_cost": 0.0,
+    }
 
 
-def test_fallback_renders_when_template_corrupt(tmp_path, monkeypatch):
-    # 用空 workbook 替换模板路径
-    from openpyxl import Workbook
-    bad = tmp_path / "bad.xlsx"
-    Workbook().save(str(bad))
-
-    import app.services.reports as reports_mod
-    monkeypatch.setattr(reports_mod, "TEMPLATE_PATH", bad)
-
-    # 这里需要建 db + project + fp，简化用 e2e fixture（在 integration test 重做更合适）
-    # 此处仅证明 fallback 能直接调用
-    fallback_mod = importlib.import_module("app.exporters.fallback")
-    out = tmp_path / "report.xlsx"
-    fallback_mod.render_fallback(out, project_name="X", project_overview="",
-                                 scale_adjusted=100,
-                                 effort_dev={"P50": 1, "P10": 0.5, "P90": 2},
-                                 cost_dev={"P50": 1000, "P10": 500, "P90": 2000},
-                                 cost_total_p50_yuan=1500,
-                                 functions=[], factors=[], steps=[], params=[])
+def test_build_report_creates_six_sheets(tmp_path):
+    out = tmp_path / "r.xlsx"
+    build_report(out, project=_project(),
+                 functions=[_fp(), _fp(l1_module="智能终端", ufp=15, us=15)],
+                 figures=_figures(), is_reverse=False, target_cost_wan=None)
     assert out.exists()
     wb = load_workbook(out)
-    assert "评估结果摘要" in wb.sheetnames
+    for s in _SHEETS:
+        assert s in wb.sheetnames
+
+
+def test_summary_has_total_cost(tmp_path):
+    out = tmp_path / "r.xlsx"
+    build_report(out, project=_project(), functions=[_fp()],
+                 figures=_figures(), is_reverse=False, target_cost_wan=None)
+    ws = load_workbook(out)["评估结果汇总"]
+    # 评估结果列在 D 列；总造价（元）应出现 100000
+    d_vals = [ws.cell(r, 4).value for r in range(1, ws.max_row + 1)]
+    assert 100000.0 in d_vals
+
+
+def test_narrative_sheet_not_empty(tmp_path):
+    """评估报告书必须有实际叙述内容（修复旧版空白 sheet 的回归）。"""
+    out = tmp_path / "r.xlsx"
+    build_report(out, project=_project(), functions=[_fp()],
+                 figures=_figures(), is_reverse=False, target_cost_wan=None)
+    ws = load_workbook(out)["评估报告书"]
+    text = "\n".join(str(ws.cell(r, 1).value or "")
+                     for r in range(1, ws.max_row + 1))
+    assert "项目概述" in text
+    assert "评估结论" in text
+    assert "测试项目" in text
+    assert ws.max_row >= 10
+
+
+def test_module_sheet_has_summary_row(tmp_path):
+    out = tmp_path / "r.xlsx"
+    build_report(out, project=_project(),
+                 functions=[_fp(), _fp(l1_module="智能终端")],
+                 figures=_figures(), is_reverse=False, target_cost_wan=None)
+    ws = load_workbook(out)["模块功能点及费用分项统计表"]
+    b_vals = [ws.cell(r, 2).value for r in range(1, ws.max_row + 1)]
+    assert "项目汇总" in b_vals
+
+
+def test_reverse_report_shows_target(tmp_path):
+    out = tmp_path / "r.xlsx"
+    build_report(out, project=_project(), functions=[_fp()],
+                 figures=_figures(), is_reverse=True, target_cost_wan=88.0)
+    text = "\n".join(
+        str(c.value or "")
+        for row in load_workbook(out)["评估报告书"].iter_rows()
+        for c in row)
+    assert "反算" in text
+
+
+def test_safe_text_quotes_formula():
+    assert _safe_text("=cmd|calc") == "'=cmd|calc"
+    assert _safe_text("用户登录") == "用户登录"
+    assert _safe_text(42) == 42
+    assert _safe_text(None) is None
