@@ -161,15 +161,19 @@ async function download(): Promise<void> {
 
 const reverseFillPending = ref(false);
 const reverseFillMsg = ref("");
+const reverseFillError = ref(false);
 
 async function triggerReverseFill(): Promise<void> {
   reverseFillPending.value = true;
   reverseFillMsg.value = "";
+  reverseFillError.value = false;
   try {
     const task = await aiTasksApi.create(props.projectId, "reverse_fill");
     await aiTasksApi.start(task.id);
+    reverseFillError.value = false;
     reverseFillMsg.value = "已启动 AI 补全任务，请在 FP 编辑页的任务面板查看进度";
   } catch (e: unknown) {
+    reverseFillError.value = true;
     reverseFillMsg.value = e instanceof Error ? e.message : "补全任务启动失败";
   } finally {
     reverseFillPending.value = false;
@@ -472,8 +476,9 @@ function fmtWan(n: number): string {
           </div>
           <div
             v-if="reverseFillMsg"
-            class="banner banner-green"
-            role="status"
+            class="banner"
+            :class="reverseFillError ? 'banner-amber' : 'banner-green'"
+            :role="reverseFillError ? 'alert' : 'status'"
             style="margin-bottom: 12px"
           >
             {{ reverseFillMsg }}
@@ -494,7 +499,7 @@ function fmtWan(n: number): string {
                 :key="sub.subsystem"
               >
                 <tr class="tree-row-l0">
-                  <td><b>{{ sub.subsystem }}</b></td>
+                  <td>{{ sub.subsystem }}</td>
                   <td class="mono" style="text-align: right">{{ sub.current_ufp.toFixed(2) }}</td>
                   <td class="mono" style="text-align: right">{{ sub.allocated_ufp.toFixed(2) }}</td>
                   <td

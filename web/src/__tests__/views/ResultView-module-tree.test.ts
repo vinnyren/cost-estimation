@@ -83,6 +83,9 @@ describe("ResultView — 反算三级模块树", () => {
     expect(w.text()).toContain("资金");
     expect(w.text()).toContain("查询");
     expect(w.text()).toContain("对账");
+    expect(w.find(".tree-row-l0").exists()).toBe(true);
+    expect(w.findAll(".tree-row-l1").length).toBe(1);
+    expect(w.findAll(".tree-row-l2").length).toBe(2);
   });
 
   it("「按反算补全 FP」按钮触发 reverse_fill AI 任务", async () => {
