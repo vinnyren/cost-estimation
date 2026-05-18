@@ -2,54 +2,22 @@
 
 基于 GB/T 36964 / T/CCUA 005-2024 / GB/T 28827.7-2022 / GB/T 42452-2023 与 CSBMK®-202510 数据集的软件造价评估工具，作为 Claude Code Plugin 发布。
 
+> 当前版本 **v2.6.0** · 数据基准 CSBMK®-202510 · 完整变更见 [docs/v2-changelog.md](docs/v2-changelog.md)
+
 ## 功能
 
-- ✅ **正向模式**（功能点 → 成本）：上传需求文档 → AI 提取 FP → 三档成本估算
-- ✅ **反向模式**（目标成本 → 功能点）：输入万元目标造价 → 反推三档共用规模 → 按现有 FP 占比细化分摊 UFP 到模块（v2.6 单一规模模型）
-- ✅ **NESMA 估算法**（默认）：EI/EO/EQ/ILF/EIF 5 类、低中高复杂度
-- ✅ **6 行业 + 37 城**生产率与费率（CSBMK®-202510 内置）
-- ✅ **17+ 调整因子全部可配**：开发因子 5 项 + 运维因子 11 项 + CF 阶段因子（v2.0 ParamManager 实装）
-- ✅ **AI 提取功能点**（v2.0）：`/cost <project_id>` 让 Claude Code 读上传文档生成 NESMA FP 草稿
-- ✅ **AI 模块分摊**（v2.0）：`/cost-allocate <project_id>` 反向模式三档 FP → 模块清单
-- ✅ **7 步 Wizard 创建项目**（v2.0）：客户/评估方 + 项目类型 + 阶段 + 因子选择 + 实时 CF 预览
-- ✅ **参数快照 + 项目复制 + 审计日志**（v2.0）
-- ✅ **Excel 报告**：7 Sheet 模板（封面 / 摘要 / 报告书 / 调整因子 / FP 表 / 详细计算 / 参数附录）
-- ✅ **本地隔离**：只绑 127.0.0.1，token + Origin + CORS 三层防护
-
-## v2.0 新功能（2026-05-11）
-
-### 11 项 v1.1 后审计 gap 全部闭环
-
-- ✅ **AI 提取功能点**（GAP-A）：在 Claude Code 终端运行 `/cost <project_id>`，AI 读取上传文档自动生成 NESMA FP 草稿
-- ✅ **AI 模块分摊**（GAP-C）：反向模式下 `/cost-allocate <project_id>` 让 AI 把三档 FP 拆成模块清单
-- ✅ **17+ 调整因子全部可配**（GAP-B）：ParamManager 4 个 v2 stub tab 实装；Wizard 第 5/6 步用 dropdown 选因子级别，实时显示链式相乘
-- ✅ **运维费率 / 生产率**（GAP-D）：城市费率表新增 ops 列；生产率 tab 新增运维行业表
-- ✅ **alpha_dev / include_ops**（GAP-E）：dev_and_ops 项目类型显式滑块 + 联动开关
-- ✅ **客户 / 评估方填写**（GAP-G）：Wizard 第 1 步可选字段，写入 Excel 报告封面
-- ✅ **项目列表搜索 / 筛选 / 排序 / 分页**（GAP-F）：toolbar 实时搜索，5 个筛选维度
-- ✅ **参数快照 + restore**（GAP-H）：ParamManager 快照 tab 可创建 / 恢复 / 删除
-- ✅ **项目复制**（GAP-I）：行 ⋯ 菜单一键复制项目（含 FP + 参数 override）
-- ✅ **项目审计日志**（GAP-J）：所有 mutating 操作自动记录，AuditView 可查
-- ✅ **阶段 CF 实时预览**（GAP-K）：Wizard 第 3 步显示选定阶段的 CF 调整因子值
-
-### 数据迁移
-
-v1.1 老项目自动兼容：
-- `factors_dev_json` / `factors_ops_json` 为 NULL → calc 用 1.0 + Result.warning_messages 提示
-- 已有参数 / FP / 上传 不受影响
-- 跑 `cd server && alembic upgrade head` 应用 3 个新 migration（factors 列、param_snapshots 表、audit_log 表）
-
-### 新 API endpoint
-
-- `POST /api/projects/{id}/copy` — 项目复制
-- `GET /api/projects/{id}/audit` — 项目审计日志（cursor 分页）
-- `GET /api/params/snapshots` / `POST` / `POST /{id}/restore` / `DELETE /{id}` — 参数快照 CRUD
-- `GET /api/projects` 升级查询参数 — q / city / industry / phase / mode / sort / order / page / size
-- `GET /api/params/effective` — 全局 effective 视图（无项目作用域）
-
-### 新前端 view
-
-- `/projects/:id/audit` — 项目审计时间线
+- **正向模式**（功能点 → 成本）：上传需求文档 → AI 提取功能点 → P10/P50/P90 三档成本估算。
+- **反向模式**（目标成本 → 功能点）：输入万元目标造价 → 单一规模模型反推三档功能点规模 → 按现有 FP 各一级模块占比把 UFP 细化分摊到模块。
+- **NESMA 估算法**：EI/EO/EQ/ILF/EIF 五类别、低/中/高复杂度。
+- **6 行业 + 37 城**生产率与费率，CSBMK®-202510 内置。
+- **17+ 调整因子全部可配**：开发因子 5 项 + 运维因子 11 项 + CF 阶段因子，含中文说明与悬停帮助。
+- **AI 提取功能点**：上传文档后在「AI 任务面板」一键发起，后台调 Claude Code 读文档生成 NESMA FP 草稿；也可在终端运行 `/cost-estimation:cost <project_id>`。
+- **功能点编辑**：模块树过滤、增删改查、历史版本快照与恢复。
+- **创建项目向导**：客户/评估方 + 项目类型 + 阶段 + 城市/行业 + 评估方式 + 因子选择 + 实时 CF 预览，项目设定可二次编辑。
+- **参数管理**：项目级 override + 全局参数库、参数快照、项目复制、审计日志。
+- **Excel 报告**：6-sheet 行业评估表（封面 / 评估结果汇总 / 模块功能点及费用分项统计表 / 系统功能点明细表 / 评估报告书 / 调整因子表），按项目模式导出，反向项目报告总费用 = 目标造价。
+- **大文件上传**：支持 PDF/Word/Excel/MD/TXT，单文件最大 500MB，分块流式写盘。
+- **本地隔离**：只绑 127.0.0.1，token + Origin + CORS 三层防护。
 
 ## 一键安装
 
@@ -57,34 +25,33 @@ v1.1 老项目自动兼容：
 # 在 Claude Code 中：
 /plugin marketplace add github.com/vinnyren/cost-estimation
 /plugin install cost-estimation
-/cost-estimation:setup
-/cost
+/cost-estimation:setup        # 首次：建后端 venv + 装依赖
+/cost-estimation:cost         # 无参：启动后端 + 打开浏览器
 ```
 
-详见 [docs/user-guide.md](docs/user-guide.md)。
+启动后在浏览器创建项目、上传文档；回到终端运行 `/cost-estimation:cost <project_id>` 让 AI 提取功能点。详细操作见 [docs/user-guide.md](docs/user-guide.md)。
 
 ## 目录结构
 
 ```
 .
 ├── .claude-plugin/         # Plugin 元信息（marketplace.json + plugin.json）
-├── commands/               # slash 命令（setup / cost / cost-stop）
+├── commands/               # slash 命令（setup / cost / cost-allocate / cost-stop）
 ├── reference/              # NESMA 规则 + CSBMK 说明
 ├── server/                 # FastAPI 后端 + 计算引擎
 │   ├── app/
 │   │   ├── core/           # 算法核心（forward / reverse / allocator）
 │   │   ├── api/            # REST 路由
-│   │   ├── parsers/        # PDF / Word / Excel 解析
-│   │   ├── exporters/      # Excel 渲染
-│   │   └── data/csbmk_202510.json
-│   └── tests/              # pytest（单元 + 集成 + 黄金）
+│   │   ├── parsers/        # PDF / Word / Excel 解析 + 上传校验
+│   │   ├── exporters/      # Excel 报告生成（report_builder）
+│   │   └── data/           # csbmk_202510.json + 因子中文 meta
+│   └── tests/              # pytest（单元 + 集成 + 属性 + 黄金）
 ├── web/                    # Vue 3 前端 + Vitest + Playwright E2E
 ├── docs/
-│   ├── user-guide.md       # 用户手册
+│   ├── user-guide.md       # 用户使用手册
 │   ├── dev-guide.md        # 开发者指南
 │   ├── troubleshooting.md  # 故障排查
-│   ├── mutation-report.md  # 变异测试报告
-│   └── superpowers/        # 设计与实施计划存档
+│   └── v2-changelog.md     # 版本变更清单
 └── SKILL.md                # AI 提取触发与规则
 ```
 
@@ -99,236 +66,39 @@ pytest --cov=app
 
 # 前端
 cd web
-pnpm install
-pnpm test
-pnpm dev      # 开发服务器（vite proxy 后端 8788）
-
-# E2E
-pnpm test:e2e
+npm install
+npm run test          # vitest
+npm run build         # vue-tsc 类型检查 + vite 构建
+npm run dev           # 开发服务器（vite proxy 后端 8788）
+npm run test:e2e      # Playwright E2E
 ```
 
 详见 [docs/dev-guide.md](docs/dev-guide.md)。
 
-## 覆盖率验证（v2.1+）
+## 覆盖率验证
 
-项目维护 `coverage-baseline.json` 防止覆盖率退化。本地验证：
-
-```bash
-# 跑全套测试 + 与 baseline 比对（>0.5% 退化时退出 1）
-./scripts/check-coverage.sh
-
-# 覆盖率上升时锁定新 baseline
-./scripts/update-coverage-baseline.sh
-```
-
-可选 pre-commit hook（自决）：
+项目维护 `coverage-baseline.json` 防止覆盖率退化：
 
 ```bash
-ln -sf ../../scripts/check-coverage.sh .git/hooks/pre-commit
+./scripts/check-coverage.sh             # 跑全套测试 + 与 baseline 比对（>0.5% 退化退出 1）
+./scripts/update-coverage-baseline.sh   # 覆盖率上升时锁定新 baseline
 ```
 
-测试基线（v2.1）：
-
-| 项 | 数量 | line coverage |
-|---|---:|---:|
-| Backend pytest | 173 | 91.9% |
-| Frontend vitest | 220 | 97.8% |
-| Playwright e2e | 13 | n/a |
-
-## v2.2 — 设计 import 全屏重做
-
-v2.2 把 claude.ai/design import 的 6 屏以**像素级复刻**落到前端，并补齐后端 4 个 endpoint。
-
-### 前端
-
-- 暗色 sidebar + topbar 双区布局 + ⌘K 命令面板
-- ProjectList KPI cards + 城市/行业/阶段 filter + table/card 视图切换
-- ResultView 9 步 Pipeline 详解 + 4 段 CostBar + 合规说明卡
-- AuditView 时间轴重做（替换 v2.0 的表格视图）
-- FpEditor AI 提取模态对话框（CLI 触发 + polling 进度）
-- 全局参数库 `/params/global` + 报告中心 `/reports` 入口
-
-### 后端
-
-- `GET /api/projects/stats` — KPI 汇总（counts + 本月聚合）
-- forward calc 返回 `trace`（9 步详解）+ `composition`（4 段拆分）
-- `/api/ai-tasks` CRUD endpoints — AI 任务状态轮询（plugin 接入留 v2.3）
-
-### 新表
-
-- `ai_tasks`（alembic migration 自动应用）
-
-### 升级（v2.1 → v2.2）
-
-```bash
-git pull && cd server && .venv/bin/alembic upgrade head
-```
-
-### 设计 token 变化
-
-v2.2 全套换 design import 自带 token（详见 `web/src/styles/tokens.css`）：
-- 字号基线 13px（v1.x 是 14px）
-- 配色 `--accent: #1E5EFF`（v1.x 是 `#165DFF`）
-- 字体 Noto Sans SC + JetBrains Mono
-- Sidebar 深色 `#0F1626`
-
-Legacy `--color-*` token 保留为 alias，避免破坏旧组件。
-
-### v2.2 测试基线
+测试基线（v2.6）：
 
 | 项 | 数量 |
 |---|---:|
-| pytest | 185 |
-| vitest | 221 |
-| playwright e2e | 21 |
-| backend coverage | 92.27%（见 coverage-baseline.json） |
-| frontend coverage | 95.88%（见 coverage-baseline.json） |
+| Backend pytest | 218 |
+| Frontend vitest | 282（1 skipped） |
+| Playwright e2e | 28+ |
+| Backend / Frontend coverage | 92%+ / line 96%+ |
 
-## v2.3 — 闭环 (Plugin AI · Allocator UI · 测试补齐)
+## 文档
 
-v2.3 闭环 v2.2 留下的 3 项 "半完成"，零技术债。
-
-### Plugin AI 接入
-- `commands/cost.md` 在 FP 提取流程中加 6 次 PATCH `/api/ai-tasks` 上报（创建/解析/切分/归类/写入/完成）
-- `commands/cost-allocate.md` 加 4 次 PATCH 上报
-- 前端 AiTaskModal 自动 polling，每 1.5s 拉最新 task 状态 → 显示阶段日志 + 进度条
-
-### AI 模块分摊 UI
-- `AllocatorPanel.vue` 替换原 `window.prompt` JSON 输入
-- 表格行内编辑 drafts（模块名 / 权重滑块 / 锁定 FP / 删除）
-- backend `core/allocator.py` 加 `allocate_with_validation()` 返回 `{items, validation}` envelope
-- 一致性 banner 显示反算误差（≤ 1% 绿色，否则黄色）
-
-### 测试闭环
-- 修 `forward.spec.ts` 严格行数断言 → 宽松 ">= 1 row"，并改用 v2.2 `.result-card` selector
-- 修 `audit-view.spec.ts` selector 从 `data-testid` → `.tl-item`
-- 修 `reverse-allocator.spec.ts` data.items envelope
-- 加 4 个 thin view + api smoke unit test + 1 个 composable 单测
-- 恢复 vitest function coverage threshold 至 **80**
-
-### 升级（v2.2 → v2.3）
-
-```bash
-git pull
-# 无 schema migration
-```
-
-### v2.3 测试基线
-
-| 项 | 数量 |
-|---|---:|
-| pytest | 191 |
-| vitest | 236 |
-| playwright e2e | 25 |
-| backend coverage | 92.39% |
-| frontend coverage | line 96.98% / function 80%+ |
-
-## v2.4 — 反算路径视觉升级
-
-v2.4 把 ResultView 的 **reverse 分支**视觉对齐 v2.2 design import：
-
-- 反算输入卡 → v2.2 `.card` + 4 列 grid（目标总造价 / 其他费 / 可用预算 disabled / α 开发占比 disabled）
-- 三档 FP 卡片 → 用 v2.2 `ResultTrio` (unit="fp")，与 forward 同款组件
-- `.page` 加 `hero-bg` accent gradient
-- Reverse 下载按钮上移到 page-header 右侧（与 forward 一致体验）
-- AllocatorPanel（v2.3）和反算算法保持不变
-
-### 升级（v2.3 → v2.4）
-
-```bash
-git pull
-# 无 schema 改动，无 plugin 改动
-```
-
-### v2.4 测试基线
-
-| 项 | 数量 |
-|---|---:|
-| pytest | 191 |
-| vitest | 237 |
-| playwright e2e | 26 |
-| backend coverage | 92.39% |
-| frontend coverage | line 96.88% / function 80%+ |
-
-## v2.6 — 反算重做与报告升级 (2026-05-18)
-
-来源：v2.5 release 后用户反馈，聚焦反算模型一致性、行业评估报告格式与大文件上传。
-
-### 反算
-
-- **单一规模模型**：旧反算把目标造价按 α 拆成开发/运维两份、各自反推出两个不同规模，FP 表只能存一个，写回后正向计算总额对不上。新模型让开发与运维**共用同一个功能点规模**，对每档直接求规模使 `forward(规模)` 总成本 = 目标造价；`budget_for_dev` / `budget_for_ops` 变成按生产率/费率推导的成本拆分（输出，不再是 α 输入），α 开发占比不再参与反算。
-- **以 UFP 为核心 + 细化分摊到模块**：反算算出可承载的 UFP 总量后，读取项目现有 FP 表，按各一级模块现有 UFP 占比把目标 UFP 细化分摊到模块，给出每个模块的「现有 UFP / 分摊后 UFP / 需细化增加的差额」；反算结果页新增「反算 UFP 模块细化分摊」表。
-- **进结果页自动计算**：reverse 项目若已有目标造价，进结果页即自动反算，无需手动点「反算」。
-- **AllocatorPanel 基于真实 FP 模块**：分摊面板的模块来自项目真实功能点的一级模块；「写回 FP 表」确认框会显示规模前后量级，剧烈缩放时强警告，避免无声冲掉 FP 设计稿。
-
-### 报告
-
-- **模式感知导出**：Excel 导出不再永远走正向计算；按项目 `mode` 分流，reverse 项目报告总费用 = 目标造价。
-- **6-sheet 行业评估表格式**：Excel 报告重做为 封面 / 评估结果汇总（规模·工作量·成本·造价主表）/ 模块功能点及费用分项统计表 / 系统功能点明细表 / 评估报告书（六章文字叙述）/ 调整因子表，并修复旧版「评估报告书」sheet 空白的问题。
-
-### 上传
-
-- **上限 50MB → 500MB**：改为 1MB 分块流式写盘，不再整文件读进内存，超限立即中止；上传超时放宽到 10 分钟。
-- **真实错误提示**：上传失败弹窗显示真实原因（如「文件超过 500MB」），不再只显示「status code 4xx」。
-- **AI 任务面板引导**：上传文档后提示用户可点右上角「AI 任务面板」一键发起 AI 提取任务，提示条内直接带「打开 AI 任务面板」按钮。
-
-### 其它
-
-- **目标造价单位改为万元**：向导和反算输入页的「目标总造价 / 其他费用」标签改为「万元」，计算层内部仍按元运算（边界 ×10000 换算）。
-- **编辑设定可改评估方式与项目类型**：修复「编辑设定把项目改成反向后不生效」的问题（后端 PATCH schema 之前漏了 `mode` / `project_type` 字段）。
-- **FP 规模标识中文化**：FP 编辑表、反算分摊、结果页里面向用户的「US」改为中文「规模」。
-
-### 升级（v2.5 → v2.6）
-
-```bash
-git pull
-# 无破坏性 schema 改动，无新表，无需 alembic migration
-```
-
-> v2.6 不新增数据表，不改动既有列结构，老项目数据完全兼容。reverse 老项目首次进结果页会按新单一规模模型自动重算。
-
-## v2.5 — 用户反馈修复 (5 项)
-
-来源：v2.4 release 后用户反馈 PDF 汇总。
-
-### 1. 上传文件查看 + 删除管理
-- 新 endpoint `DELETE /api/projects/{pid}/uploads/{id}`（含磁盘物理清理）
-- FpEditor toolbar 加 `📁 已上传文件 (N)` 按钮 → `UploadListModal`
-- 列表：文件名 / 大小 / 类型 / 上传时间 + 单行删除按钮 + 确认弹窗
-
-### 2. 历史项目 Wizard 重新编辑
-- 新路由 `/projects/:id/edit`
-- `ProjectWizard` 接 `projectId` prop：有 prop → GET 项目预填表单 + Submit 用 PATCH
-- `ProjectActionMenu` ⋯ 加 `⚙️ 编辑设定` · `FpEditor` toolbar 同款入口
-
-### 3+4. 因子中文化 + 帮助说明
-- 新数据文件 `server/app/data/csbmk_factors_meta.json`：16 factor × 全部 options 中文 label + description（multiplier 与 csbmk_202510.json 校对一致）
-- 新 endpoint `GET /api/params/factor-meta`
-- `FactorDropdown` 接 `meta` prop：选项显示中文名 + ⓘ 悬停查看描述
-- Wizard step 5/6 顶部加 📖 折叠说明模块（含倍率叠加示例）
-
-### 5. AI 任务后台调 Claude + 任务列表
-- backend `services/ai_tasks.spawn_claude_extract()` 调 `subprocess.Popen(['claude', '--print', '/cost <id>'])` 启动后台进程（detached，server 重启不杀子进程）
-- 新 endpoints `POST /api/ai-tasks/{id}/start` + `POST /api/ai-tasks/{id}/stop`
-- AiTask 模型加 `pid` 列（alembic migration `e5be802ba4f1_add_pid_to_ai_tasks`）
-- 新组件 `AiTaskPanel.vue`（替换 v2.2 的 `AiTaskModal`）：任务列表 · 进度条 · 停止按钮 · 1.5s polling 实时刷新
-
-### 升级（v2.4 → v2.5）
-
-```bash
-git pull
-cd server && .venv/bin/alembic upgrade head   # 加 ai_tasks.pid 列
-```
-
-### v2.5 测试基线
-
-| 项 | 数量 |
-|---|---:|
-| pytest | 202 |
-| vitest | 256 |
-| playwright e2e | 28+ |
-| backend coverage | 92%+ |
-| frontend coverage | line 96%+ |
+- [用户使用手册](docs/user-guide.md) —— 面向最终用户的逐页操作说明。
+- [开发者指南](docs/dev-guide.md) —— 架构、API、计算引擎。
+- [故障排查](docs/troubleshooting.md) —— 常见问题。
+- [版本变更清单](docs/v2-changelog.md) —— v2.0 至 v2.6 全量变更。
 
 ## 标准合规
 
