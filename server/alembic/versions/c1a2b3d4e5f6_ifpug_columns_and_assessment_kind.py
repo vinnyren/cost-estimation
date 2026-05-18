@@ -16,6 +16,7 @@ dev 库兼容：本项目 bootstrap 用 create_all，dev 库可能无 alembic �
   ALTER TABLE function_points ADD COLUMN ftr INTEGER;
   ALTER TABLE projects ADD COLUMN assessment_kind VARCHAR DEFAULT 'development' NOT NULL;
   UPDATE function_points SET modify_type='add' WHERE modify_type='new';
+  UPDATE function_points SET modify_type='change' WHERE modify_type='modify';
 """
 from alembic import op
 import sqlalchemy as sa
@@ -40,11 +41,17 @@ def upgrade():
     op.execute(
         "UPDATE function_points SET modify_type='add' WHERE modify_type='new'"
     )
+    op.execute(
+        "UPDATE function_points SET modify_type='change' WHERE modify_type='modify'"
+    )
 
 
 def downgrade():
     op.execute(
         "UPDATE function_points SET modify_type='new' WHERE modify_type='add'"
+    )
+    op.execute(
+        "UPDATE function_points SET modify_type='modify' WHERE modify_type='change'"
     )
     with op.batch_alter_table("projects") as batch:
         batch.drop_column("assessment_kind")

@@ -34,6 +34,12 @@ class FunctionPointBase(BaseModel):
     notes: Optional[str] = None
     ord: Optional[int] = None
 
+    @field_validator("modify_type", mode="before")
+    @classmethod
+    def _normalize_legacy_modify_type(cls, v):
+        # v2.7 旧值兼容：new→add, modify→change
+        return {"new": "add", "modify": "change"}.get(v, v)
+
     @field_validator("ufp", "us")
     @classmethod
     def _finite(cls, v: float) -> float:
