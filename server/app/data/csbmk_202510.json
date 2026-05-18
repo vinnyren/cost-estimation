@@ -58,7 +58,6 @@
   "factors_dev": {
     "app_type": {
       "业务处理": 1.00,
-      "软件集成": 1.20,
       "科技": 1.20,
       "多媒体": 1.30,
       "智能信息": 1.50,
@@ -79,12 +78,12 @@
       "base": 1.0
     },
     "platform": {
-      "C": 1.5,
+      "C": 1.2,
       "JAVA": 1.0,
       "C++": 1.0,
       "C#": 1.0,
-      "PowerBuilder": 0.6,
-      "ASP": 0.6
+      "PowerBuilder": 0.8,
+      "ASP": 0.8
     },
     "team_bg": {
       "same_industry": 0.8,
@@ -93,8 +92,8 @@
     }
   },
   "factors_ops": {
-    "update_freq": {"quarterly": 0.95, "monthly": 1.00, "frequent": 1.12},
-    "support": {"remote": 0.89, "onsite": 1.00, "pure_onsite": 1.08},
+    "update_freq": {"quarterly": 0.78, "monthly": 1.00, "frequent": 1.12},
+    "support": {"remote": 0.90, "onsite": 1.00, "pure_onsite": 1.20},
     "security_level": {"L1": 0.90, "L2": 0.95, "L3": 1.00, "L4": 1.05, "L5": 1.10},
     "business_importance": {"core": 1.10, "general": 1.00, "peripheral": 0.90},
     "response_time": {"72h": 0.90, "48h": 1.00, "24h": 1.10},
@@ -102,14 +101,13 @@
     "team_exp": {"same_industry": 0.80, "related": 1.00, "none": 1.20},
     "automation": {"auto": 0.90, "semi": 1.00, "manual": 1.10},
     "deployment": {"centralized": 1.00, "distributed": 1.06},
-    "user_scale": {"<=1k": 0.90, "<=10k": 1.00, ">10k": 1.10},
-    "system_relevance": {"none": 0.97, "1-5": 1.00, "6+": 1.14}
+    "user_scale": {"<=1k": 0.93, "<=10k": 1.00, ">10k": 1.12},
+    "system_relevance": {"none": 0.97, "1-10": 1.00, "10+": 1.14}
   },
   "scale_change": {
     "add": 1.00,
-    "modify": 0.70,
-    "remove": 0.40,
-    "convert": 0.60,
+    "modify": 0.80,
+    "remove": 0.20,
     "threshold": 0.05
   },
   "hours_per_pm": 174,
