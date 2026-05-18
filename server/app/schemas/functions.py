@@ -12,13 +12,17 @@ class FunctionPointBase(BaseModel):
     name: Optional[str] = None
     category: Literal["EI", "EO", "EQ", "ILF", "EIF"]
     complexity: Literal["low", "average", "high"]
+    # v2.8 — IFPUG GB/T 42449 复杂度查表输入，均可空。
+    det: Optional[int] = Field(default=None, ge=0)
+    ret: Optional[int] = Field(default=None, ge=0)
+    ftr: Optional[int] = Field(default=None, ge=0)
     # dev = 开发功能点 / ops = 运维功能点。默认 dev 兼容历史数据。
     fp_kind: Literal["dev", "ops"] = "dev"
     # ufp / us 必须 ≥ 0 — 负值会让 forward calc 产出负造价，业务无意义
     # （ISSUE-021 round 3 QA：曾有 ufp=-5 通过 schema → cost_dev_yuan 也是负）
     ufp: float = Field(ge=0)
     reuse_level: Optional[Literal["low", "high"]] = "low"
-    modify_type: Optional[Literal["new", "modify", "delete"]] = "new"
+    modify_type: Optional[Literal["add", "change", "delete", "convert"]] = "add"
     us: float = Field(ge=0)
     # v2.0 T6 — "copied" 标记由 /projects/{id}/copy 写入，提示该 FP 来源于另一个
     # 项目的副本（与 manual 区分以便日后审计/统计）。
@@ -56,6 +60,10 @@ class FunctionPointPatch(BaseModel):
     name: Optional[str] = None
     category: Optional[Literal["EI", "EO", "EQ", "ILF", "EIF"]] = None
     complexity: Optional[Literal["low", "average", "high"]] = None
+    det: Optional[int] = Field(default=None, ge=0)
+    ret: Optional[int] = Field(default=None, ge=0)
+    ftr: Optional[int] = Field(default=None, ge=0)
+    modify_type: Optional[Literal["add", "change", "delete", "convert"]] = None
     fp_kind: Optional[Literal["dev", "ops"]] = None
     ufp: Optional[float] = Field(default=None, ge=0)
     us: Optional[float] = Field(default=None, ge=0)

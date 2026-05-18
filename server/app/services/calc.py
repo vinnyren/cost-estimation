@@ -25,13 +25,13 @@ def _resolve_items(
     """
     raw_items = payload.get("items")
     if raw_items:
-        return [FpItem(us=i["us"]) for i in raw_items]
+        return [FpItem(us=i["us"], modify_type=i.get("modify_type", "add")) for i in raw_items]
     db_items = fs.list_for_project(db, project_id)
     if not db_items and mode == "forward":
         raise ValueError(
             "NO_FUNCTION_POINTS: 项目暂无功能点，请先在 FP 编辑屏添加或上传文档让 AI 提取"
         )
-    return [FpItem(us=fp.us) for fp in db_items]
+    return [FpItem(us=fp.us, modify_type=fp.modify_type or "add") for fp in db_items]
 
 
 def _resolve_factors(
@@ -79,6 +79,7 @@ def run_forward(db: Session, project_id: str, payload: dict) -> dict:
         include_dev=payload.get("include_dev", True),
         include_ops=payload.get("include_ops", proj.include_ops or False),
         other_cost=payload.get("other_cost", proj.other_cost or 0.0),
+        assessment_kind=getattr(proj, "assessment_kind", None) or "development",
     )
     r = calculate_forward(ctx, inp)
     out = r.__dict__.copy()

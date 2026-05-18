@@ -45,3 +45,46 @@ async def test_create_fp_with_ifpug_fields_persists(client_factory, db_session):
         assert data["det"] == 25
         assert data["ret"] == 3
         assert data["modify_type"] == "add"
+
+
+@pytest.mark.asyncio
+async def test_create_fp_autocomputes_ufp_from_ifpug(client_factory, db_session):
+    """提供 det/ret 时 create 按 IFPUG 重算 ufp/us，忽略请求里的手填值。"""
+    _seed(db_session, pid="p-ifpug-auto")
+    async with await client_factory() as client:
+        r = await client.post(
+            "/api/projects/p-ifpug-auto/functions",
+            headers={**H, "Content-Type": "application/json"},
+            json={
+                "name": "用户表", "category": "ILF", "complexity": "low",
+                "det": 60, "ret": 6, "ufp": 999, "us": 999, "modify_type": "add",
+            },
+        )
+        assert r.status_code == 201
+        data = r.json()["data"]
+        # det=60 ret=6 → high → ILF high = 15；complexity 也被重算为 high
+        assert data["complexity"] == "high"
+        assert data["ufp"] == 15
+        assert data["us"] == 15
+
+
+@pytest.mark.asyncio
+async def test_forward_uses_assessment_kind(client_factory, db_session):
+    """enhancement 项目 forward 计入 change/delete。"""
+    from app.db.models import FunctionPoint
+    p = _seed(db_session, pid="p-ifpug-efp")
+    p.assessment_kind = "enhancement"
+    for mt, us in [("add", 10), ("change", 20), ("delete", 5)]:
+        db_session.add(FunctionPoint(
+            id=f"fp-{mt}", project_id="p-ifpug-efp", version=1,
+            category="EI", complexity="average", modify_type=mt,
+            ufp=us, us=us))
+    db_session.commit()
+    async with await client_factory() as client:
+        r = await client.post(
+            "/api/calc/forward",
+            headers={**H, "Content-Type": "application/json"},
+            json={"project_id": "p-ifpug-efp"},
+        )
+        assert r.status_code == 200
+        assert r.json()["data"]["scale_us"] == 35  # 10 + 20 + 5
