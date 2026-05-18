@@ -92,8 +92,17 @@ def patch(db: Session, project_id: str, fp_id: str, payload: FunctionPointPatch)
     fp = db.query(FunctionPoint).filter_by(id=fp_id, project_id=project_id).first()
     if not fp:
         return None
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    # Merge existing column values with patch updates, then recompute IFPUG
+    # fields (complexity/ufp/us) when det/ret/ftr/category are sufficient.
+    merged = {c.name: getattr(fp, c.name) for c in fp.__table__.columns}
+    merged.update(updates)
+    merged = _apply_ifpug(merged)
+    for k, v in updates.items():
         setattr(fp, k, v)
+    for k in ("complexity", "ufp", "us"):
+        if merged.get(k) is not None:
+            setattr(fp, k, merged[k])
     db.commit(); db.refresh(fp)
     _mark_results_stale(db, project_id)
     return fp

@@ -88,3 +88,25 @@ async def test_forward_uses_assessment_kind(client_factory, db_session):
         )
         assert r.status_code == 200
         assert r.json()["data"]["scale_us"] == 35  # 10 + 20 + 5
+
+
+@pytest.mark.asyncio
+async def test_forward_development_assessment_kind_only_counts_add(client_factory, db_session):
+    """development 项目 forward 只计入 add 类型的功能点（scale_us == 10）。"""
+    from app.db.models import FunctionPoint
+    p = _seed(db_session, pid="p-ifpug-dev")
+    p.assessment_kind = "development"
+    for mt, us in [("add", 10), ("change", 20), ("delete", 5)]:
+        db_session.add(FunctionPoint(
+            id=f"fp-dev-{mt}", project_id="p-ifpug-dev", version=1,
+            category="EI", complexity="average", modify_type=mt,
+            ufp=us, us=us))
+    db_session.commit()
+    async with await client_factory() as client:
+        r = await client.post(
+            "/api/calc/forward",
+            headers={**H, "Content-Type": "application/json"},
+            json={"project_id": "p-ifpug-dev"},
+        )
+        assert r.status_code == 200
+        assert r.json()["data"]["scale_us"] == 10  # only "add" FP counts
