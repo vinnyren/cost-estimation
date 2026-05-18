@@ -69,6 +69,7 @@ describe("ParamManager — 全局草稿编辑", () => {
     await w.find("[data-testid='draft-save']").trigger("click");
     await flushPromises();
     expect(paramsApi.patchGlobal).toHaveBeenCalledWith("city_rate.北京.dev", 40000);
+    expect(w.find("[data-testid='draft-dirty']").exists()).toBe(false);
   });
 
   it("点撤销 → 丢弃草稿，dirty 提示消失", async () => {

@@ -142,6 +142,9 @@ const isGlobal = computed(() => !props.projectId);
 const isDirty = computed(() => Object.keys(draftBuffer.value).length > 0);
 const savingDraft = ref(false);
 
+// 切换 projectId 时清除残留草稿，防止跨模式污染
+watch(() => props.projectId, () => { draftBuffer.value = {}; });
+
 // 草稿优先：全局模式下若某 leaf 在 draftBuffer 里，显示草稿值。
 function draftValue(path: string, fallback: number | string): number | string {
   if (isGlobal.value && path in draftBuffer.value) {
@@ -154,10 +157,11 @@ function draftValue(path: string, fallback: number | string): number | string {
 async function saveDraft(): Promise<void> {
   savingDraft.value = true;
   try {
-    for (const [key, value] of Object.entries(draftBuffer.value)) {
+    for (const [key, value] of Object.entries({ ...draftBuffer.value })) {
       await paramsApi.patchGlobal(key, value);
+      const { [key]: _removed, ...rest } = draftBuffer.value;
+      draftBuffer.value = rest;
     }
-    draftBuffer.value = {};
     await store.loadGlobal();
     results.markParamsChanged();
   } catch (e: unknown) {
@@ -330,12 +334,14 @@ async function onFactorEdit(
         v-if="isGlobal"
         class="draft-toolbar"
       >
-        <span
-          v-if="isDirty"
-          data-testid="draft-dirty"
-          class="draft-dirty"
-        >● 有未保存的修改</span>
-        <span v-else class="draft-clean">参数已是最新保存状态</span>
+        <span role="status" aria-live="polite">
+          <span
+            v-if="isDirty"
+            data-testid="draft-dirty"
+            class="draft-dirty"
+          >● 有未保存的修改</span>
+          <span v-else class="draft-clean">参数已是最新保存状态</span>
+        </span>
         <div class="draft-actions">
           <button
             type="button"
@@ -855,8 +861,13 @@ async function onFactorEdit(
   border: none;
   color: var(--color-danger, #b91c1c);
   cursor: pointer;
+  padding: var(--space-1) var(--space-2);
   text-decoration: underline;
   font-family: inherit;
   font-size: var(--font-size-sm);
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.draft-actions .btn-link:hover {
+  opacity: 0.75;
 }
 </style>
