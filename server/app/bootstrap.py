@@ -44,6 +44,41 @@ def _flatten(prefix: str, obj, out: dict) -> None:
         out[prefix] = obj
 
 
+def reseed_if_outdated(session) -> int:
+    """v2.8 — 把 params_global 里未被用户改动的行刷新到当前 csbmk JSON。
+
+    判定与策略：
+    - 删除所有 modified=False 的行，按当前 JSON 重新插入（扁平 key）。
+    - modified=True 的行（用户改过）原样保留。
+    - 空库 → 等价于全量 seed。
+    返回重新插入的行数。
+    """
+    from app.config import settings
+    from app.db.models import ParamGlobal
+
+    raw = json.loads(settings.csbmk_seed_path.read_text(encoding="utf-8"))
+    version = raw.get("version", "CSBMK®-unknown")
+    flat: dict = {}
+    _flatten("", raw, flat)
+
+    modified_keys = {
+        row.key for row in
+        session.query(ParamGlobal).filter_by(modified=True).all()
+    }
+    session.query(ParamGlobal).filter_by(modified=False).delete()
+    inserted = 0
+    for k, v in flat.items():
+        if k in modified_keys:
+            continue  # 用户改过的 key 不动
+        session.add(ParamGlobal(
+            key=k, value=json.dumps(v, ensure_ascii=False),
+            basis_version=version, modified=False,
+        ))
+        inserted += 1
+    session.commit()
+    return inserted
+
+
 @click.command()
 @click.option(
     "--db",
@@ -89,8 +124,9 @@ def cli(db_path: Path, seed_path: Path) -> None:
             text("SELECT count(*) FROM params_global")
         ).scalar()
         if existing and existing > 0:
+            n = reseed_if_outdated(session)
             click.echo(
-                f"CSBMK 参数已存在（{existing} 行），跳过 seed（idempotent skip）。"
+                f"CSBMK 参数已存在（{existing} 行）；已 re-seed 未改动项 {n} 条。"
             )
         else:
             flat: dict = {}
