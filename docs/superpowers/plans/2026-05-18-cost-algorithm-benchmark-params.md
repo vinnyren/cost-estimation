@@ -2252,8 +2252,21 @@ curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
   每条草稿要给出 `name`（结合 `subsystem/l1_module/l2_module` 语境的合理功能名）、
   `description`（一句话功能说明）、`category`（EI/EO/EQ/ILF/EIF）、`det` + `ret`/`ftr`
   （按 IFPUG 估计）。`source` 必须为 `"reverse_draft"`。
-- **超出（`delta_ufp` < 0）**：不新增 FP；在 stage_log 注明该模块现有 FP 偏多，
-  建议人工下调（本命令不自动改现有 FP，避免误删用户数据）。
+- **超出（`delta_ufp` < 0）**：不新增 FP，按比例下调该叶子模块现有 FP 的 `us`。
+  这是反算补全的预期行为（用户主动触发「按反算补全 FP」），只下调规模、不删条目。
+  做法：对该叶子模块 `GET /api/projects/<project_id>/functions`，按
+  `subsystem` + `l1_module` + `l2_module` 过滤出属于它的 FP，算
+  `ratio = allocated_ufp / current_ufp`（0 < ratio < 1），逐条
+  `PATCH /api/projects/<project_id>/functions/<fp_id>` 把 `us` 改为
+  `round(us × ratio, 2)`。`ufp` 不动（IFPUG 计数值），只调 `us`（规模口径）。
+  下调完成后 stage_log 注明「模块 X 现有 FP 规模已按 ratio 下调」。
+
+  下调单条 FP 的命令形如：
+  ```bash
+  curl -fsS -X PATCH "$BASE/api/projects/<project_id>/functions/<fp_id>" \
+    -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+    -d "{\"us\": <us×ratio>}" > /dev/null || true
+  ```
 
 若项目已上传文档，先 `GET /api/projects/<project_id>/uploads` 拿语境，让草稿名称
 更贴合真实需求。进度上报 45：
@@ -2299,7 +2312,8 @@ curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
 
 ## 不要做的事
 
-- 不要删除或覆盖用户已有 FP（超出场景仅提示，不自动改）。
+- 不要**删除**用户已有 FP（超出场景只按比例下调现有 FP 的 `us`，不删条目、不动 `ufp`）。
+- 缺口场景写入的草稿一律 `source="reverse_draft"`、`replace=false`，不覆盖用户 FP。
 - 不要修改 params_global。
 - 不要绕过 token 鉴权。
 ```
