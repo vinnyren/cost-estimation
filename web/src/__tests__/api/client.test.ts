@@ -135,7 +135,7 @@ describe("API client", () => {
             error: {
               code: "FILE_TOO_LARGE",
               problem: "FILE_TOO_LARGE: 60000000 > 104857600",
-              fix: "确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 100MB",
+              fix: "确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 500MB",
             },
           },
         },
@@ -152,7 +152,7 @@ describe("API client", () => {
     const client = createClient();
     await expect(client.post("/api/x", {})).rejects.toMatchObject({
       code: "FILE_TOO_LARGE",
-      message: "确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 100MB",
+      message: "确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 500MB",
     });
   });
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 import pytest
-from app.parsers.validator import validate_upload, UploadValidationError, ALLOWED_EXTENSIONS
+from app.parsers.validator import (
+    validate_upload, UploadValidationError, ALLOWED_EXTENSIONS, MAX_SIZE)
 
 FIX = Path(__file__).parent.parent / "fixtures"
 
@@ -22,8 +23,11 @@ def test_reject_bad_extension():
         validate_upload(FIX / "sample.pdf", original_name="evil.exe")
 
 def test_reject_size_over_limit(tmp_path):
+    # 用稀疏文件把逻辑大小撑到上限 +1 —— st_size 报告超限，但不真占磁盘。
     big = tmp_path / "big.pdf"
-    big.write_bytes(b"%PDF-1.4\n" + b"x" * (100 * 1024 * 1024 + 1))
+    with big.open("wb") as f:
+        f.write(b"%PDF-1.4\n")
+        f.truncate(MAX_SIZE + 1)
     with pytest.raises(UploadValidationError, match="FILE_TOO_LARGE"):
         validate_upload(big, original_name="big.pdf")
 

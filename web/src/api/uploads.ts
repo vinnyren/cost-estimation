@@ -24,7 +24,10 @@ export const uploadsApi = {
     // Do NOT set Content-Type manually — axios detects FormData and generates
     // the correct multipart/form-data header with a boundary. Hand-writing
     // "multipart/form-data" without a boundary breaks server-side parsing.
-    return api.post<UploadResult>(`/api/projects/${projectId}/uploads`, form);
+    // 大文件（最大 500MB）上传 + 解析可能超过默认 30s，给 10 分钟超时。
+    return api.post<UploadResult>(`/api/projects/${projectId}/uploads`, form, {
+      timeout: 600_000,
+    });
   },
 
   list: async (projectId: string): Promise<UploadRecord[]> => {

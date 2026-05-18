@@ -64,7 +64,11 @@ function getToken(): string {
 
 export interface Client {
   get<T>(url: string, params?: Record<string, unknown>): Promise<T>;
-  post<T>(url: string, body?: unknown, config?: { headers?: Record<string, string> }): Promise<T>;
+  post<T>(
+    url: string,
+    body?: unknown,
+    config?: { headers?: Record<string, string>; timeout?: number },
+  ): Promise<T>;
   patch<T>(url: string, body?: unknown): Promise<T>;
   delete<T>(url: string): Promise<T>;
   raw: AxiosInstance;
@@ -140,11 +144,12 @@ export function createClient(): Client {
     async post<T>(
       url: string,
       body?: unknown,
-      config?: { headers?: Record<string, string> },
+      config?: { headers?: Record<string, string>; timeout?: number },
     ): Promise<T> {
       try {
         const resp = await instance.post<ApiEnvelope<T>>(url, body, {
           headers: config?.headers,
+          timeout: config?.timeout,
         });
         return unwrap<T>(resp);
       } catch (err) {

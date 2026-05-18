@@ -215,7 +215,7 @@ describe("FpEditor", () => {
 
   it("上传失败 → 弹窗显示真实原因，不污染功能点加载 banner", async () => {
     (uploadsApi.upload as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 100MB"),
+      new Error("确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 500MB"),
     );
     const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
     const w = mount(FpEditor, {
@@ -230,7 +230,7 @@ describe("FpEditor", () => {
     await w.find("input[type='file']").trigger("change");
     await flushPromises();
     expect(alertSpy).toHaveBeenCalledWith(
-      "文件上传失败：确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 100MB",
+      "文件上传失败：确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 500MB",
     );
     // 不应触发「功能点加载失败」错误 banner
     expect(w.find("[role='alert']").exists()).toBe(false);

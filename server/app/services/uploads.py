@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..db.models import Upload, Project
-from ..parsers.validator import validate_upload
+from ..parsers.validator import validate_upload, MAX_SIZE, UploadValidationError
 from ..parsers.pdf import parse_pdf
 from ..parsers.docx import parse_docx
 from ..parsers.xlsx import parse_xlsx
@@ -43,8 +43,23 @@ async def save_and_parse(db: Session, project_id: str, file: UploadFile) -> Uplo
     safe_name = f"{upload_uid}__{original_name}"
 
     target = _uploads_dir(project_id) / safe_name
-    content = await file.read()
-    target.write_bytes(content)
+    # 分块写盘 —— 避免把整个大文件（最大 500MB）一次性读进内存。边写边累计
+    # 字节数，超限立即中止 + 清理，不把超大文件整个落盘。
+    total = 0
+    try:
+        with target.open("wb") as f:
+            while True:
+                chunk = await file.read(1024 * 1024)  # 1 MiB
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_SIZE:
+                    raise UploadValidationError(
+                        f"FILE_TOO_LARGE: {total}+ > {MAX_SIZE}")
+                f.write(chunk)
+    except UploadValidationError:
+        target.unlink(missing_ok=True)
+        raise
 
     try:
         info = validate_upload(target, original_name=original_name)
