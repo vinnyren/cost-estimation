@@ -2,9 +2,16 @@ from dataclasses import dataclass, field
 from .context import EvaluationContext
 
 
+# 开发项目计入 add(ADD) + convert(CFP)；增强项目额外计入 change(CHGA) + delete(DEL)。
+_DEV_TYPES = {"add", "convert"}
+_ENHANCEMENT_TYPES = {"add", "convert", "change", "delete"}
+
+
 @dataclass
 class FpItem:
     us: float
+    # v2.8 — 变更类型（add/change/delete/convert）。None 视为 add（老数据兼容）。
+    modify_type: str | None = "add"
 
 
 @dataclass
@@ -15,6 +22,8 @@ class ForwardInput:
     include_dev: bool = True
     include_ops: bool = False
     other_cost: float = 0.0
+    # v2.8 — development 开发项目 / enhancement 增强项目。
+    assessment_kind: str = "development"
 
 
 @dataclass
@@ -40,7 +49,11 @@ BANDS = ("P10", "P50", "P90")
 
 
 def calculate_forward(ctx: EvaluationContext, inp: ForwardInput) -> ForwardResult:
-    us = sum(i.us for i in inp.items)
+    # v2.8 — 按 assessment_kind 选取计入规模的变更类型集合。
+    counted = (_ENHANCEMENT_TYPES if inp.assessment_kind == "enhancement"
+               else _DEV_TYPES)
+    us = sum(i.us for i in inp.items
+             if (i.modify_type or "add") in counted)
     cf = ctx.cf()
     s = us * cf
     eff_dev = ({b: s * ctx.pdr_dev(b) * inp.dev_factor for b in BANDS}
@@ -69,6 +82,7 @@ def calculate_forward(ctx: EvaluationContext, inp: ForwardInput) -> ForwardResul
         "f_city": rate_dev,
         "ops_plus_other": cost_ops["P50"] + inp.other_cost,
         "total_p50": total["P50"],
+        "fp_count_declaration": f"{us:g} FP (IFPUG-GB/T 42449-2023)",
     }
 
     # v2.2 composition: 4 段拆分（间接 = total - dev_labor - ops_labor - other，钳到 0+）
