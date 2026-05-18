@@ -2,6 +2,7 @@
 
 数据功能（ILF/EIF）按 RET × DET 定复杂度（表 1）；
 事务功能 EI 按 FTR × DET（表 6），EO/EQ 按 FTR × DET（表 7）。
+表 1/6/7 形状一致，共用一张复杂度矩阵；仅 DET 分档因表而异。
 fp_value 把 (category, complexity) 映射为未调整功能点数（表 2 / 表 8）。
 """
 from typing import Literal, Optional
@@ -20,9 +21,17 @@ _FP_VALUE: dict[str, dict[str, int]] = {
     "EQ": {"low": 3, "average": 4, "high": 6},
 }
 
+# 表 1/6/7 复杂度矩阵：[行档][列档] → complexity。行=RET/FTR，列=DET。
+# 三表形状一致，共用此矩阵。
+_MATRIX: list[list[Complexity]] = [
+    ["low", "low", "average"],
+    ["low", "average", "high"],
+    ["average", "high", "high"],
+]
+
 
 def _ret_band(ret: int) -> int:
-    """RET 分档：1 → 0；2-5 → 1；>5 → 2。"""
+    """RET 分档（表 1）：1 → 0；2-5 → 1；>5 → 2。"""
     if ret <= 1:
         return 0
     if ret <= 5:
@@ -31,7 +40,7 @@ def _ret_band(ret: int) -> int:
 
 
 def _data_det_band(det: int) -> int:
-    """数据功能 DET 分档：1-19 → 0；20-50 → 1；>50 → 2。"""
+    """数据功能 DET 分档（表 1）：1-19 → 0；20-50 → 1；>50 → 2。"""
     if det <= 19:
         return 0
     if det <= 50:
@@ -40,7 +49,7 @@ def _data_det_band(det: int) -> int:
 
 
 def _ftr_band_ei(ftr: int) -> int:
-    """EI 的 FTR 分档：0-1 → 0；2 → 1；>2 → 2。"""
+    """EI 的 FTR 分档（表 6）：0-1 → 0；2 → 1；>2 → 2。"""
     if ftr <= 1:
         return 0
     if ftr == 2:
@@ -49,7 +58,7 @@ def _ftr_band_ei(ftr: int) -> int:
 
 
 def _ftr_band_eo_eq(ftr: int) -> int:
-    """EO/EQ 的 FTR 分档：0-1 → 0；2-3 → 1；>3 → 2。"""
+    """EO/EQ 的 FTR 分档（表 7）：0-1 → 0；2-3 → 1；>3 → 2。"""
     if ftr <= 1:
         return 0
     if ftr <= 3:
@@ -57,29 +66,22 @@ def _ftr_band_eo_eq(ftr: int) -> int:
     return 2
 
 
-def _txn_det_band(det: int) -> int:
-    """事务功能 DET 分档：1-4(EI)/1-5(EO/EQ) 简化为 1-5 → 0；6-19 → 1；>19 → 2。"""
+def _ei_det_band(det: int) -> int:
+    """EI 的 DET 分档（表 6）：1-4 → 0；5-15 → 1；>15 → 2。"""
+    if det <= 4:
+        return 0
+    if det <= 15:
+        return 1
+    return 2
+
+
+def _eo_eq_det_band(det: int) -> int:
+    """EO/EQ 的 DET 分档（表 7）：1-5 → 0；6-19 → 1；>19 → 2。"""
     if det <= 5:
         return 0
     if det <= 19:
         return 1
     return 2
-
-
-# 数据功能查表矩阵（ILF/EIF 表 1）：[RET_band][DET_band] → complexity。
-# GB/T 42449: RET=1 时 DET=20-50 已达 average。
-_DATA_MATRIX: list[list[Complexity]] = [
-    ["low", "average", "high"],   # RET=1
-    ["low", "average", "high"],   # RET=2-5
-    ["average", "high", "high"],  # RET>5
-]
-
-# 事务功能查表矩阵（EI/EO/EQ 表 6/7）：[FTR_band][DET_band] → complexity。
-_TXN_MATRIX: list[list[Complexity]] = [
-    ["low", "low", "average"],
-    ["low", "average", "high"],
-    ["average", "high", "high"],
-]
 
 
 def classify_complexity(
@@ -96,12 +98,13 @@ def classify_complexity(
     if category in ("ILF", "EIF"):
         if det is None or ret is None:
             return _DEFAULT
-        return _DATA_MATRIX[_ret_band(ret)][_data_det_band(det)]
+        return _MATRIX[_ret_band(ret)][_data_det_band(det)]
     if category in ("EI", "EO", "EQ"):
         if det is None or ftr is None:
             return _DEFAULT
-        ftr_band = _ftr_band_ei(ftr) if category == "EI" else _ftr_band_eo_eq(ftr)
-        return _TXN_MATRIX[ftr_band][_txn_det_band(det)]
+        if category == "EI":
+            return _MATRIX[_ftr_band_ei(ftr)][_ei_det_band(det)]
+        return _MATRIX[_ftr_band_eo_eq(ftr)][_eo_eq_det_band(det)]
     return _DEFAULT
 
 

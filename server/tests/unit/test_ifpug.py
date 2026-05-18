@@ -12,8 +12,8 @@ def test_data_function_low(category):
 
 @pytest.mark.parametrize("category", ["ILF", "EIF"])
 def test_data_function_average_mid_det(category):
-    # RET 1 + DET 20-50 → average
-    assert classify_complexity(category, det=30, ret=1, ftr=None) == "average"
+    # RET 2-5 + DET 20-50 → average（表 1）
+    assert classify_complexity(category, det=30, ret=3, ftr=None) == "average"
 
 
 @pytest.mark.parametrize("category", ["ILF", "EIF"])
