@@ -60,16 +60,24 @@ def test_compliance_factor_present():
 def test_ops_software_type_factor_present():
     st = _seed()["factors_ops"]["software_type"]
     assert isinstance(st, dict) and len(st) >= 2
+    # 表 A.8 软件类型因子（运维侧）已核对值
+    assert st["操作系统"] == 0.90
+    assert st["数据库"] == 1.00
 
 
 def test_confidentiality_factor_present():
     conf = _seed()["factors_dev"]["confidentiality"]
     assert isinstance(conf, dict) and len(conf) >= 2
+    # 表 A.19 涉密因子已核对值
+    assert conf["非涉密"] == 1.00
+    assert conf["涉密"] == 1.18
 
 
 def test_defect_density_table_present():
     dd = _seed()["display"]["defect_density"]
     assert "P50" in dd
+    # 表 4.4 缺陷密度已核对值
+    assert dd["P50"] == 0.23
 
 
 def test_phase_effort_distribution_present():
@@ -82,6 +90,8 @@ def test_phase_effort_distribution_present():
 def test_fp_unit_price_present():
     up = _seed()["display"]["fp_unit_price"]
     assert isinstance(up, dict) and len(up) >= 1
+    # 第 4.6 节 功能点单价已核对值（北京开发）
+    assert up["北京_开发"] == 1243.52
 
 
 def test_ops_cost_ratio_all_bands():
@@ -93,3 +103,5 @@ def test_appendix_c_tables_present():
     appc = _seed()["appendix_c"]
     assert "hw_ops_unit_effort" in appc      # 表 C.1
     assert "security_service_unit_price" in appc  # 表 C.2
+    assert len(appc["hw_ops_unit_effort"]) > 0
+    assert len(appc["security_service_unit_price"]) > 0
