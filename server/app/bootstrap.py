@@ -22,7 +22,7 @@ from pathlib import Path
 
 import click
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 # 注意：导入 db.session 会触发其顶层副作用（按 settings.db_path 创建一个全局
 # engine）。bootstrap 自身不复用该全局 engine —— 我们按 --db 现场建一个独立
@@ -44,7 +44,7 @@ def _flatten(prefix: str, obj, out: dict) -> None:
         out[prefix] = obj
 
 
-def reseed_if_outdated(session, seed_path: Path | None = None) -> int:
+def reseed_if_outdated(session: Session, seed_path: Path | None = None) -> int:
     """v2.8 — 把 params_global 里未被用户改动的行刷新到当前 csbmk JSON。
 
     判定与策略：
@@ -59,12 +59,14 @@ def reseed_if_outdated(session, seed_path: Path | None = None) -> int:
     from app.config import settings
     from app.db.models import ParamGlobal
 
-    resolved_path = seed_path if seed_path is not None else settings.csbmk_seed_path
-    raw = json.loads(Path(resolved_path).read_text(encoding="utf-8"))
+    resolved_path: Path = seed_path if seed_path is not None else settings.csbmk_seed_path
+    raw = json.loads(resolved_path.read_text(encoding="utf-8"))
     version = raw.get("version", "CSBMK®-unknown")
     flat: dict = {}
     _flatten("", raw, flat)
 
+    # flush 待写入项，使 modified_keys 快照确定
+    session.flush()
     modified_keys = {
         row.key for row in
         session.query(ParamGlobal).filter_by(modified=True).all()
