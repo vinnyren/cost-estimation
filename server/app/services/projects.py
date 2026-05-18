@@ -180,6 +180,126 @@ def delete(db: Session, project_id: str) -> bool:
     return True
 
 
+BUNDLE_VERSION = "2.7"
+
+
+def export_projects(db: Session, ids: list[str]) -> dict:
+    """把指定项目导出为可移植 bundle dict。
+
+    不存在的 id 静默跳过；全部不存在则 projects 为空数组。bundle 只含
+    可移植数据 — 不含 id / created_at / updated_at / results / snapshots /
+    uploads / ai_tasks / audit_log（运行时与历史数据）。
+    """
+    projects_out: list[dict] = []
+    for pid in ids:
+        p = db.query(ProjectORM).filter_by(id=pid).first()
+        if not p:
+            continue
+        fps = [
+            {
+                "subsystem": fp.subsystem,
+                "l1_module": fp.l1_module,
+                "l2_module": fp.l2_module,
+                "description": fp.description,
+                "name": fp.name,
+                "category": fp.category,
+                "complexity": fp.complexity,
+                "fp_kind": fp.fp_kind,
+                "ufp": fp.ufp,
+                "reuse_level": fp.reuse_level,
+                "modify_type": fp.modify_type,
+                "us": fp.us,
+                "source": fp.source,
+                "locked": fp.locked,
+                "notes": fp.notes,
+                "ord": fp.ord,
+            }
+            for fp in p.function_points
+        ]
+        overrides = [
+            {"key": po.key, "value": po.value, "reason": po.reason}
+            for po in p.param_overrides
+        ]
+        projects_out.append({
+            "name": p.name,
+            "project_type": p.project_type,
+            "phase": p.phase,
+            "city": p.city,
+            "industry": p.industry,
+            "client": p.client,
+            "evaluator": p.evaluator,
+            "mode": p.mode,
+            "target_cost": p.target_cost,
+            "other_cost": p.other_cost,
+            "include_ops": p.include_ops,
+            "alpha_dev": p.alpha_dev,
+            "fp_method": p.fp_method,
+            "basis_data_ver": p.basis_data_ver,
+            "factors_dev": json.loads(p.factors_dev_json) if p.factors_dev_json else None,
+            "factors_ops": json.loads(p.factors_ops_json) if p.factors_ops_json else None,
+            "param_overrides": overrides,
+            "function_points": fps,
+        })
+    return {
+        "version": BUNDLE_VERSION,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "projects": projects_out,
+    }
+
+
+def import_bundle(db: Session, bundle) -> tuple[int, list[str]]:
+    """把已校验的 ProjectBundle 落库为新建项目。
+
+    bundle 形参是 schemas.project.ProjectBundle 实例（router 层用 Pydantic
+    校验后传入，格式非法在 router 层就被拒为 400）。每个项目生成新 id，
+    不覆盖、不合并、不按名匹配 —— 落库逻辑参照 copy。
+    返回 (导入数量, 新项目 id 列表)。
+    """
+    new_ids: list[str] = []
+    for item in bundle.projects:
+        new_id = f"prj-{uuid.uuid4().hex[:12]}"
+        new = ProjectORM(
+            id=new_id,
+            name=item.name,
+            project_type=item.project_type,
+            phase=item.phase,
+            city=item.city,
+            industry=item.industry,
+            client=item.client,
+            evaluator=item.evaluator,
+            mode=item.mode,
+            target_cost=item.target_cost,
+            other_cost=item.other_cost,
+            include_ops=item.include_ops,
+            alpha_dev=item.alpha_dev,
+            fp_method=item.fp_method,
+            basis_data_ver=item.basis_data_ver,
+            factors_dev_json=json.dumps(item.factors_dev) if item.factors_dev is not None else None,
+            factors_ops_json=json.dumps(item.factors_ops) if item.factors_ops is not None else None,
+        )
+        db.add(new)
+        for fp in item.function_points:
+            data = fp.model_dump()
+            if data.get("source") == "claude_draft":
+                data["source"] = "ai_extracted"
+            db.add(FunctionPoint(
+                id=f"fp-{uuid.uuid4().hex[:12]}",
+                project_id=new_id,
+                version=1,
+                **data,
+            ))
+        for po in item.param_overrides:
+            db.add(ParamOverride(
+                project_id=new_id,
+                key=po.key,
+                value=po.value,
+                reason=po.reason,
+            ))
+        new_ids.append(new_id)
+    db.commit()
+    return len(new_ids), new_ids
+
+
 def get_stats(db: Session, month: str | None = None) -> dict:
     """v2.2 — 项目 KPI 汇总（counts + 月度数）。
 

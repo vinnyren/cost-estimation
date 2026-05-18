@@ -142,6 +142,76 @@ function fmtWan(n: number | null | undefined): string {
 function modeLabel(m: string): string {
   return m === "reverse" ? "反向反推" : "正向估算";
 }
+
+// v2.7 — 批量导出 / 导入
+const selectedIds = ref<Set<string>>(new Set());
+const fileInput = ref<HTMLInputElement | null>(null);
+const importHint = ref<string>("");
+
+const allSelected = computed(
+  () =>
+    filtered.value.length > 0 &&
+    filtered.value.every((p) => selectedIds.value.has(p.id)),
+);
+
+function toggleRow(id: string, checked: boolean): void {
+  const next = new Set(selectedIds.value);
+  if (checked) next.add(id);
+  else next.delete(id);
+  selectedIds.value = next;
+}
+
+function toggleAll(checked: boolean): void {
+  if (checked) {
+    selectedIds.value = new Set(filtered.value.map((p) => p.id));
+  } else {
+    selectedIds.value = new Set();
+  }
+}
+
+async function onExport(): Promise<void> {
+  if (selectedIds.value.size === 0) {
+    return;
+  }
+  try {
+    const bundle = await projectsApi.exportProjects([...selectedIds.value]);
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    a.href = url;
+    a.download = `projects-export-${today}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    importHint.value = e instanceof ApiError ? e.message : "导出失败";
+  }
+}
+
+function triggerImport(): void {
+  fileInput.value?.click();
+}
+
+async function onImportFile(ev: Event): Promise<void> {
+  const input = ev.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  importHint.value = "";
+  try {
+    const text = await file.text();
+    const bundle = JSON.parse(text);
+    const result = await projectsApi.importProjects(bundle);
+    importHint.value = `已导入 ${result.imported} 个项目`;
+    await load();
+  } catch (e) {
+    importHint.value =
+      e instanceof ApiError ? `导入失败：${e.message}` : "导入失败：文件格式非法";
+  } finally {
+    input.value = "";
+  }
+}
 </script>
 
 <template>
@@ -154,8 +224,27 @@ function modeLabel(m: string): string {
         </div>
       </div>
       <div class="page-spacer" />
-      <button type="button" class="btn btn-ghost">导入</button>
-      <button type="button" class="btn btn-ghost">批量导出</button>
+      <button
+        type="button"
+        class="btn btn-ghost"
+        data-testid="import-btn"
+        @click="triggerImport"
+      >导入</button>
+      <button
+        type="button"
+        class="btn btn-ghost"
+        data-testid="export-btn"
+        :disabled="selectedIds.size === 0"
+        @click="onExport"
+      >批量导出（{{ selectedIds.size }}）</button>
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".json"
+        data-testid="import-input"
+        hidden
+        @change="onImportFile"
+      >
       <button type="button" class="btn btn-primary" @click="onNew">
         + 新建项目
       </button>
@@ -176,6 +265,15 @@ function modeLabel(m: string): string {
       :total="total"
       :filtered="filtered.length"
     />
+
+    <div
+      v-if="importHint"
+      class="banner"
+      :class="importHint.includes('失败') ? 'banner-amber' : 'banner-green'"
+      style="margin-top: 4px"
+    >
+      {{ importHint }}
+    </div>
 
     <ErrorBanner
       v-if="error"
@@ -205,6 +303,14 @@ function modeLabel(m: string): string {
       <table class="table">
         <thead>
           <tr>
+            <th style="width: 36px">
+              <input
+                type="checkbox"
+                data-testid="select-all"
+                :checked="allSelected"
+                @change="toggleAll(($event.target as HTMLInputElement).checked)"
+              >
+            </th>
             <th>项目名 / 编码</th>
             <th>模式</th>
             <th>客户 · 城市 · 行业</th>
@@ -224,6 +330,14 @@ function modeLabel(m: string): string {
             :data-project-id="p.id"
             @click="onOpen(p)"
           >
+            <td style="width: 36px" @click.stop>
+              <input
+                type="checkbox"
+                data-testid="row-checkbox"
+                :checked="selectedIds.has(p.id)"
+                @change="toggleRow(p.id, ($event.target as HTMLInputElement).checked)"
+              >
+            </td>
             <td>
               <div style="font-weight: 500">{{ p.name }}</div>
               <div class="muted mono" style="font-size: 11px">{{ p.id }}</div>

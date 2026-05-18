@@ -1,4 +1,5 @@
 // v2.0 T8 — Project audit-log client surface.
+// v2.7 — 新增全局审计 listGlobal（跨项目聚合）。
 //
 // Backend (server/app/api/audit.py) emits the new {success, data, error}
 // envelope, so we go through api.raw and unwrap inline (same pattern as
@@ -13,6 +14,11 @@ export interface AuditEntry {
   action: string;
   target: string | null;
   diff_json: string | null;
+}
+
+// 全局审计条目 — 在 AuditEntry 基础上附带项目名。
+export interface GlobalAuditEntry extends AuditEntry {
+  project_name: string;
 }
 
 export interface AuditListOptions {
@@ -36,14 +42,24 @@ function unwrapNew<T>(payload: unknown): T {
   throw new ApiError(e.code, e.message ?? "", e.details);
 }
 
+function buildQs(opts: AuditListOptions): string {
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.beforeId !== undefined) params.set("before_id", String(opts.beforeId));
+  const qs = params.toString();
+  return qs ? "?" + qs : "";
+}
+
 export const auditApi = {
   async list(projectId: string, opts: AuditListOptions = {}): Promise<AuditEntry[]> {
-    const params = new URLSearchParams();
-    if (opts.limit !== undefined) params.set("limit", String(opts.limit));
-    if (opts.beforeId !== undefined) params.set("before_id", String(opts.beforeId));
-    const qs = params.toString();
-    const url = `/api/projects/${projectId}/audit${qs ? "?" + qs : ""}`;
+    const url = `/api/projects/${projectId}/audit${buildQs(opts)}`;
     const resp = await api.raw.get<NewEnvelope<AuditEntry[]>>(url);
     return unwrapNew<AuditEntry[]>(resp.data);
+  },
+
+  async listGlobal(opts: AuditListOptions = {}): Promise<GlobalAuditEntry[]> {
+    const url = `/api/audit${buildQs(opts)}`;
+    const resp = await api.raw.get<NewEnvelope<GlobalAuditEntry[]>>(url);
+    return unwrapNew<GlobalAuditEntry[]>(resp.data);
   },
 };

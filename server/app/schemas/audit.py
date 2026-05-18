@@ -16,3 +16,16 @@ class AuditOut(BaseModel):
     diff_json: str | None    # 变更详情的 JSON 字符串；create/delete 等可为 None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AuditGlobalOut(BaseModel):
+    """全局审计条目 — 在 AuditOut 字段基础上附带项目名（跨项目时间线用）。"""
+
+    id: int
+    project_id: str
+    project_name: str
+    ts: datetime
+    actor: str | None
+    action: str
+    target: str | None
+    diff_json: str | None

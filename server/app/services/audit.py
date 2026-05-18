@@ -56,3 +56,32 @@ def list_for_project(
     if before_id is not None:
         q = q.filter(AuditLog.id < before_id)
     return q.order_by(AuditLog.id.desc()).limit(limit).all()
+
+
+def list_global(
+    db: Session,
+    limit: int = 100,
+    before_id: int | None = None,
+) -> list[tuple[AuditLog, str]]:
+    """Return audit rows across ALL projects, newest first.
+
+    与 list_for_project 同样的 keyset 分页语义（id < before_id 严格小于），
+    区别是不按 project_id 过滤，并 join Project 取项目名。返回 (AuditLog,
+    project_name) 元组列表 — router 层据此组装带 project_name 的响应。
+    排序键用 (ts desc, id desc)：同一 ts 上多条事件靠 id 决定顺序，与
+    keyset 游标 before_id 一致。
+    """
+    from ..db.models import Project
+
+    q = (
+        db.query(AuditLog, Project.name)
+        .join(Project, AuditLog.project_id == Project.id)
+    )
+    if before_id is not None:
+        q = q.filter(AuditLog.id < before_id)
+    rows = (
+        q.order_by(AuditLog.ts.desc(), AuditLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [(log, name) for log, name in rows]

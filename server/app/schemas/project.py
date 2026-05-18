@@ -89,3 +89,54 @@ class ProjectStats(BaseModel):
     monthly_count: int
     monthly_p50_sum: float
     monthly_growth_pct: float
+
+
+# ── v2.7 导出 / 导入 bundle ────────────────────────────────────────────────
+
+from .functions import FunctionPointBase  # noqa: E402
+
+
+class ParamOverrideItem(BaseModel):
+    key: str
+    value: str
+    reason: Optional[str] = None
+
+
+class ProjectBundleItem(BaseModel):
+    """单个项目的可移植快照 — 不含运行时与历史数据。"""
+
+    name: str = Field(min_length=1, max_length=NAME_MAX)
+    project_type: Literal["dev_only", "ops_only", "dev_and_ops"]
+    phase: Literal["budget", "bidding", "planning", "change", "settled"]
+    city: str
+    industry: str
+    client: Optional[str] = None
+    evaluator: Optional[str] = None
+    mode: Literal["forward", "reverse"]
+    target_cost: Optional[float] = None
+    other_cost: float = 0
+    include_ops: bool = False
+    alpha_dev: float = 1.0
+    fp_method: Literal["nesma_estimated", "ifpug", "quick"] = "nesma_estimated"
+    basis_data_ver: str
+    factors_dev: Optional[dict] = None
+    factors_ops: Optional[dict] = None
+    param_overrides: list[ParamOverrideItem] = Field(default_factory=list, max_length=500)
+    function_points: list[FunctionPointBase] = Field(default_factory=list, max_length=5000)
+
+
+class ProjectBundle(BaseModel):
+    """导出 / 导入的 JSON bundle 顶层结构。"""
+
+    version: str
+    exported_at: str
+    projects: list[ProjectBundleItem] = Field(..., max_length=200)
+
+
+class ProjectExportRequest(BaseModel):
+    ids: list[str]
+
+
+class ProjectImportResult(BaseModel):
+    imported: int
+    project_ids: list[str]

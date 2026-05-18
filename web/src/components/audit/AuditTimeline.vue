@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AuditEntry } from "@/api/audit";
 
-defineProps<{ events: AuditEntry[] }>();
+defineProps<{ events: AuditEntry[]; showProject?: boolean }>();
 
 function typeOf(e: AuditEntry): "user" | "calc" | "ai" | "system" {
   const a = e.action ?? "";
@@ -39,6 +39,10 @@ function label(action: string): string {
   return ACTION_LABELS[action] ?? action;
 }
 
+function projectName(e: AuditEntry): string {
+  return (e as AuditEntry & { project_name?: string }).project_name ?? "";
+}
+
 function detail(e: AuditEntry): string {
   if (e.target) return e.target;
   if (e.diff_json) {
@@ -64,6 +68,10 @@ function detail(e: AuditEntry): string {
           <span class="tl-time mono">{{ e.ts }}</span>
         </div>
         <div class="tl-meta">
+          <span
+            v-if="showProject && 'project_name' in e"
+            class="badge badge-blue"
+          >{{ projectName(e) }}</span>
           <span class="badge" :class="`badge-${typeOf(e) === 'ai' ? 'purple' : typeOf(e) === 'calc' ? 'blue' : ''}`">
             {{ e.action }}
           </span>

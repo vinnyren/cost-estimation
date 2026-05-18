@@ -12,6 +12,13 @@ vi.mock("@/api/aiTasks", () => ({
 }));
 import { aiTasksApi } from "@/api/aiTasks";
 
+vi.mock("@/api/functions", () => ({
+  functionsApi: {
+    acceptDrafts: vi.fn(),
+  },
+}));
+import { functionsApi } from "@/api/functions";
+
 const mockTask = (overrides: Partial<{ id: string; status: string; progress_pct: number }> = {}) => ({
   id: "task-abcdef12-3456",
   project_id: "p-1",
@@ -57,5 +64,33 @@ describe("AiTaskPanel (v2.5)", () => {
     await flushPromises();
     expect(aiTasksApi.create).toHaveBeenCalledWith("p-1", "extract");
     expect(aiTasksApi.start).toHaveBeenCalledWith("task-abcdef12-3456");
+  });
+
+  it("task 为 done 时采纳 FP 按钮可点", async () => {
+    (aiTasksApi.list as ReturnType<typeof vi.fn>).mockResolvedValue([
+      mockTask({ status: "done", progress_pct: 100 }),
+    ]);
+    const w = mount(AiTaskPanel, { props: { open: true, projectId: "p-1" } });
+    await flushPromises();
+    const btn = w.findAll("button").find((b) => b.text().includes("采纳 FP"));
+    expect(btn).toBeTruthy();
+    expect((btn!.element as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("点采纳 FP 调 acceptDrafts 并 emit accepted", async () => {
+    (aiTasksApi.list as ReturnType<typeof vi.fn>).mockResolvedValue([
+      mockTask({ status: "done", progress_pct: 100 }),
+    ]);
+    (functionsApi.acceptDrafts as ReturnType<typeof vi.fn>).mockResolvedValue({
+      accepted: 4,
+    });
+    const w = mount(AiTaskPanel, { props: { open: true, projectId: "p-1" } });
+    await flushPromises();
+    const btn = w.findAll("button").find((b) => b.text().includes("采纳 FP"));
+    await btn!.trigger("click");
+    await flushPromises();
+    expect(functionsApi.acceptDrafts).toHaveBeenCalledWith("p-1");
+    expect(w.emitted("accepted")).toBeTruthy();
+    expect(w.text()).toContain("已采纳 4 条功能点");
   });
 });

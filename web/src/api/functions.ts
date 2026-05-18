@@ -59,4 +59,8 @@ export const functionsApi = {
     api.post<{ restored_version: number; fp_count: number }>(
       `/api/projects/${projectId}/functions/restore?version=${version}`,
     ),
+  acceptDrafts: (projectId: string) =>
+    api.post<{ accepted: number }>(
+      `/api/projects/${projectId}/functions/accept-drafts`,
+    ),
 };

@@ -526,6 +526,7 @@ async function onFpSaved(): Promise<void> {
     <AiTaskPanel
       v-model:open="aiModalOpen"
       :project-id="projectId"
+      @accepted="reloadFps"
     />
 
     <FpFormModal

@@ -58,6 +58,15 @@ def bulk(project_id: str, payload: BulkRequest, db: Session = Depends(get_db)):
     return {"ok": True, "data": {"written": n}}
 
 
+@router.post("/accept-drafts")
+def accept_drafts_route(project_id: str, db: Session = Depends(get_db)):
+    try:
+        n = svc.accept_drafts(db, project_id)
+    except ValueError as e:
+        raise HTTPException(404, detail={"error": {"code": str(e)}})
+    return {"ok": True, "data": {"accepted": n}}
+
+
 @router.get("/snapshots")
 def list_snapshots(project_id: str, db: Session = Depends(get_db)):
     from ..db.models import Project

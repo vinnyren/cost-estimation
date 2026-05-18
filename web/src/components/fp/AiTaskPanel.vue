@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { aiTasksApi, type AiTask } from "@/api/aiTasks";
+import { functionsApi } from "@/api/functions";
 import { formatBeijing } from "@/lib/datetime";
 
 const props = defineProps<{ open: boolean; projectId: string }>();
-const emit = defineEmits<{ "update:open": [v: boolean] }>();
+const emit = defineEmits<{
+  "update:open": [v: boolean];
+  accepted: [count: number];
+}>();
 
 const tasks = ref<AiTask[]>([]);
 const loading = ref(false);
@@ -55,6 +59,21 @@ async function onStop(task: AiTask) {
   }
 }
 
+const accepting = ref(false);
+
+async function onAcceptDrafts() {
+  accepting.value = true;
+  hint.value = "";
+  try {
+    const result = await functionsApi.acceptDrafts(props.projectId);
+    hint.value = `已采纳 ${result.accepted} 条功能点`;
+    emit("accepted", result.accepted);
+  } catch (e) {
+    hint.value = e instanceof Error ? e.message : "采纳失败";
+  } finally {
+    accepting.value = false;
+  }
+}
 
 watch(() => props.open, (v) => {
   if (v) startPolling(); else stopPolling();
@@ -116,9 +135,9 @@ function close() { stopPolling(); emit("update:open", false); }
             <button
               v-else-if="t.status === 'done'"
               class="btn btn-sm btn-primary"
-              disabled
-              title="v3 实装"
-            >采纳 FP</button>
+              :disabled="accepting"
+              @click="onAcceptDrafts"
+            >{{ accepting ? "采纳中…" : "采纳 FP" }}</button>
           </div>
           <div class="task-row-progress">
             <div class="bar"><div class="bar-fill" :style="{ width: t.progress_pct + '%' }" /></div>

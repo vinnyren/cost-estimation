@@ -15,7 +15,7 @@ from .api.uploads import router as uploads_router
 from .api.functions import router as functions_router
 from .api.reports import router as reports_router
 from .api.snapshots import router as snapshots_router
-from .api.audit import router as audit_router
+from .api.audit import router as audit_router, global_router as audit_global_router
 from .api.ai_tasks import router as ai_tasks_router
 from .config import Settings, settings
 from .deps import auth_middleware, origin_middleware
@@ -115,6 +115,7 @@ def create_app() -> FastAPI:
     app.include_router(reports_router)
     app.include_router(snapshots_router)
     app.include_router(audit_router)
+    app.include_router(audit_global_router)
     app.include_router(ai_tasks_router)
 
     # 生产期：若配置了 web_dist_dir 则挂载静态资源 + SPA fallback。

@@ -1,9 +1,13 @@
 <script setup lang="ts">
-// v2.2 T28 — AuditView 重做：表格 → timeline，复用 AuditTimeline 组件。
-// 接受 global prop 用于 /audit 全局路由 (server 暂无全局 endpoint，placeholder)。
+// v2.2 T28 — AuditView：表格 → timeline，复用 AuditTimeline 组件。
+// v2.7 — global 分支补全：调 auditApi.listGlobal 渲染跨项目聚合时间线。
 import { ref, onMounted, computed } from "vue";
 import { useRoute } from "vue-router";
-import { auditApi, type AuditEntry } from "@/api/audit";
+import {
+  auditApi,
+  type AuditEntry,
+  type GlobalAuditEntry,
+} from "@/api/audit";
 import AuditTimeline from "@/components/audit/AuditTimeline.vue";
 import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 
@@ -16,15 +20,20 @@ const projectId = computed(() => {
   const id = route.params.id;
   return typeof id === "string" && id ? id : null;
 });
-const entries = ref<AuditEntry[]>([]);
+const entries = ref<Array<AuditEntry | GlobalAuditEntry>>([]);
 const loading = ref(false);
 const hasMore = ref(true);
 
 async function reload(beforeId?: number): Promise<void> {
-  if (props.global || !projectId.value) return;
   loading.value = true;
   try {
-    const more = await auditApi.list(projectId.value, { limit: PAGE_SIZE, beforeId });
+    let more: Array<AuditEntry | GlobalAuditEntry>;
+    if (props.global) {
+      more = await auditApi.listGlobal({ limit: PAGE_SIZE, beforeId });
+    } else {
+      if (!projectId.value) return;
+      more = await auditApi.list(projectId.value, { limit: PAGE_SIZE, beforeId });
+    }
     if (beforeId !== undefined) {
       entries.value = [...entries.value, ...more];
     } else {
@@ -37,7 +46,7 @@ async function reload(beforeId?: number): Promise<void> {
 }
 
 onMounted(() => {
-  if (!props.global) void reload();
+  if (props.global || projectId.value) void reload();
 });
 
 async function onLoadMore(): Promise<void> {
@@ -54,30 +63,27 @@ async function onLoadMore(): Promise<void> {
           {{ global ? '全局审计日志' : '项目审计' }}
         </h1>
         <div class="page-sub">
-          <template v-if="!global">{{ entries.length }} 条事件 · 不可变 append-only · keyset 分页</template>
-          <template v-else>全局审计聚合视图 · v2.3 实装</template>
+          <template v-if="global">{{ entries.length }} 条事件 · 跨项目聚合 · keyset 分页</template>
+          <template v-else>{{ entries.length }} 条事件 · 不可变 append-only · keyset 分页</template>
         </div>
       </div>
     </div>
 
-    <div v-if="global" class="card" style="padding: 40px; text-align: center; color: var(--text-3)">
-      全局审计聚合视图（跨项目）将在 v2.3 上线。
-      请通过 <strong>侧边栏 → 项目工作台</strong> 选择具体项目查看其审计时间线。
+    <LoadingSkeleton v-if="loading && entries.length === 0" />
+    <div
+      v-else-if="entries.length === 0"
+      class="card"
+      style="padding: 40px; text-align: center; color: var(--text-3)"
+    >
+      暂无审计事件
     </div>
-
-    <template v-else>
-      <LoadingSkeleton v-if="loading && entries.length === 0" />
-      <div v-else-if="entries.length === 0" class="card" style="padding: 40px; text-align: center; color: var(--text-3)">
-        暂无审计事件
+    <div v-else class="card" style="padding: 20px 24px">
+      <AuditTimeline :events="entries" :show-project="global" />
+      <div v-if="hasMore" style="margin-top: 20px; text-align: center">
+        <button class="btn btn-ghost btn-sm" :disabled="loading" @click="onLoadMore">
+          {{ loading ? '加载中...' : '加载更多' }}
+        </button>
       </div>
-      <div v-else class="card" style="padding: 20px 24px">
-        <AuditTimeline :events="entries" />
-        <div v-if="hasMore" style="margin-top: 20px; text-align: center">
-          <button class="btn btn-ghost btn-sm" :disabled="loading" @click="onLoadMore">
-            {{ loading ? '加载中...' : '加载更多' }}
-          </button>
-        </div>
-      </div>
-    </template>
+    </div>
   </div>
 </template>

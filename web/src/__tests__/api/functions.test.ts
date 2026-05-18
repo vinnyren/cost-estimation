@@ -46,4 +46,15 @@ describe("functionsApi", () => {
     await functionsApi.restore("p-11", 3);
     expect(api.post).toHaveBeenCalledWith("/api/projects/p-11/functions/restore?version=3");
   });
+
+  it("acceptDrafts 调 POST /api/projects/:id/functions/accept-drafts", async () => {
+    (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      accepted: 3,
+    });
+    const result = await functionsApi.acceptDrafts("p-1");
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/projects/p-1/functions/accept-drafts",
+    );
+    expect(result).toEqual({ accepted: 3 });
+  });
 });
