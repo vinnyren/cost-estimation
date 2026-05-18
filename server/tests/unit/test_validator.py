@@ -23,7 +23,7 @@ def test_reject_bad_extension():
 
 def test_reject_size_over_limit(tmp_path):
     big = tmp_path / "big.pdf"
-    big.write_bytes(b"%PDF-1.4\n" + b"x" * (50 * 1024 * 1024 + 1))
+    big.write_bytes(b"%PDF-1.4\n" + b"x" * (100 * 1024 * 1024 + 1))
     with pytest.raises(UploadValidationError, match="FILE_TOO_LARGE"):
         validate_upload(big, original_name="big.pdf")
 

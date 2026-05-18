@@ -116,7 +116,10 @@ async function onFileChange(e: Event): Promise<void> {
     await uploadSection.value?.reload();
     startAiPolling();
   } catch (err: unknown) {
-    error.value = err instanceof Error ? err.message : "上传失败";
+    // 上传失败用弹窗提示真实原因（如「文件超过 100MB」），不要塞进
+    // 「功能点加载失败」那个 banner —— 那是 FP 列表加载错误专用的。
+    const msg = err instanceof Error ? err.message : "上传失败";
+    window.alert("文件上传失败：" + msg);
   } finally {
     uploading.value = false;
     input.value = "";

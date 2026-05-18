@@ -213,6 +213,30 @@ describe("FpEditor", () => {
     w.unmount();
   });
 
+  it("上传失败 → 弹窗显示真实原因，不污染功能点加载 banner", async () => {
+    (uploadsApi.upload as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error("确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 100MB"),
+    );
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+    const w = mount(FpEditor, {
+      props: { projectId: "p-6" },
+      global: { plugins: [createPinia(), router] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    const fileInput = w.find("input[type='file']").element as HTMLInputElement;
+    const file = new File(["x"], "big.pdf", { type: "application/pdf" });
+    Object.defineProperty(fileInput, "files", { value: [file], configurable: true });
+    await w.find("input[type='file']").trigger("change");
+    await flushPromises();
+    expect(alertSpy).toHaveBeenCalledWith(
+      "文件上传失败：确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 100MB",
+    );
+    // 不应触发「功能点加载失败」错误 banner
+    expect(w.find("[role='alert']").exists()).toBe(false);
+    w.unmount();
+  });
+
   it("历史版本下拉：点击拉 snapshots，再次点击关闭", async () => {
     (functionsApi.snapshots as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 2, version: 2, snapshot_at: "2026-05-11T01:00:00", reason: "bulk_write", fp_count: 3 },

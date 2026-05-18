@@ -1,2 +1,0 @@
-import{d as r,o as e,c as s,F as n,r as l,e as i}from"./vendor-vue-BwCGSoR5.js";import{_ as c}from"./index-V-rJz605.js";const d={role:"status","aria-live":"polite","aria-busy":"true",class:"skeleton-wrap"},p=r({__name:"LoadingSkeleton",props:{rows:{}},setup(o){return(_,t)=>(e(),s("div",d,[(e(!0),s(n,null,l(o.rows??3,a=>(e(),s("div",{key:a,"data-test":"skeleton-row",class:"skeleton-row"}))),128)),t[0]||(t[0]=i("span",{class:"visually-hidden"},"加载中",-1))]))}}),k=c(p,[["__scopeId","data-v-7e7c80b6"]]);export{k as L};
-//# sourceMappingURL=LoadingSkeleton-DFTHHVSc.js.map

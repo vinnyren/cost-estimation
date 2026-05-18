@@ -125,6 +125,54 @@ describe("API client", () => {
     await expect(client.post("/api/x", {})).rejects.toBeInstanceOf(ApiError);
   });
 
+  it("FastAPI HTTPException {detail:{error}} → ApiError 带 code 与 fix 文案", async () => {
+    // 后端 HTTPException 把业务错误塞在 data.detail.error（非 data.error）。
+    const err = {
+      response: {
+        status: 400,
+        data: {
+          detail: {
+            error: {
+              code: "FILE_TOO_LARGE",
+              problem: "FILE_TOO_LARGE: 60000000 > 104857600",
+              fix: "确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 100MB",
+            },
+          },
+        },
+      },
+    };
+    const post = vi.fn().mockRejectedValue(err);
+    (axios.create as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      post,
+      get: vi.fn(),
+      patch: vi.fn(),
+      delete: vi.fn(),
+      interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+    });
+    const client = createClient();
+    await expect(client.post("/api/x", {})).rejects.toMatchObject({
+      code: "FILE_TOO_LARGE",
+      message: "确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 100MB",
+    });
+  });
+
+  it("FastAPI {detail:'字符串'} → ApiError(REQUEST_FAILED) 带原文", async () => {
+    const err = { response: { status: 422, data: { detail: "字段校验失败" } } };
+    const post = vi.fn().mockRejectedValue(err);
+    (axios.create as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      post,
+      get: vi.fn(),
+      patch: vi.fn(),
+      delete: vi.fn(),
+      interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } },
+    });
+    const client = createClient();
+    await expect(client.post("/api/x", {})).rejects.toMatchObject({
+      code: "REQUEST_FAILED",
+      message: "字段校验失败",
+    });
+  });
+
   it("malformed envelope (非对象 data) → throw INVALID_RESPONSE", async () => {
     const get = vi.fn().mockResolvedValue({ data: null });
     (axios.create as unknown as ReturnType<typeof vi.fn>).mockReturnValue({

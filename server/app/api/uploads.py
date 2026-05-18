@@ -17,7 +17,7 @@ async def upload_one(project_id: str, file: UploadFile = File(...),
     except UploadValidationError as e:
         code = str(e).split(":")[0]
         raise HTTPException(400, detail={"error": {"code": code, "problem": str(e),
-                                                     "fix": "确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 50MB"}})
+                                                     "fix": "确认文件类型为 PDF/Word/Excel/MD/TXT 且小于 100MB"}})
     except ValueError as e:
         raise HTTPException(404, detail={"error": {"code": str(e)}})
     return {"ok": True, "data": UploadRead.model_validate(rec).model_dump(mode="json")}

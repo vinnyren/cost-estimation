@@ -9,7 +9,7 @@ ALLOWED_MIME = {
     "text/plain",
     "text/markdown",
 }
-MAX_SIZE = 50 * 1024 * 1024  # 50 MiB
+MAX_SIZE = 100 * 1024 * 1024  # 100 MiB
 
 
 class UploadValidationError(ValueError):
