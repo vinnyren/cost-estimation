@@ -3,7 +3,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..db.session import get_db
-from ..schemas.project import ProjectCreate, ProjectRead, ProjectPatch, ProjectStats
+from ..schemas.project import (
+    ProjectCreate,
+    ProjectRead,
+    ProjectPatch,
+    ProjectStats,
+    ProjectBundle,
+    ProjectExportRequest,
+    ProjectImportResult,
+)
 from ..services import projects as svc
 
 router = APIRouter(prefix="/api/projects")
@@ -65,6 +73,31 @@ def list_all(
 @router.get("/stats", response_model=ProjectStats)
 def get_project_stats(month: str | None = None, db: Session = Depends(get_db)):
     return svc.get_stats(db, month=month)
+
+
+@router.post("/export")
+def export_projects(payload: ProjectExportRequest, db: Session = Depends(get_db)) -> dict:
+    bundle = svc.export_projects(db, payload.ids)
+    return {"success": True, "data": bundle, "error": None}
+
+
+@router.post("/import")
+def import_projects(payload: dict, db: Session = Depends(get_db)) -> dict:
+    from pydantic import ValidationError
+    try:
+        bundle = ProjectBundle.model_validate(payload)
+    except ValidationError as e:
+        raise HTTPException(
+            400,
+            detail={"error": {
+                "code": "INVALID_BUNDLE",
+                "message": "导入数据格式非法",
+                "problem": str(e.errors()[0].get("msg", "格式校验失败")),
+            }},
+        )
+    n, ids = svc.import_bundle(db, bundle)
+    result = ProjectImportResult(imported=n, project_ids=ids)
+    return {"success": True, "data": result.model_dump(mode="json"), "error": None}
 
 
 @router.get("/{project_id}")
