@@ -73,7 +73,7 @@ curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
 
   下调单条 FP 的命令形如：
   ```bash
-  curl -fsS -X PATCH "$BASE/api/projects/$PROJECT_ID/functions/<fp_id>" \
+  curl -fsS -X PATCH "$BASE/api/projects/$PROJECT_ID/functions/$FP_ID" \
     -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
     -d "{\"us\": <us×ratio>}" > /dev/null || true
   ```

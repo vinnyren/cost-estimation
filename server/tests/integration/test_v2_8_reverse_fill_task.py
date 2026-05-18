@@ -15,7 +15,7 @@ def _seed(db, pid="p-revfill"):
     db.add(FunctionPoint(id="fp-seed-1", project_id=pid, version=1,
                          subsystem="结算", l1_module="资金", l2_module="查询",
                          category="EQ", complexity="average",
-                         modify_type="add", ufp=4, us=4))
+                         modify_type="add", ufp=4, us=4, source="manual"))
     db.commit()
     return p
 
@@ -77,3 +77,4 @@ async def test_reverse_fill_writes_reverse_draft_fp(client_factory, db_session):
         r = await client.get("/api/projects/p-revfill-3/functions", headers=H)
         sources = {fp["source"] for fp in r.json()["data"]}
         assert "reverse_draft" in sources
+        assert "manual" in sources  # replace=False 未覆盖用户已有 FP
