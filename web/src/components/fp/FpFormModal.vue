@@ -57,7 +57,7 @@ function classifyComplexity(
   }
   if (det === null || ftr === null) return "average";
   if (cat === "EI") return COMPLEXITY_MATRIX[ftrBandEi(ftr)][eiDetBand(det)];
-  return COMPLEXITY_MATRIX[ftrBandEoEq(ftr)][eoEqDetBand(det)];
+  return COMPLEXITY_MATRIX[ftrBandEoEq(ftr)][eoEqDetBand(det)]; // EO | EQ
 }
 
 const CATEGORIES: FpCategory[] = ["EI", "EO", "EQ", "ILF", "EIF"];
@@ -75,6 +75,16 @@ const ftr = ref<number | null>(null);
 const submitting = ref(false);
 const errorMsg = ref("");
 const validationMsg = ref("");
+
+// Guard: prevents the category watch from clearing det/ret/ftr during prefillForm
+let suppressCategoryReset = false;
+
+watch(category, () => {
+  if (suppressCategoryReset) return;
+  det.value = null;
+  ret.value = null;
+  ftr.value = null;
+});
 
 const complexity = computed<FpComplexity>(() =>
   classifyComplexity(category.value, det.value, ret.value, ftr.value),
@@ -97,6 +107,7 @@ function resetForm(): void {
 }
 
 function prefillForm(fp: FunctionPoint): void {
+  suppressCategoryReset = true;
   name.value = fp.name ?? "";
   description.value = fp.description ?? "";
   subsystem.value = fp.subsystem ?? "";
@@ -108,6 +119,7 @@ function prefillForm(fp: FunctionPoint): void {
   ftr.value = fp.ftr ?? null;
   errorMsg.value = "";
   validationMsg.value = "";
+  suppressCategoryReset = false;
 }
 
 watch(
@@ -268,7 +280,7 @@ async function onSubmit(): Promise<void> {
 
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">复杂度（IFPUG 自动）</label>
+            <span class="form-label">复杂度（IFPUG 自动）</span>
             <div class="ufp-display">
               <span data-testid="fp-complexity-auto" class="ufp-value">
                 {{ complexity === 'low' ? '低' : complexity === 'high' ? '高' : '中' }}
@@ -277,9 +289,9 @@ async function onSubmit(): Promise<void> {
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">UFP（自动）</label>
+            <span class="form-label">UFP（自动）</span>
             <div class="ufp-display">
-              <span class="ufp-value">{{ computedUfp }}</span>
+              <span data-testid="fp-ufp-auto" class="ufp-value">{{ computedUfp }}</span>
               <span class="ufp-hint muted">按 IFPUG 标准表自动计算</span>
             </div>
           </div>

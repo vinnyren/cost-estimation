@@ -25,7 +25,7 @@ export interface FunctionPoint {
   det?: number | null;
   ret?: number | null;
   ftr?: number | null;
-  modify_type?: "add" | "change" | "delete" | "convert" | null;
+  modify_type?: FpModifyType | null;
   fp_kind?: FpKind;
   ufp: number;
   reuse_level?: FpReuseLevel;

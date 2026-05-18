@@ -76,9 +76,7 @@ describe("FpFormModal", () => {
     await w.find("#fp-ret").setValue("6");
     await flushPromises();
 
-    // The second .ufp-value is the UFP number (first is complexity label)
-    const ufpDisplayAll = w.findAll(".ufp-value");
-    const ufpDisplay = ufpDisplayAll[ufpDisplayAll.length - 1];
+    const ufpDisplay = w.find("[data-testid='fp-ufp-auto']");
     expect(ufpDisplay.exists()).toBe(true);
     expect(ufpDisplay.text()).toBe("15");
   });
@@ -127,9 +125,7 @@ describe("FpFormModal", () => {
     });
 
     // default: category=EI, det/ftr=null → complexity=average → UFP=4
-    // The second .ufp-value is the UFP number (first is complexity label)
-    const ufpDisplayAll = w.findAll(".ufp-value");
-    const ufpDisplay = ufpDisplayAll[ufpDisplayAll.length - 1];
+    const ufpDisplay = w.find("[data-testid='fp-ufp-auto']");
     expect(ufpDisplay.text()).toBe("4");
   });
 

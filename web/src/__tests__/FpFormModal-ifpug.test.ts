@@ -33,7 +33,7 @@ describe("FpFormModal — IFPUG 复杂度联动", () => {
     expect(w.text()).toContain("3");
   });
 
-  it("信息不足 → 默认 average，提交带 det/ret", async () => {
+  it("ILF + DET 25 + RET 3 → average，提交 payload 含 det/ret", async () => {
     const w = mount(FpFormModal, { props: { open: true, projectId: "p-1" } });
     await flushPromises();
     await w.find("#fp-name").setValue("查询客户");
