@@ -53,6 +53,39 @@ export interface ProjectQueryResult {
   meta: { total: number; page: number; size: number };
 }
 
+// v2.7 — 项目批量导出 / 导入 bundle 类型。
+export interface ProjectBundleItem {
+  name: string;
+  project_type: ProjectType;
+  phase: ProjectPhase;
+  city: string;
+  industry: string;
+  client?: string | null;
+  evaluator?: string | null;
+  mode: ProjectMode;
+  target_cost?: number | null;
+  other_cost?: number;
+  include_ops?: boolean;
+  alpha_dev?: number;
+  fp_method?: "nesma_estimated" | "ifpug" | "quick";
+  basis_data_ver: string;
+  factors_dev?: Record<string, unknown> | null;
+  factors_ops?: Record<string, unknown> | null;
+  param_overrides: Array<{ key: string; value: string; reason?: string | null }>;
+  function_points: Array<Record<string, unknown>>;
+}
+
+export interface ProjectBundle {
+  version: string;
+  exported_at: string;
+  projects: ProjectBundleItem[];
+}
+
+export interface ProjectImportResult {
+  imported: number;
+  project_ids: string[];
+}
+
 interface NewEnvelope<T> {
   success: boolean;
   data: T;
@@ -118,5 +151,21 @@ export const projectsApi = {
       { name },
     );
     return unwrapNew<Project>(resp.data);
+  },
+
+  async exportProjects(ids: string[]): Promise<ProjectBundle> {
+    const resp = await api.raw.post<NewEnvelope<ProjectBundle>>(
+      "/api/projects/export",
+      { ids },
+    );
+    return unwrapNew<ProjectBundle>(resp.data);
+  },
+
+  async importProjects(bundle: ProjectBundle): Promise<ProjectImportResult> {
+    const resp = await api.raw.post<NewEnvelope<ProjectImportResult>>(
+      "/api/projects/import",
+      bundle,
+    );
+    return unwrapNew<ProjectImportResult>(resp.data);
   },
 };
