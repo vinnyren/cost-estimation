@@ -136,6 +136,47 @@ def bulk_write(db: Session, project_id: str, items: list[FunctionPointCreate],
     return len(items)
 
 
+def accept_drafts(db: Session, project_id: str) -> int:
+    """把项目内所有 source='claude_draft' 的功能点采纳为 'ai_extracted'。
+
+    改动前先存一次 FP 快照（reason='accept_drafts'）便于回退 —— 快照版本用
+    当前最大 version，与 bulk_write 的 pre-replace 快照同一约定，避免与
+    UNIQUE(project_id, version) 冲突时跳过重复写。
+    项目不存在抛 PROJECT_NOT_FOUND；无 claude_draft 行时返回 0（非错误，
+    且不写快照 —— 无改动无需快照）。
+    """
+    if not db.query(Project).filter_by(id=project_id).first():
+        raise ValueError("PROJECT_NOT_FOUND")
+
+    drafts = (
+        db.query(FunctionPoint)
+        .filter_by(project_id=project_id, source="claude_draft")
+        .all()
+    )
+    if not drafts:
+        return 0
+
+    current_max = (
+        db.query(func.max(FunctionPoint.version))
+        .filter_by(project_id=project_id)
+        .scalar()
+    )
+    if current_max is not None:
+        existing_snap = (
+            db.query(FPSnapshot)
+            .filter_by(project_id=project_id, version=current_max)
+            .first()
+        )
+        if not existing_snap:
+            _snapshot(db, project_id, current_max, reason="accept_drafts")
+
+    for fp in drafts:
+        fp.source = "ai_extracted"
+    db.commit()
+    _mark_results_stale(db, project_id)
+    return len(drafts)
+
+
 def restore(db: Session, project_id: str, version: int) -> int:
     """Replay an earlier FPSnapshot back into function_points.
 
