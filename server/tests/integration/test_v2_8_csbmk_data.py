@@ -48,3 +48,48 @@ def test_system_relevance_rebanded():
 def test_app_type_no_software_integration():
     # 标准没有「软件集成 1.20」档
     assert "软件集成" not in _seed()["factors_dev"]["app_type"]
+
+
+def test_compliance_factor_present():
+    cf = _seed()["factors_dev"]["compliance"]
+    # 表 A.2：吻合度 高 1/3 / 中 2/3 / 低 1
+    assert set(cf.keys()) == {"high", "medium", "low"}
+    assert cf["low"] == 1.0
+
+
+def test_ops_software_type_factor_present():
+    st = _seed()["factors_ops"]["software_type"]
+    assert isinstance(st, dict) and len(st) >= 2
+
+
+def test_confidentiality_factor_present():
+    conf = _seed()["factors_dev"]["confidentiality"]
+    assert isinstance(conf, dict) and len(conf) >= 2
+
+
+def test_defect_density_table_present():
+    dd = _seed()["display"]["defect_density"]
+    assert "P50" in dd
+
+
+def test_phase_effort_distribution_present():
+    pe = _seed()["display"]["phase_effort"]
+    # 阶段工作量分布各阶段占比之和约等于 1
+    total = sum(pe.values())
+    assert abs(total - 1.0) < 0.05
+
+
+def test_fp_unit_price_present():
+    up = _seed()["display"]["fp_unit_price"]
+    assert isinstance(up, dict) and len(up) >= 1
+
+
+def test_ops_cost_ratio_all_bands():
+    ocr = _seed()["ops_cost_ratio"]
+    assert {"P10", "P50", "P90"} <= set(ocr.keys())
+
+
+def test_appendix_c_tables_present():
+    appc = _seed()["appendix_c"]
+    assert "hw_ops_unit_effort" in appc      # 表 C.1
+    assert "security_service_unit_price" in appc  # 表 C.2
