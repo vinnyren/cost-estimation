@@ -87,3 +87,8 @@ def test_fp_value_transaction_functions():
 def test_fp_value_unknown_category_raises():
     with pytest.raises(ValueError):
         fp_value("XXX", "low")
+
+
+def test_fp_value_unknown_complexity_raises():
+    with pytest.raises(ValueError):
+        fp_value("ILF", "bogus")

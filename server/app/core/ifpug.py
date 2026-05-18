@@ -85,7 +85,7 @@ def _eo_eq_det_band(det: int) -> int:
 
 
 def classify_complexity(
-    category: str,
+    category: Category,
     det: Optional[int],
     ret: Optional[int],
     ftr: Optional[int],
@@ -93,7 +93,7 @@ def classify_complexity(
     """按 GB/T 42449 查表得复杂度。信息不足时返回 average。
 
     数据功能（ILF/EIF）需 det+ret；事务功能（EI/EO/EQ）需 det+ftr。
-    缺任一必需输入即默认 average。
+    缺任一必需输入、或 category 不在 EI/EO/EQ/ILF/EIF 内，均默认 average。
     """
     if category in ("ILF", "EIF"):
         if det is None or ret is None:
@@ -108,9 +108,15 @@ def classify_complexity(
     return _DEFAULT
 
 
-def fp_value(category: str, complexity: str) -> int:
-    """(category, complexity) → 未调整功能点数。未知 category 抛 ValueError。"""
+def fp_value(category: Category, complexity: Complexity) -> int:
+    """(category, complexity) → 未调整功能点数（表 2 / 表 8）。
+
+    未知 category 或 complexity 抛 ValueError。
+    """
     table = _FP_VALUE.get(category)
     if table is None:
         raise ValueError(f"UNKNOWN_CATEGORY: {category!r}")
-    return table[complexity]
+    value = table.get(complexity)
+    if value is None:
+        raise ValueError(f"UNKNOWN_COMPLEXITY: {complexity!r}")
+    return value
