@@ -20,6 +20,7 @@ import {
   type AllocateResult,
 } from "@/api/calc";
 import { reportsApi } from "@/api/reports";
+import { aiTasksApi } from "@/api/aiTasks";
 import { useResultsStore } from "@/stores/results";
 import ResultTrio from "@/components/result/ResultTrio.vue";
 import PipelineGrid from "@/components/result/PipelineGrid.vue";
@@ -155,6 +156,23 @@ async function download(): Promise<void> {
     }
   } finally {
     downloading.value = false;
+  }
+}
+
+const reverseFillPending = ref(false);
+const reverseFillMsg = ref("");
+
+async function triggerReverseFill(): Promise<void> {
+  reverseFillPending.value = true;
+  reverseFillMsg.value = "";
+  try {
+    const task = await aiTasksApi.create(props.projectId, "reverse_fill");
+    await aiTasksApi.start(task.id);
+    reverseFillMsg.value = "已启动 AI 补全任务，请在 FP 编辑页的任务面板查看进度";
+  } catch (e: unknown) {
+    reverseFillMsg.value = e instanceof Error ? e.message : "补全任务启动失败";
+  } finally {
+    reverseFillPending.value = false;
   }
 }
 
@@ -427,49 +445,99 @@ function fmtWan(n: number): string {
           <ResultTrio :tiers="reverseTiers" />
         </div>
 
-        <!-- 反算 UFP 细化分摊：按现有 FP 表各一级模块 UFP 占比拆分 -->
+        <!-- 反算 UFP 三级模块树细化分摊 -->
         <div
-          v-if="reverseResult!.module_allocation && reverseResult!.module_allocation.length"
+          v-if="reverseResult!.module_allocation_tree && reverseResult!.module_allocation_tree.length"
           class="card"
           style="padding: 20px"
         >
-          <div class="section-title" style="margin-bottom: 4px">
-            反算 UFP 模块细化分摊
+          <div
+            style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px"
+          >
+            <div class="section-title">反算 UFP 模块树细化分摊</div>
+            <button
+              type="button"
+              data-testid="reverse-fill-btn"
+              class="btn btn-primary btn-sm"
+              :disabled="reverseFillPending"
+              @click="triggerReverseFill"
+            >
+              {{ reverseFillPending ? "启动中…" : "按反算补全 FP" }}
+            </button>
           </div>
           <div class="muted" style="font-size: 12px; margin-bottom: 12px">
             目标可承载 UFP <b class="mono">{{ reverseResult!.target_ufp.toFixed(2) }}</b>，
-            按现有功能点清单各一级模块的 UFP 占比细化分摊到模块
+            沿 子系统 → 一级 → 二级 模块树逐层按现有 UFP 占比分摊。
+            「按反算补全 FP」会让 AI 为有缺口的叶子模块生成功能点草稿（需人工审核后采纳）。
+          </div>
+          <div
+            v-if="reverseFillMsg"
+            class="banner banner-green"
+            role="status"
+            style="margin-bottom: 12px"
+          >
+            {{ reverseFillMsg }}
           </div>
           <table class="table">
             <thead>
               <tr>
-                <th>子系统</th>
-                <th>一级模块</th>
+                <th>模块层级</th>
                 <th style="text-align: right">现有 UFP</th>
                 <th style="text-align: right">分摊后 UFP</th>
-                <th style="text-align: right">需细化增加</th>
+                <th style="text-align: right">缺口 / 超出</th>
                 <th style="text-align: right">占比</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(m, idx) in reverseResult!.module_allocation" :key="idx">
-                <td>{{ m.subsystem }}</td>
-                <td><b>{{ m.l1_module }}</b></td>
-                <td class="mono" style="text-align: right">{{ m.current_ufp.toFixed(2) }}</td>
-                <td class="mono" style="text-align: right; font-weight: 500">
-                  {{ m.allocated_ufp.toFixed(2) }}
-                </td>
-                <td
-                  class="mono"
-                  style="text-align: right"
-                  :style="{ color: m.delta_ufp >= 0 ? 'var(--green)' : 'var(--red)' }"
+              <template
+                v-for="sub in reverseResult!.module_allocation_tree"
+                :key="sub.subsystem"
+              >
+                <tr class="tree-row-l0">
+                  <td><b>{{ sub.subsystem }}</b></td>
+                  <td class="mono" style="text-align: right">{{ sub.current_ufp.toFixed(2) }}</td>
+                  <td class="mono" style="text-align: right">{{ sub.allocated_ufp.toFixed(2) }}</td>
+                  <td
+                    class="mono"
+                    style="text-align: right"
+                    :style="{ color: sub.delta_ufp >= 0 ? 'var(--green)' : 'var(--red)' }"
+                  >{{ sub.delta_ufp >= 0 ? "+" : "" }}{{ sub.delta_ufp.toFixed(2) }}</td>
+                  <td class="mono" style="text-align: right">{{ (sub.ratio * 100).toFixed(1) }}%</td>
+                </tr>
+                <template
+                  v-for="l1 in sub.children"
+                  :key="`${sub.subsystem}/${l1.l1_module}`"
                 >
-                  {{ m.delta_ufp >= 0 ? "+" : "" }}{{ m.delta_ufp.toFixed(2) }}
-                </td>
-                <td class="mono" style="text-align: right">
-                  {{ (m.ratio * 100).toFixed(2) }}%
-                </td>
-              </tr>
+                  <tr class="tree-row-l1">
+                    <td style="padding-left: 24px">{{ l1.l1_module }}</td>
+                    <td class="mono" style="text-align: right">{{ l1.current_ufp.toFixed(2) }}</td>
+                    <td class="mono" style="text-align: right">{{ l1.allocated_ufp.toFixed(2) }}</td>
+                    <td
+                      class="mono"
+                      style="text-align: right"
+                      :style="{ color: l1.delta_ufp >= 0 ? 'var(--green)' : 'var(--red)' }"
+                    >{{ l1.delta_ufp >= 0 ? "+" : "" }}{{ l1.delta_ufp.toFixed(2) }}</td>
+                    <td class="mono" style="text-align: right">{{ (l1.ratio * 100).toFixed(1) }}%</td>
+                  </tr>
+                  <tr
+                    v-for="l2 in l1.children"
+                    :key="`${sub.subsystem}/${l1.l1_module}/${l2.l2_module}`"
+                    class="tree-row-l2"
+                  >
+                    <td style="padding-left: 48px" class="muted">{{ l2.l2_module }}</td>
+                    <td class="mono" style="text-align: right">{{ l2.current_ufp.toFixed(2) }}</td>
+                    <td class="mono" style="text-align: right; font-weight: 500">
+                      {{ l2.allocated_ufp.toFixed(2) }}
+                    </td>
+                    <td
+                      class="mono"
+                      style="text-align: right"
+                      :style="{ color: l2.delta_ufp >= 0 ? 'var(--green)' : 'var(--red)' }"
+                    >{{ l2.delta_ufp >= 0 ? "+" : "" }}{{ l2.delta_ufp.toFixed(2) }}</td>
+                    <td class="mono" style="text-align: right">{{ (l2.ratio * 100).toFixed(1) }}%</td>
+                  </tr>
+                </template>
+              </template>
             </tbody>
           </table>
         </div>
@@ -629,5 +697,15 @@ function fmtWan(n: number): string {
   font-weight: 700;
   color: var(--text, var(--color-text));
   margin: 4px 0 2px;
+}
+.tree-row-l0 td {
+  background: var(--color-bg-hover, #f8fafc);
+  font-weight: 600;
+}
+.tree-row-l1 td {
+  font-weight: 500;
+}
+.tree-row-l2 td {
+  font-size: 12px;
 }
 </style>

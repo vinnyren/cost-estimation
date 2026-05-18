@@ -1,6 +1,6 @@
 import { api } from "./client";
 
-export type AiTaskKind = "extract" | "allocate";
+export type AiTaskKind = "extract" | "allocate" | "reverse_fill";
 export type AiTaskStatus = "queued" | "running" | "done" | "failed";
 
 export interface AiTask {
