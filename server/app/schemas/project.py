@@ -64,6 +64,9 @@ class ProjectPatch(BaseModel):
     industry: Optional[str] = None
     client: Optional[str] = None
     evaluator: Optional[str] = None
+    # 编辑设定可改评估方式与项目类型 —— 缺这两项时前端改「正向↔反向」会被静默丢弃。
+    mode: Optional[Literal["forward", "reverse"]] = None
+    project_type: Optional[Literal["dev_only", "ops_only", "dev_and_ops"]] = None
     target_cost: Optional[float] = None
     other_cost: Optional[float] = None
     include_ops: Optional[bool] = None
