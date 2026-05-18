@@ -54,6 +54,8 @@ const stubReverseResult = {
   scale_unadjusted_bands: { P10: 297, P50: 275, P90: 252 },
   cf_used: 1.21,
   recommended_band: "P50" as const,
+  target_ufp: 0,
+  module_allocation: [],
 };
 
 const allocateResult = {

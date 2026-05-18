@@ -22,6 +22,8 @@ const sampleReverse = (): ReverseResult => ({
   scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
   cf_used: 1.25,
   recommended_band: "P50",
+  target_ufp: 0,
+  module_allocation: [],
 });
 
 describe("resultsStore", () => {

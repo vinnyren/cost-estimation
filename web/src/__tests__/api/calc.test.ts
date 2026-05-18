@@ -46,6 +46,8 @@ describe("calcApi", () => {
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
       cf_used: 1.25,
       recommended_band: "P50" as const,
+      target_ufp: 0,
+      module_allocation: [],
     };
     (api.post as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(reply);
     const result = await calcApi.reverse(body);

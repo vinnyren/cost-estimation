@@ -86,6 +86,35 @@ def run_forward(db: Session, project_id: str, payload: dict) -> dict:
     return out
 
 
+def _allocate_ufp_to_modules(
+    db: Session, project_id: str, target_ufp: float
+) -> list[dict]:
+    """细化分摊：把反算出的目标 UFP 按现有 FP 表各一级模块的 UFP 占比拆下去。
+
+    每个模块给出现有 UFP、分摊后的目标 UFP、需细化增加的 UFP 差额。
+    FP 表为空时返回空列表。
+    """
+    fps = fs.list_for_project(db, project_id)
+    groups: dict[tuple[str, str], float] = {}
+    for fp in fps:
+        key = (fp.subsystem or "未分组", fp.l1_module or "未分类")
+        groups[key] = groups.get(key, 0.0) + float(fp.ufp or 0.0)
+    total_current = sum(groups.values())
+    out: list[dict] = []
+    for (sub, mod), cur in sorted(groups.items()):
+        ratio = cur / total_current if total_current > 0 else 0.0
+        allocated = target_ufp * ratio
+        out.append({
+            "subsystem": sub,
+            "l1_module": mod,
+            "current_ufp": round(cur, 2),
+            "allocated_ufp": round(allocated, 2),
+            "delta_ufp": round(allocated - cur, 2),
+            "ratio": round(ratio, 4),
+        })
+    return out
+
+
 def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
     proj = db.query(Project).filter_by(id=project_id).first()
     if not proj:
@@ -106,6 +135,12 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
     r = calculate_reverse(ctx, inp)
     out = r.__dict__.copy()
     out["warning_messages"] = list(out.get("warning_messages") or []) + warnings
+    # 以「细化增加 UFP」为核心：反算总规模（推荐档未调整规模 = UFP 口径）
+    # 按现有 FP 表各一级模块的 UFP 占比细化分摊到模块。
+    rec = out.get("recommended_band", "P50")
+    target_ufp = out["scale_unadjusted_bands"][rec]
+    out["target_ufp"] = round(target_ufp, 2)
+    out["module_allocation"] = _allocate_ufp_to_modules(db, project_id, target_ufp)
     return out
 
 

@@ -1,0 +1,2 @@
+import{a as o}from"./index-HW4o1Gjc.js";const i={list:t=>o.get(`/api/projects/${t}/functions`),create:(t,s)=>o.post(`/api/projects/${t}/functions`,s),patch:(t,s,p)=>o.patch(`/api/projects/${t}/functions/${s}`,p),remove:(t,s)=>o.delete(`/api/projects/${t}/functions/${s}`),bulk:(t,s)=>o.post(`/api/projects/${t}/functions/bulk`,{items:s}),snapshots:t=>o.get(`/api/projects/${t}/functions/snapshots`),restore:(t,s)=>o.post(`/api/projects/${t}/functions/restore?version=${s}`)};export{i as f};
+//# sourceMappingURL=functions-keBbJ3gD.js.map

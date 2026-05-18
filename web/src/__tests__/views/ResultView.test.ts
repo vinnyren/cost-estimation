@@ -262,6 +262,8 @@ describe("ResultView", () => {
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
       cf_used: 1.21,
       recommended_band: "P50" as const,
+      target_ufp: 0,
+      module_allocation: [],
     });
     router.push("/projects/2/result");
     await router.isReady();
@@ -288,6 +290,8 @@ describe("ResultView", () => {
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
       cf_used: 1.25,
       recommended_band: "P50" as const,
+      target_ufp: 0,
+      module_allocation: [],
     });
     router.push("/projects/2/result");
     await router.isReady();
@@ -338,6 +342,8 @@ describe("ResultView", () => {
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
       cf_used: 1.25,
       recommended_band: "P50" as const,
+      target_ufp: 0,
+      module_allocation: [],
     });
     await w.findAll("input[type='number']")[0].setValue(1_000_000);
     const reverseBtn = w.findAll("button").find((b) => b.text() === "反算");
@@ -373,6 +379,8 @@ describe("ResultView", () => {
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
       cf_used: 1.21,
       recommended_band: "P50" as const,
+      target_ufp: 0,
+      module_allocation: [],
     });
     vi.mocked(functionsApi.list).mockResolvedValue(allocFps);
     vi.mocked(calcApi.allocate).mockResolvedValueOnce({
@@ -426,6 +434,8 @@ describe("ResultView", () => {
       scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
       cf_used: 1.21,
       recommended_band: "P50" as const,
+      target_ufp: 0,
+      module_allocation: [],
     });
     vi.mocked(functionsApi.list).mockResolvedValue(allocFps);
     vi.mocked(calcApi.allocate).mockRejectedValueOnce(new Error("分摊服务不可用"));

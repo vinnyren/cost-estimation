@@ -41,6 +41,43 @@ async def test_reverse_endpoint_three_bands(client_factory):
         assert data["recommended_band"] == "P50"
 
 
+async def test_reverse_allocates_ufp_to_modules(client_factory):
+    """反算以 UFP 为核心：按现有 FP 表各一级模块 UFP 占比细化分摊。"""
+    async with await client_factory() as c:
+        pid = await _make_project(c)
+        await c.post(f"/api/projects/{pid}/functions/bulk",
+                     headers={**H, "Content-Type": "application/json"},
+                     json={"items": [
+                         {"name": "A", "subsystem": "软件开发", "l1_module": "电子结算",
+                          "category": "ILF", "complexity": "low", "ufp": 30, "us": 30,
+                          "source": "manual"},
+                         {"name": "B", "subsystem": "软件开发", "l1_module": "电子结算",
+                          "category": "ILF", "complexity": "low", "ufp": 10, "us": 10,
+                          "source": "manual"},
+                         {"name": "C", "subsystem": "软件开发", "l1_module": "智能终端",
+                          "category": "EIF", "complexity": "low", "ufp": 10, "us": 10,
+                          "source": "manual"},
+                     ]})
+        r = await c.post("/api/calc/reverse",
+                         headers={**H, "Content-Type": "application/json"},
+                         json={"project_id": pid, "target_total": 500000})
+        assert r.status_code == 200
+        data = r.json()["data"]
+        assert "target_ufp" in data
+        alloc = data["module_allocation"]
+        assert len(alloc) == 2  # 电子结算 + 智能终端
+        by_mod = {m["l1_module"]: m for m in alloc}
+        # 电子结算现有 UFP 40，智能终端 10 → 占比 0.8 / 0.2
+        assert abs(by_mod["电子结算"]["ratio"] - 0.8) < 1e-6
+        assert abs(by_mod["智能终端"]["ratio"] - 0.2) < 1e-6
+        # 分摊后 UFP 合计 ≈ target_ufp
+        total_alloc = sum(m["allocated_ufp"] for m in alloc)
+        assert abs(total_alloc - data["target_ufp"]) < 0.1
+        # delta = 分摊后 − 现有
+        assert abs(by_mod["电子结算"]["delta_ufp"]
+                   - (by_mod["电子结算"]["allocated_ufp"] - 40.0)) < 0.01
+
+
 async def test_allocator_endpoint(client_factory):
     async with await client_factory() as c:
         pid = await _make_project(c)

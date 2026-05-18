@@ -1,0 +1,1 @@
+{"version":3,"file":"AuditGlobalView-DeTQ2-wH.js","sources":["../../src/views/AuditGlobalView.vue"],"sourcesContent":["<script setup lang=\"ts\">\nimport AuditView from \"./AuditView.vue\";\n</script>\n\n<template>\n  <AuditView :global=\"true\" />\n</template>\n"],"names":["_createBlock","AuditView"],"mappings":"4QAKEA,EAA4BC,EAAA,CAAhB,OAAQ,GAAI"}

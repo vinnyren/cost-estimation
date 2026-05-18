@@ -45,6 +45,16 @@ export interface ForwardResult {
   composition?: CostComposition;
 }
 
+/** 反算 UFP 细化分摊到一级模块的单行。 */
+export interface ModuleUfpAllocation {
+  subsystem: string;
+  l1_module: string;
+  current_ufp: number;
+  allocated_ufp: number;
+  delta_ufp: number;
+  ratio: number;
+}
+
 /**
  * Reverse 反算返回值（与 server `app/core/reverse.py:ReverseResult` 对齐）。
  *
@@ -52,6 +62,8 @@ export interface ForwardResult {
  * - P10 乐观 / P50 中位 / P90 保守。
  * - 单一规模模型：scale_*_bands 为开发与运维共用的功能点规模（FP）。
  * - budget_for_dev / budget_for_ops 是该规模下推导出的成本拆分（推荐档）。
+ * - target_ufp / module_allocation：以 UFP 为核心，把反算总规模按现有 FP
+ *   表各一级模块的 UFP 占比细化分摊。
  */
 export interface ReverseResult {
   budget_for_dev: number;
@@ -60,6 +72,8 @@ export interface ReverseResult {
   scale_unadjusted_bands: BandValues;
   cf_used: number;
   recommended_band: Band;
+  target_ufp: number;
+  module_allocation: ModuleUfpAllocation[];
 }
 
 /**

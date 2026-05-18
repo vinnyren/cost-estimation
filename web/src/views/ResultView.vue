@@ -426,6 +426,53 @@ function fmtWan(n: number): string {
           </div>
           <ResultTrio :tiers="reverseTiers" />
         </div>
+
+        <!-- 反算 UFP 细化分摊：按现有 FP 表各一级模块 UFP 占比拆分 -->
+        <div
+          v-if="reverseResult!.module_allocation && reverseResult!.module_allocation.length"
+          class="card"
+          style="padding: 20px"
+        >
+          <div class="section-title" style="margin-bottom: 4px">
+            反算 UFP 模块细化分摊
+          </div>
+          <div class="muted" style="font-size: 12px; margin-bottom: 12px">
+            目标可承载 UFP <b class="mono">{{ reverseResult!.target_ufp.toFixed(2) }}</b>，
+            按现有功能点清单各一级模块的 UFP 占比细化分摊到模块
+          </div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>子系统</th>
+                <th>一级模块</th>
+                <th style="text-align: right">现有 UFP</th>
+                <th style="text-align: right">分摊后 UFP</th>
+                <th style="text-align: right">需细化增加</th>
+                <th style="text-align: right">占比</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(m, idx) in reverseResult!.module_allocation" :key="idx">
+                <td>{{ m.subsystem }}</td>
+                <td><b>{{ m.l1_module }}</b></td>
+                <td class="mono" style="text-align: right">{{ m.current_ufp.toFixed(2) }}</td>
+                <td class="mono" style="text-align: right; font-weight: 500">
+                  {{ m.allocated_ufp.toFixed(2) }}
+                </td>
+                <td
+                  class="mono"
+                  style="text-align: right"
+                  :style="{ color: m.delta_ufp >= 0 ? 'var(--green)' : 'var(--red)' }"
+                >
+                  {{ m.delta_ufp >= 0 ? "+" : "" }}{{ m.delta_ufp.toFixed(2) }}
+                </td>
+                <td class="mono" style="text-align: right">
+                  {{ (m.ratio * 100).toFixed(2) }}%
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </template>
 
       <AllocatorPanel
