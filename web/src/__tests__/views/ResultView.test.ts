@@ -250,6 +250,35 @@ describe("ResultView", () => {
     expect(calcApi.reverse).not.toHaveBeenCalled();
   });
 
+  it("reverse 模式：已有目标造价 → 进页面自动反算（无需再点反算）", async () => {
+    vi.mocked(projectsApi.get).mockResolvedValueOnce({
+      ...reverseProject,
+      target_cost: 400,
+    });
+    vi.mocked(calcApi.reverse).mockResolvedValue({
+      budget_for_dev: 4_000_000,
+      budget_for_ops: 0,
+      scale_adjusted_bands: { P10: 300, P50: 200, P90: 100 },
+      scale_unadjusted_bands: { P10: 240, P50: 160, P90: 80 },
+      cf_used: 1.21,
+      recommended_band: "P50" as const,
+    });
+    router.push("/projects/2/result");
+    await router.isReady();
+    mount(ResultView, {
+      props: { projectId: "p-2" },
+      global: { plugins: [createPinia(), router] },
+    });
+    await flushPromises();
+    await flushPromises();
+    // 挂载即自动反算，目标 400 万 ×10000 换算成元 = 4,000,000
+    expect(calcApi.reverse).toHaveBeenCalledWith({
+      project_id: "p-2",
+      target_total: 4_000_000,
+      other_cost: 0,
+    });
+  });
+
   it("reverse 模式：targetTotal>0 → 调 reverse API 并显示三档 FP", async () => {
     vi.mocked(projectsApi.get).mockResolvedValueOnce(reverseProject);
     vi.mocked(calcApi.reverse).mockResolvedValueOnce({

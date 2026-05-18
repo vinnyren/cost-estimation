@@ -104,6 +104,10 @@ async function loadAndCompute(): Promise<void> {
       // reverse 模式：从向导/编辑保存的 target_cost 预填，省一次手输
       targetTotal.value = project.value.target_cost ?? 0;
       otherCost.value = project.value.other_cost ?? 0;
+      // 已有目标造价 → 进页面即自动反算，避免「第二次进入要再点一次反算」。
+      if (targetTotal.value > 0) {
+        await reverseCalc();
+      }
     }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : "计算失败";
