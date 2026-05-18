@@ -1,17 +1,18 @@
 from dataclasses import dataclass, field
+from typing import Literal, Optional
 from .context import EvaluationContext
 
 
 # 开发项目计入 add(ADD) + convert(CFP)；增强项目额外计入 change(CHGA) + delete(DEL)。
 _DEV_TYPES = {"add", "convert"}
-_ENHANCEMENT_TYPES = {"add", "convert", "change", "delete"}
+_ENHANCEMENT_TYPES = _DEV_TYPES | {"change", "delete"}
 
 
 @dataclass
 class FpItem:
     us: float
     # v2.8 — 变更类型（add/change/delete/convert）。None 视为 add（老数据兼容）。
-    modify_type: str | None = "add"
+    modify_type: Optional[Literal["add", "change", "delete", "convert"]] = "add"
 
 
 @dataclass
@@ -23,7 +24,7 @@ class ForwardInput:
     include_ops: bool = False
     other_cost: float = 0.0
     # v2.8 — development 开发项目 / enhancement 增强项目。
-    assessment_kind: str = "development"
+    assessment_kind: Literal["development", "enhancement"] = "development"
 
 
 @dataclass
