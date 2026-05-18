@@ -121,8 +121,8 @@ class ProjectBundleItem(BaseModel):
     basis_data_ver: str
     factors_dev: Optional[dict] = None
     factors_ops: Optional[dict] = None
-    param_overrides: list[ParamOverrideItem] = Field(default_factory=list)
-    function_points: list[FunctionPointBase] = Field(default_factory=list)
+    param_overrides: list[ParamOverrideItem] = Field(default_factory=list, max_length=500)
+    function_points: list[FunctionPointBase] = Field(default_factory=list, max_length=5000)
 
 
 class ProjectBundle(BaseModel):
@@ -130,7 +130,7 @@ class ProjectBundle(BaseModel):
 
     version: str
     exported_at: str
-    projects: list[ProjectBundleItem]
+    projects: list[ProjectBundleItem] = Field(..., max_length=200)
 
 
 class ProjectExportRequest(BaseModel):

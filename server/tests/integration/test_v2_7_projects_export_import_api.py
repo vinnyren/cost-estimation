@@ -89,3 +89,85 @@ async def test_import_rejects_project_missing_required_field(client_factory):
                "projects": [{"name": "缺字段"}]}  # 缺 project_type 等
         r = await client.post("/api/projects/import", headers=HJ, json=bad)
         assert r.status_code == 400
+
+
+# ── H1: bundle 规模上限 ────────────────────────────────────────────────────
+
+_MIN_PROJECT = {
+    "name": "x",
+    "project_type": "dev_only",
+    "phase": "bidding",
+    "city": "北京",
+    "industry": "电子政务",
+    "mode": "forward",
+    "basis_data_ver": "CSBMK®-202510",
+}
+
+
+async def test_import_rejects_bundle_with_201_projects(client_factory):
+    """H1: projects 超过 200 条时 POST /api/projects/import 应返回 400。"""
+    async with await client_factory() as client:
+        big_bundle = {
+            "version": "2.7",
+            "exported_at": "2026-05-18T00:00:00Z",
+            "projects": [_MIN_PROJECT.copy() for _ in range(201)],
+        }
+        r = await client.post("/api/projects/import", headers=HJ, json=big_bundle)
+        assert r.status_code == 400
+
+
+# ── H2: claude_draft 归一化 ───────────────────────────────────────────────
+
+async def test_import_normalizes_claude_draft_source_to_ai_extracted(client_factory):
+    """H2: 导出的 claude_draft FP 在导入后 source 应被归一化为 ai_extracted。"""
+    async with await client_factory() as client:
+        pid = await _make_project(client, "含草稿FP的项目")
+        # 直接用 bulk 写入一个 claude_draft FP（或先创建后通过 bundle 注入）
+        # 通过 bundle 注入：构造 bundle 使 FP source = claude_draft
+        bundle = {
+            "version": "2.7",
+            "exported_at": "2026-05-18T00:00:00Z",
+            "projects": [{
+                **_MIN_PROJECT,
+                "name": "含草稿FP的项目",
+                "client": None,
+                "evaluator": None,
+                "target_cost": None,
+                "other_cost": 0,
+                "include_ops": False,
+                "alpha_dev": 1.0,
+                "fp_method": "nesma_estimated",
+                "factors_dev": None,
+                "factors_ops": None,
+                "param_overrides": [],
+                "function_points": [
+                    {
+                        "name": "草稿fp",
+                        "category": "EI",
+                        "complexity": "low",
+                        "ufp": 3,
+                        "us": 3,
+                        "source": "claude_draft",
+                        "subsystem": None,
+                        "l1_module": None,
+                        "l2_module": None,
+                        "description": None,
+                        "fp_kind": "dev",
+                        "reuse_level": "low",
+                        "modify_type": "new",
+                        "locked": False,
+                        "notes": None,
+                        "ord": 0,
+                    }
+                ],
+            }],
+        }
+        r = await client.post("/api/projects/import", headers=HJ, json=bundle)
+        assert r.status_code == 200
+        new_id = r.json()["data"]["project_ids"][0]
+        fps = (await client.get(f"/api/projects/{new_id}/functions",
+                                headers=H)).json()["data"]
+        assert len(fps) == 1
+        assert fps[0]["source"] == "ai_extracted", (
+            f"Expected source='ai_extracted', got {fps[0]['source']!r}"
+        )

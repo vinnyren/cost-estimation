@@ -279,11 +279,14 @@ def import_bundle(db: Session, bundle) -> tuple[int, list[str]]:
         )
         db.add(new)
         for fp in item.function_points:
+            data = fp.model_dump()
+            if data.get("source") == "claude_draft":
+                data["source"] = "ai_extracted"
             db.add(FunctionPoint(
                 id=f"fp-{uuid.uuid4().hex[:12]}",
                 project_id=new_id,
                 version=1,
-                **fp.model_dump(),
+                **data,
             ))
         for po in item.param_overrides:
             db.add(ParamOverride(

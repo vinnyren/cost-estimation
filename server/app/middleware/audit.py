@@ -44,6 +44,8 @@ def _action_for(method: str, path: str) -> str | None:
         return "fp.bulk_write"
     if sub_path.startswith("functions/restore"):
         return "fp.restore"
+    if sub_path.startswith("functions/accept-drafts") and method == "POST":
+        return "fp.accept_drafts"
     if sub_path.startswith("functions") and method == "POST":
         return "fp.create"
     if sub_path.startswith("functions") and method == "PATCH":
