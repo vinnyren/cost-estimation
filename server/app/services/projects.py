@@ -274,6 +274,7 @@ def import_bundle(db: Session, bundle) -> tuple[int, list[str]]:
             alpha_dev=item.alpha_dev,
             fp_method=item.fp_method,
             basis_data_ver=item.basis_data_ver,
+            assessment_kind=item.assessment_kind,
             factors_dev_json=json.dumps(item.factors_dev) if item.factors_dev is not None else None,
             factors_ops_json=json.dumps(item.factors_ops) if item.factors_ops is not None else None,
         )

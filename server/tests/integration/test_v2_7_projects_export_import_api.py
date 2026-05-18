@@ -154,7 +154,7 @@ async def test_import_normalizes_claude_draft_source_to_ai_extracted(client_fact
                         "description": None,
                         "fp_kind": "dev",
                         "reuse_level": "low",
-                        "modify_type": "new",
+                        "modify_type": "add",
                         "locked": False,
                         "notes": None,
                         "ord": 0,
