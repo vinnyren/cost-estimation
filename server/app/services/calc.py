@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from ..core.context import EvaluationContext, ProjectInputs
 from ..core.forward import calculate_forward, ForwardInput, FpItem
 from ..core.reverse import calculate_reverse, ReverseInput
-from ..core.allocator import allocate, allocate_with_validation, AllocatorInput, FpDraft
+from ..core.allocator import allocate_with_validation, AllocatorInput, FpDraft
 from ..db.models import Project
 from . import factors as fsvc
 from . import params as ps
@@ -111,7 +111,7 @@ def build_module_tree(fps: list, target_ufp: float) -> list[dict]:
         for l1v in subv.values() for u in l1v.values()
     )
 
-    def _split(current: float, parent_alloc: float, parent_total: float) -> tuple:
+    def _split(current: float, parent_alloc: float, parent_total: float) -> tuple[float, float]:
         ratio = current / parent_total if parent_total > 0 else 0.0
         return ratio, parent_alloc * ratio
 

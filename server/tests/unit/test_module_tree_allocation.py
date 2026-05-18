@@ -1,5 +1,5 @@
 """v2.8 — 反算三级模块树逐层分摊单元测试。"""
-from app.services.calc import build_module_tree
+from app.services.calc import build_module_tree, _flatten_tree_leaves
 
 
 class _FP:
@@ -54,6 +54,14 @@ def test_node_carries_current_allocated_delta_ratio_children():
     for key in ("subsystem", "current_ufp", "allocated_ufp",
                 "delta_ufp", "ratio", "children"):
         assert key in node
+    l1 = node["children"][0]
+    for key in ("l1_module", "current_ufp", "allocated_ufp",
+                "delta_ufp", "ratio", "children"):
+        assert key in l1
+    l2 = l1["children"][0]
+    for key in ("l2_module", "current_ufp", "allocated_ufp",
+                "delta_ufp", "ratio"):
+        assert key in l2
 
 
 def test_zero_total_current_ufp_no_div_by_zero():
@@ -61,3 +69,22 @@ def test_zero_total_current_ufp_no_div_by_zero():
     tree = build_module_tree(fps, target_ufp=100)
     assert tree[0]["ratio"] == 0.0
     assert tree[0]["allocated_ufp"] == 0.0
+
+
+def test_flatten_tree_leaves_produces_leaf_list():
+    fps = [
+        _FP("结算", "资金", "查询", 40),
+        _FP("结算", "资金", "对账", 60),
+        _FP("报表", "统计", "汇总", 50),
+    ]
+    tree = build_module_tree(fps, target_ufp=300)
+    leaves = _flatten_tree_leaves(tree)
+    # 3 个叶子，每个含三级路径 + 分摊字段
+    assert len(leaves) == 3
+    for leaf in leaves:
+        for key in ("subsystem", "l1_module", "l2_module",
+                    "current_ufp", "allocated_ufp", "delta_ufp", "ratio"):
+            assert key in leaf
+    by_l2 = {leaf["l2_module"]: leaf for leaf in leaves}
+    assert by_l2["查询"]["subsystem"] == "结算"
+    assert by_l2["查询"]["l1_module"] == "资金"
