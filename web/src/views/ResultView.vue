@@ -13,6 +13,7 @@
 import { onMounted, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { projectsApi, type Project } from "@/api/projects";
+import { BAND_DETAIL_LABEL } from "@/lib/bandLabels";
 import {
   calcApi,
   type ForwardResult,
@@ -214,12 +215,6 @@ const PHASE_LABEL_MAP: Record<string, string> = {
   planning: "立项审批",
   change: "变更评估",
   settled: "结算审计",
-};
-
-const BAND_DETAIL_LABEL: Record<"P10" | "P50" | "P90", string> = {
-  P10: "P10 乐观档",
-  P50: "P50 推荐档",
-  P90: "P90 保守档",
 };
 
 const forwardTiers = computed(() => {

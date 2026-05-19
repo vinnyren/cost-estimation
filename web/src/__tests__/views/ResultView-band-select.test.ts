@@ -138,7 +138,7 @@ describe("ResultView — 三档卡片选择", () => {
     expect(w.find("[data-testid='tier-card-P90']").attributes("data-selected")).toBe("true");
   });
 
-  it("选择 P90 后「计算路径详解」标题更新为 P90 乐观档", async () => {
+  it("选择 P90 后「计算路径详解」标题更新为 P90 保守档", async () => {
     const w = await mountForward();
     await w.find("[data-testid='tier-card-P90']").trigger("click");
     await flushPromises();

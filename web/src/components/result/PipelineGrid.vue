@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { BAND_DETAIL_LABEL } from "@/lib/bandLabels";
 
 interface PipelineTrace {
   us: number;
@@ -26,12 +27,6 @@ const props = defineProps<{
   costTotalYuan?: { P10: number; P50: number; P90: number };
 }>();
 
-const BAND_LABEL: Record<string, string> = {
-  P10: "P10 乐观档",
-  P50: "P50 推荐档",
-  P90: "P90 保守档",
-};
-
 const activeBand = computed(() => props.band ?? "P50");
 
 /** PDR scales inversely with effort from P50 baseline */
@@ -44,6 +39,8 @@ const pdrForBand = computed(() => {
   const effPmP50 = props.trace.eff_pm_p50;
   if (effPmP50 === 0) return props.trace.pdr_p50;
   const effPmBand = props.effortDevHours[activeBand.value] / (props.trace.eff_hours_p50 / effPmP50);
+  // Guard the actual denominator used in the division below.
+  if (effPmBand === 0) return props.trace.pdr_p50;
   return props.trace.pdr_p50 * (effPmP50 / effPmBand);
 });
 
@@ -53,9 +50,10 @@ const effPmForBand = computed(() => {
     return props.trace.eff_pm_p50;
   }
   const effPmP50 = props.trace.eff_pm_p50;
-  const effHoursP50 = props.trace.eff_hours_p50;
-  if (effHoursP50 === 0) return effPmP50;
-  const ratio = props.effortDevHours[activeBand.value] / props.effortDevHours["P50"];
+  // Guard the actual denominator: effortDevHours["P50"] is what we divide by.
+  const effortP50 = props.effortDevHours["P50"];
+  if (effortP50 === 0) return effPmP50;
+  const ratio = props.effortDevHours[activeBand.value] / effortP50;
   return effPmP50 * ratio;
 });
 
@@ -75,7 +73,7 @@ const totalForBand = computed(() => {
   return props.costTotalYuan[activeBand.value];
 });
 
-const bandLabel = computed(() => BAND_LABEL[activeBand.value] ?? activeBand.value);
+const bandLabel = computed(() => BAND_DETAIL_LABEL[activeBand.value] ?? activeBand.value);
 
 const steps = computed(() => [
   { tag: "US", label: "未调整规模", val: props.trace.us.toFixed(2), unit: "FP", note: "Σ FP[i].us" },
