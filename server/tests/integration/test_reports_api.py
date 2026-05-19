@@ -29,11 +29,11 @@ async def test_download_excel(client_factory, tmp_data_dir):
         for s in ["封面", "评估结果汇总", "模块功能点及费用分项统计表",
                   "系统功能点明细表", "评估报告书", "调整因子表"]:
             assert s in wb.sheetnames
-        # 评估结果汇总：调整后规模 S = us 4 × cf 1.21 = 4.84（在 D 列）
+        # 评估结果汇总：调整后规模 S = us 4 × cf 1.25 = 5.0（在 D 列，SSM-BK-202509 招标阶段）
         ws = wb["评估结果汇总"]
         d_vals = [ws.cell(row=row, column=4).value
                   for row in range(1, ws.max_row + 1)]
-        assert 4.84 in d_vals
+        assert 5.0 in d_vals
         # 评估报告书必须有叙述内容（修复旧版空白 sheet）
         narr = wb["评估报告书"]
         narr_text = "\n".join(str(narr.cell(r, 1).value or "")

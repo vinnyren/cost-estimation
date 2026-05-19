@@ -21,7 +21,7 @@ async def test_forward_endpoint_smoke(client_factory):
         assert r.status_code == 200
         data = r.json()["data"]
         assert data["scale_us"] == 275
-        assert abs(data["scale_adjusted"] - 275 * 1.21) < 1e-6
+        assert abs(data["scale_adjusted"] - 275 * 1.25) < 1e-6
 
 
 async def test_reverse_endpoint_three_bands(client_factory):
