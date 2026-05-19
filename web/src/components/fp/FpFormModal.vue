@@ -130,6 +130,18 @@ const cosmicCfpTotal = computed<number>(() =>
   (cosmicWrite.value ?? 0),
 );
 
+// Fix 2: method-aware complexity label/hint for the v-else (ifpug-style) block
+const complexityMeta = computed<{ label: string; hint: string }>(() => {
+  if (effectiveMethod.value === "nesma_detailed") {
+    return { label: "复杂度（NESMA 详细级 自动）", hint: "按 GB/T 42588 查表" };
+  }
+  if (effectiveMethod.value === "nesma_indicative") {
+    return { label: "复杂度（NESMA 预估级）", hint: "预估级仅按 ILF/EIF 计数" };
+  }
+  // ifpug (and any unexpected method that falls into v-else)
+  return { label: "复杂度（IFPUG 自动）", hint: "按 GB/T 42449 查表" };
+});
+
 function resetForm(): void {
   name.value = "";
   description.value = "";
@@ -213,6 +225,7 @@ async function onSubmit(): Promise<void> {
       l1_module: l1_module.value.trim() || undefined,
       l2_module: l2_module.value.trim() || undefined,
       category: category.value,
+      complexity: "average" as const, // COSMIC has no complexity concept; schema requires a value
       cosmic_entry: cosmicEntry.value ?? 0,
       cosmic_exit: cosmicExit.value ?? 0,
       cosmic_read: cosmicRead.value ?? 0,
@@ -468,7 +481,7 @@ async function onSubmit(): Promise<void> {
           <div class="form-group">
             <span class="form-label">复杂度（估算级固定）</span>
             <div class="ufp-display">
-              <span data-testid="fp-complexity-auto" class="ufp-value">中</span>
+              <span data-testid="fp-complexity-estimated" class="ufp-value">中</span>
               <span class="ufp-hint muted">NESMA 估算级固定为中等复杂度</span>
             </div>
           </div>
@@ -484,12 +497,12 @@ async function onSubmit(): Promise<void> {
         <!-- ifpug / nesma_detailed / nesma_indicative: complexity auto display -->
         <div v-else class="form-row">
           <div class="form-group">
-            <span class="form-label">复杂度（IFPUG 自动）</span>
+            <span class="form-label">{{ complexityMeta.label }}</span>
             <div class="ufp-display">
               <span data-testid="fp-complexity-auto" class="ufp-value">
                 {{ complexity === 'low' ? '低' : complexity === 'high' ? '高' : '中' }}
               </span>
-              <span class="ufp-hint muted">按 GB/T 42449 查表</span>
+              <span class="ufp-hint muted">{{ complexityMeta.hint }}</span>
             </div>
           </div>
           <div class="form-group">
