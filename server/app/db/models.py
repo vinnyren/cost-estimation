@@ -38,7 +38,7 @@ class Project(Base):
     other_cost = Column(Float, default=0)
     include_ops = Column(Boolean, default=False)
     alpha_dev = Column(Float, default=1.0)
-    fp_method = Column(String, default="nesma_estimated")
+    measurement_method = Column(String, nullable=False, server_default="nesma_estimated")
     basis_data_ver = Column(String, nullable=False)
     # v2.8 — 评估口径：development 开发项目 / enhancement 增强项目。
     # 独立于 project_type（dev_only/...），决定 forward 规模公式（DFP vs EFP）。
@@ -118,6 +118,11 @@ class FunctionPoint(Base):
     det = Column(Integer)  # 数据元素类型数 Data Element Types
     ret = Column(Integer)  # 记录元素类型数 Record Element Types（数据功能用）
     ftr = Column(Integer)  # 引用文件数 File Types Referenced（事务功能用）
+    # v2.9 COSMIC 数据移动列（可空，仅 cosmic 方法使用）
+    cosmic_entry = Column(Integer, nullable=True)
+    cosmic_exit  = Column(Integer, nullable=True)
+    cosmic_read  = Column(Integer, nullable=True)
+    cosmic_write = Column(Integer, nullable=True)
     # fp_kind 区分开发 / 运维功能点 —— 反算分摊按口径拆分目标 US 时用它过滤。
     fp_kind = Column(String, nullable=False, server_default="dev")  # dev|ops
     ufp = Column(Float, nullable=False)
