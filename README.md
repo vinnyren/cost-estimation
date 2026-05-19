@@ -2,7 +2,7 @@
 
 基于 GB/T 36964 / T/CCUA 005-2024 / GB/T 28827.7-2022 / GB/T 42449-2023 / GB/T 42452-2023 / GB/T 42588-2023 与 SSM-BK-202509 数据集的软件造价评估工具，作为 Claude Code Plugin 发布。
 
-> 当前版本 **v2.6.0** · 数据基准 CSBMK®-202510 · 完整变更见 [docs/v2-changelog.md](docs/v2-changelog.md)
+> 当前版本 **v2.6.0** · 数据基准 SSM-BK-202509 · 完整变更见 [docs/v2-changelog.md](docs/v2-changelog.md)
 
 ## 功能
 

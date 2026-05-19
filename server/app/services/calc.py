@@ -14,7 +14,7 @@ _METHOD_DECLARATION = {
     "nesma_detailed":   "FP (NESMA-GB/T 42588-2023, 详细级)",
     "nesma_estimated":  "FP (NESMA-GB/T 42588-2023, 估算级)",
     "nesma_indicative": "FP (NESMA-GB/T 42588-2023, 预估级)",
-    "cosmic":           "CFP (COSMIC-GB/T 42452-2023)",
+    "cosmic":           "FP 当量 (COSMIC-GB/T 42452-2023, 经 CFP 换算)",
 }
 
 

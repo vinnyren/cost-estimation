@@ -58,7 +58,7 @@ class TestForwardDeclaration:
     def test_cosmic_declaration(self):
         ctx = _make_ctx()
         inp = ForwardInput(items=[FpItem(us=10.0)],
-                           size_declaration="CFP (COSMIC-GB/T 42452-2023)")
+                           size_declaration="FP 当量 (COSMIC-GB/T 42452-2023, 经 CFP 换算)")
         result = calculate_forward(ctx, inp)
         assert "COSMIC" in result.trace["fp_count_declaration"]
 
