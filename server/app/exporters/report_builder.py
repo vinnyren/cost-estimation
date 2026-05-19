@@ -383,7 +383,7 @@ def _sheet_narrative(wb: Workbook, project: Any, functions: list, fig: dict,
          f"评估阶段为「{project.phase}」，评估方式为{mode_label}。"),
         ("二、评估依据",
          "1.《软件研发成本度量规范》（GB/T 36964-2018）；"
-         "2. NESMA 功能点估算方法；"
+         f"2. {_DECLARATION_LABEL.get(measurement_method, '功能规模测量方法')}；"
          f"3. CSBMK 行业基准数据（版本 {project.basis_data_ver}）。"),
         ("三、评估方法", method_section_body),
         ("四、评估过程",
