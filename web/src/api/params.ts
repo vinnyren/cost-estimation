@@ -15,6 +15,8 @@ export interface EffectiveParams {
    * 或嵌套 map（细分变更类型）。两种都按 leaf 渲染。
    */
   scale_change?: Record<string, number | Record<string, number>>;
+  /** v2.9 B2 — COSMIC CFP → FP 当量换算系数（默认 1.2）。 */
+  cfp_to_fp?: number;
   overrides?: Record<string, unknown>;
 }
 

@@ -532,6 +532,38 @@ async function onFactorEdit(
             </template>
           </tbody>
         </table>
+
+        <h3 class="subtitle subtitle-spaced">
+          计量方法换算
+        </h3>
+        <p class="hint">
+          COSMIC CFP 与 IFPUG FP 之间的当量换算系数，用于跨标准规模对比。
+        </p>
+        <table
+          v-if="eff.cfp_to_fp !== undefined"
+          class="rate-table"
+        >
+          <thead>
+            <tr>
+              <th>参数</th>
+              <th>值</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>CFP→FP 换算系数</td>
+              <td>
+                <OverrideField
+                  label=""
+                  :model-value="draftValue('cfp_to_fp', eff.cfp_to_fp as number)"
+                  :default-value="eff.cfp_to_fp as number"
+                  :overridden="store.isOverridden('cfp_to_fp')"
+                  @update:model-value="(nv) => patchOverride('cfp_to_fp', nv)"
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </section>
 
       <section

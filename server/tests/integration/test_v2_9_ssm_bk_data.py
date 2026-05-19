@@ -65,3 +65,10 @@ def test_cf_phases_present():
     data = _load()
     for phase in ("budget", "bidding", "planning", "change", "settled"):
         assert phase in data["cf"], f"cf 缺少阶段 {phase}"
+
+
+def test_cfp_to_fp_present_and_default():
+    """ssm_bk_202509.json 含 cfp_to_fp = 1.2。"""
+    data = _load()
+    assert "cfp_to_fp" in data
+    assert data["cfp_to_fp"] == pytest.approx(1.2)

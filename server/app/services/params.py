@@ -126,6 +126,7 @@ _FLAT_TOP_KEYS = (
     "hours_per_pm",
     "ops_cost_ratio",
     "scale_change",  # v2.0 — 规模变更因子（QA round 2: 补 CSBMK 数据）
+    "cfp_to_fp",    # v2.9 B2 — COSMIC CFP → FP 换算系数
 )
 
 
