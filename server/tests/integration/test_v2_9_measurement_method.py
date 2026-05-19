@@ -89,9 +89,6 @@ def test_fp_patch_cosmic_fields():
 # ---------------------------------------------------------------------------
 # Task A4: _apply_sizing — HTTP integration tests
 # ---------------------------------------------------------------------------
-import uuid
-from app.db.models import Project, FunctionPoint
-from app.services import functions as fn_svc
 
 
 def _seed_project(db, pid: str, measurement_method: str = "nesma_estimated"):
@@ -149,7 +146,7 @@ async def test_create_fp_under_nesma_estimated_uses_average(client_factory, db_s
 
 
 @pytest.mark.asyncio
-async def test_create_fp_under_ifpug_unchanged(client_factory, db_session):
+async def test_create_fp_under_ifpug_computes_ufp_from_det_ret(client_factory, db_session):
     """IFPUG 项目：按 det/ret 查表，ILF det=10 ret=1 → low → 7。"""
     _seed_project(db_session, "p-a4-ifpug", measurement_method="ifpug")
     async with await client_factory() as client:

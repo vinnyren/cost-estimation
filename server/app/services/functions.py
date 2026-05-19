@@ -3,7 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..db.models import FunctionPoint, FPSnapshot, Project, Result
 from ..schemas.functions import FunctionPointCreate, FunctionPointPatch
-from ..core.ifpug import classify_complexity, fp_value
+from ..core.ifpug import classify_complexity
 from ..core.sizing import get_method
 
 
@@ -118,6 +118,8 @@ def patch(db: Session, project_id: str, fp_id: str, payload: FunctionPointPatch)
     merged = {c.name: getattr(fp, c.name) for c in fp.__table__.columns}
     merged.update(updates)
     proj_obj = db.query(Project).filter_by(id=project_id).first()
+    if proj_obj is None:
+        return None
     method = getattr(proj_obj, "measurement_method", "nesma_estimated") or "nesma_estimated"
     merged = _apply_sizing(method, merged)
     for k, v in updates.items():
