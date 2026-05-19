@@ -16,6 +16,11 @@ class FunctionPointBase(BaseModel):
     det: Optional[int] = Field(default=None, ge=0)
     ret: Optional[int] = Field(default=None, ge=0)
     ftr: Optional[int] = Field(default=None, ge=0)
+    # v2.9 COSMIC 数据移动字段（可空，仅 cosmic 方法使用）
+    cosmic_entry: Optional[int] = Field(default=None, ge=0)
+    cosmic_exit:  Optional[int] = Field(default=None, ge=0)
+    cosmic_read:  Optional[int] = Field(default=None, ge=0)
+    cosmic_write: Optional[int] = Field(default=None, ge=0)
     # dev = 开发功能点 / ops = 运维功能点。默认 dev 兼容历史数据。
     fp_kind: Literal["dev", "ops"] = "dev"
     # ufp / us 必须 ≥ 0 — 负值会让 forward calc 产出负造价，业务无意义
@@ -70,6 +75,10 @@ class FunctionPointPatch(BaseModel):
     det: Optional[int] = Field(default=None, ge=0)
     ret: Optional[int] = Field(default=None, ge=0)
     ftr: Optional[int] = Field(default=None, ge=0)
+    cosmic_entry: Optional[int] = Field(default=None, ge=0)
+    cosmic_exit:  Optional[int] = Field(default=None, ge=0)
+    cosmic_read:  Optional[int] = Field(default=None, ge=0)
+    cosmic_write: Optional[int] = Field(default=None, ge=0)
     modify_type: Optional[Literal["add", "change", "delete", "convert"]] = None
     fp_kind: Optional[Literal["dev", "ops"]] = None
     ufp: Optional[float] = Field(default=None, ge=0)

@@ -18,7 +18,9 @@ class ProjectCreate(BaseModel):
     other_cost: float = 0
     include_ops: bool = False
     alpha_dev: float = 1.0
-    fp_method: Literal["nesma_estimated", "ifpug", "quick"] = "nesma_estimated"
+    measurement_method: Literal[
+        "ifpug", "nesma_indicative", "nesma_estimated", "nesma_detailed", "cosmic"
+    ] = "nesma_estimated"
     basis_data_ver: str
     # v2.8 — 评估口径：development 开发项目 / enhancement 增强项目。
     assessment_kind: Literal["development", "enhancement"] = "development"
@@ -80,6 +82,9 @@ class ProjectPatch(BaseModel):
     # v2.0 — per-project 调整因子选择
     factors_dev: Optional[dict] = None
     factors_ops: Optional[dict] = None
+    measurement_method: Optional[Literal[
+        "ifpug", "nesma_indicative", "nesma_estimated", "nesma_detailed", "cosmic"
+    ]] = None
 
 
 class ProjectStatsCounts(BaseModel):
@@ -123,7 +128,9 @@ class ProjectBundleItem(BaseModel):
     other_cost: float = 0
     include_ops: bool = False
     alpha_dev: float = 1.0
-    fp_method: Literal["nesma_estimated", "ifpug", "quick"] = "nesma_estimated"
+    measurement_method: Literal[
+        "ifpug", "nesma_indicative", "nesma_estimated", "nesma_detailed", "cosmic"
+    ] = "nesma_estimated"
     basis_data_ver: str
     assessment_kind: Literal["development", "enhancement"] = "development"
     selected_band: Literal["P10", "P50", "P90"] = "P50"

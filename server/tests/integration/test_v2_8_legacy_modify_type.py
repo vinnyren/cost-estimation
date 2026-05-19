@@ -33,7 +33,7 @@ async def test_import_v2_7_bundle_with_legacy_modify_type(client_factory, db_ses
             "name": "legacy import", "project_type": "dev_only", "phase": "bidding",
             "city": "北京", "industry": "电子政务", "mode": "forward",
             "other_cost": 0, "include_ops": False, "alpha_dev": 1.0,
-            "fp_method": "nesma_estimated", "basis_data_ver": "CSBMK®-202510",
+            "measurement_method": "nesma_estimated", "basis_data_ver": "CSBMK®-202510",
             "param_overrides": [],
             "function_points": [{
                 "name": "登录", "category": "EI", "complexity": "low",

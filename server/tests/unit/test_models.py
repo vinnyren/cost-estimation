@@ -27,7 +27,7 @@ def test_project_required_fields():
         "other_cost",
         "include_ops",
         "alpha_dev",
-        "fp_method",
+        "measurement_method",
         "basis_data_ver",
     }
     assert must_have.issubset(fields)
