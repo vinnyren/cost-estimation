@@ -52,7 +52,9 @@ def _resolve_items(
         items = [FpItem(us=fp.us, modify_type=fp.modify_type or "add") for fp in db_items]
 
     # COSMIC CFP → FP 等量换算（仅 forward，仅 COSMIC 方法）
-    if is_cosmic and cfp_to_fp:
+    if is_cosmic:
+        if not (cfp_to_fp and cfp_to_fp > 0):
+            raise ValueError("INVALID_CFP_TO_FP: COSMIC 换算系数 cfp_to_fp 必须 > 0")
         items = [FpItem(us=item.us / cfp_to_fp, modify_type=item.modify_type)
                  for item in items]
 

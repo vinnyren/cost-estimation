@@ -4,8 +4,6 @@ from app.core.forward import ForwardInput, FpItem, calculate_forward
 from app.core.context import EvaluationContext, ProjectInputs
 from app.services import calc as calc_svc
 
-H = {"X-Auth-Token": "test-secret-token-xyz", "Origin": "http://127.0.0.1:8788"}
-
 
 def _seed_params(db):
     """Seed global params so get_effective resolves a complete cost context."""
@@ -48,7 +46,7 @@ class TestForwardDeclaration:
         inp = ForwardInput(items=[FpItem(us=10.0)],
                            size_declaration="FP (IFPUG-GB/T 42449-2023)")
         result = calculate_forward(ctx, inp)
-        assert "IFPUG" in result.trace["fp_count_declaration"]
+        assert result.trace["fp_count_declaration"] == "10 FP (IFPUG-GB/T 42449-2023)"
 
     def test_nesma_estimated_declaration(self):
         ctx = _make_ctx()
