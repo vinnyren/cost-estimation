@@ -23,6 +23,7 @@ import LoadingSkeleton from "@/components/status/LoadingSkeleton.vue";
 import ErrorBanner from "@/components/status/ErrorBanner.vue";
 import { snapshotsApi, type ParamSnapshot } from "@/api/snapshots";
 import { formatBeijingFull } from "@/lib/datetime";
+import { paramsApi } from "@/api/params";
 
 const props = defineProps<{ projectId: string | null }>();
 
@@ -135,12 +136,67 @@ const TABS = [
 
 const eff = computed(() => store.effective);
 
-// 每次 override 都触发 markParamsChanged，确保结果页的 StaleBanner 能提示重算
-// 全局模式（projectId = null）不支持 override 写操作
+// ── 全局模式草稿态（项目模式不用）─────────────────────────────────
+const draftBuffer = ref<Record<string, unknown>>({});
+const isGlobal = computed(() => !props.projectId);
+const isDirty = computed(() => Object.keys(draftBuffer.value).length > 0);
+const savingDraft = ref(false);
+
+// 切换 projectId 时清除残留草稿，防止跨模式污染
+watch(() => props.projectId, () => { draftBuffer.value = {}; });
+
+// 草稿优先：全局模式下若某 leaf 在 draftBuffer 里，显示草稿值。
+function draftValue(path: string, fallback: number | string): number | string {
+  if (isGlobal.value && path in draftBuffer.value) {
+    const v = draftBuffer.value[path];
+    if (typeof v === "number" || typeof v === "string") return v;
+  }
+  return fallback;
+}
+
+async function saveDraft(): Promise<void> {
+  savingDraft.value = true;
+  try {
+    for (const [key, value] of Object.entries({ ...draftBuffer.value })) {
+      await paramsApi.patchGlobal(key, value);
+      const { [key]: _removed, ...rest } = draftBuffer.value;
+      draftBuffer.value = rest;
+    }
+    await store.loadGlobal();
+    results.markParamsChanged();
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : "保存失败";
+  } finally {
+    savingDraft.value = false;
+  }
+}
+
+function undoDraft(): void {
+  draftBuffer.value = {};
+}
+
+async function resetToFactory(): Promise<void> {
+  if (!window.confirm("还原出厂会丢弃所有全局参数改动，重置为 CSBMK 默认值。确定继续？")) {
+    return;
+  }
+  try {
+    await paramsApi.resetGlobal();
+    draftBuffer.value = {};
+    await store.loadGlobal();
+    results.markParamsChanged();
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : "还原失败";
+  }
+}
+
+// 项目模式：即时落库（行为不变）。全局模式：写入草稿缓冲，不即时落库。
 async function patchOverride(key: string, value: unknown): Promise<void> {
-  if (!props.projectId) return;
-  await store.applyOverride(props.projectId, { [key]: value });
-  results.markParamsChanged();
+  if (props.projectId) {
+    await store.applyOverride(props.projectId, { [key]: value });
+    results.markParamsChanged();
+  } else {
+    draftBuffer.value = { ...draftBuffer.value, [key]: value };
+  }
 }
 
 // 规模变更因子展示标签 — 处理需求 增加 / 减少 / 修改 / 转换 / 变更率门槛
@@ -274,6 +330,42 @@ async function onFactorEdit(
         </button>
       </div>
 
+      <div
+        v-if="isGlobal"
+        class="draft-toolbar"
+      >
+        <span role="status" aria-live="polite">
+          <span
+            v-if="isDirty"
+            data-testid="draft-dirty"
+            class="draft-dirty"
+          >● 有未保存的修改</span>
+          <span v-else class="draft-clean">参数已是最新保存状态</span>
+        </span>
+        <div class="draft-actions">
+          <button
+            type="button"
+            data-testid="draft-save"
+            class="btn-primary"
+            :disabled="!isDirty || savingDraft"
+            @click="saveDraft"
+          >{{ savingDraft ? "保存中…" : "保存" }}</button>
+          <button
+            type="button"
+            data-testid="draft-undo"
+            class="btn-secondary"
+            :disabled="!isDirty"
+            @click="undoDraft"
+          >撤销</button>
+          <button
+            type="button"
+            data-testid="draft-reset"
+            class="btn-link"
+            @click="resetToFactory"
+          >还原出厂</button>
+        </div>
+      </div>
+
       <section
         v-if="activeTab === 'rate' && eff"
         role="tabpanel"
@@ -295,14 +387,14 @@ async function onFactorEdit(
             </div>
             <OverrideField
               :label="`${city}（开发）`"
-              :model-value="rate.dev"
+              :model-value="draftValue(`city_rate.${String(city)}.dev`, rate.dev)"
               :default-value="rate.dev"
               :overridden="store.isOverridden(`city_rate.${String(city)}.dev`)"
               @update:model-value="(nv) => patchOverride(`city_rate.${String(city)}.dev`, nv)"
             />
             <OverrideField
               :label="`${city}（运维）`"
-              :model-value="rate.ops"
+              :model-value="draftValue(`city_rate.${String(city)}.ops`, rate.ops)"
               :default-value="rate.ops"
               :overridden="store.isOverridden(`city_rate.${String(city)}.ops`)"
               @update:model-value="(nv) => patchOverride(`city_rate.${String(city)}.ops`, nv)"
@@ -328,7 +420,7 @@ async function onFactorEdit(
               v-for="band in PRODUCTIVITY_BANDS"
               :key="`dev-${String(ind)}-${band}`"
               :label="`${String(ind)} ${band}`"
-              :model-value="(bands as Record<Band, number>)[band]"
+              :model-value="draftValue(`productivity_dev.${String(ind)}.${band}`, (bands as Record<Band, number>)[band])"
               :default-value="(bands as Record<Band, number>)[band]"
               :overridden="store.isOverridden(`productivity_dev.${String(ind)}.${band}`)"
               @update:model-value="(nv) => patchOverride(`productivity_dev.${String(ind)}.${band}`, nv)"
@@ -353,7 +445,7 @@ async function onFactorEdit(
               v-for="band in PRODUCTIVITY_BANDS"
               :key="`ops-${String(ind)}-${band}`"
               :label="`${String(ind)} ${band}`"
-              :model-value="(bands as Record<Band, number>)[band]"
+              :model-value="draftValue(`productivity_ops.${String(ind)}.${band}`, (bands as Record<Band, number>)[band])"
               :default-value="(bands as Record<Band, number>)[band]"
               :overridden="store.isOverridden(`productivity_ops.${String(ind)}.${band}`)"
               @update:model-value="(nv) => patchOverride(`productivity_ops.${String(ind)}.${band}`, nv)"
@@ -410,7 +502,7 @@ async function onFactorEdit(
                 <td>
                   <OverrideField
                     label=""
-                    :model-value="value as number"
+                    :model-value="draftValue(`scale_change.${String(key)}`, value as number)"
                     :default-value="value as number"
                     :overridden="store.isOverridden(`scale_change.${String(key)}`)"
                     @update:model-value="(nv) => patchOverride(`scale_change.${String(key)}`, nv)"
@@ -430,7 +522,7 @@ async function onFactorEdit(
                 <td>
                   <OverrideField
                     label=""
-                    :model-value="sub"
+                    :model-value="draftValue(`scale_change.${String(key)}.${String(subKey)}`, sub)"
                     :default-value="sub"
                     :overridden="store.isOverridden(`scale_change.${String(key)}.${String(subKey)}`)"
                     @update:model-value="(nv) => patchOverride(`scale_change.${String(key)}.${String(subKey)}`, nv)"
@@ -742,6 +834,40 @@ async function onFactorEdit(
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 .snap-actions .btn-link:hover {
+  opacity: 0.75;
+}
+.draft-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-bg-hover);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+.draft-dirty {
+  color: var(--color-danger, #b91c1c);
+  font-weight: 600;
+}
+.draft-clean {
+  color: var(--color-text-muted);
+}
+.draft-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+.draft-actions .btn-link {
+  background: transparent;
+  border: none;
+  color: var(--color-danger, #b91c1c);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  text-decoration: underline;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.draft-actions .btn-link:hover {
   opacity: 0.75;
 }
 </style>

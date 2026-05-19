@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from ..core.context import EvaluationContext, ProjectInputs
 from ..core.forward import calculate_forward, ForwardInput, FpItem
 from ..core.reverse import calculate_reverse, ReverseInput
-from ..core.allocator import allocate, allocate_with_validation, AllocatorInput, FpDraft
+from ..core.allocator import allocate_with_validation, AllocatorInput, FpDraft
 from ..db.models import Project
 from . import factors as fsvc
 from . import params as ps
@@ -25,13 +25,13 @@ def _resolve_items(
     """
     raw_items = payload.get("items")
     if raw_items:
-        return [FpItem(us=i["us"]) for i in raw_items]
+        return [FpItem(us=i["us"], modify_type=i.get("modify_type", "add")) for i in raw_items]
     db_items = fs.list_for_project(db, project_id)
     if not db_items and mode == "forward":
         raise ValueError(
             "NO_FUNCTION_POINTS: 项目暂无功能点，请先在 FP 编辑屏添加或上传文档让 AI 提取"
         )
-    return [FpItem(us=fp.us) for fp in db_items]
+    return [FpItem(us=fp.us, modify_type=fp.modify_type or "add") for fp in db_items]
 
 
 def _resolve_factors(
@@ -79,6 +79,7 @@ def run_forward(db: Session, project_id: str, payload: dict) -> dict:
         include_dev=payload.get("include_dev", True),
         include_ops=payload.get("include_ops", proj.include_ops or False),
         other_cost=payload.get("other_cost", proj.other_cost or 0.0),
+        assessment_kind=getattr(proj, "assessment_kind", None) or "development",
     )
     r = calculate_forward(ctx, inp)
     out = r.__dict__.copy()
@@ -86,33 +87,88 @@ def run_forward(db: Session, project_id: str, payload: dict) -> dict:
     return out
 
 
-def _allocate_ufp_to_modules(
-    db: Session, project_id: str, target_ufp: float
-) -> list[dict]:
-    """细化分摊：把反算出的目标 UFP 按现有 FP 表各一级模块的 UFP 占比拆下去。
+def build_module_tree(fps: list, target_ufp: float) -> list[dict]:
+    """沿 子系统→一级→二级 模块树逐层分摊目标 UFP。
 
-    每个模块给出现有 UFP、分摊后的目标 UFP、需细化增加的 UFP 差额。
-    FP 表为空时返回空列表。
+    纯函数：fps 是带 subsystem/l1_module/l2_module/ufp 属性的对象列表。
+    每层按现有 UFP 占比把上层 allocated_ufp 分到子节点。
+    返回子系统节点列表，每节点含 current_ufp/allocated_ufp/delta_ufp/
+    ratio/children。FP 列表为空 → 返回 []。
     """
-    fps = fs.list_for_project(db, project_id)
-    groups: dict[tuple[str, str], float] = {}
+    if not fps:
+        return []
+
+    tree: dict[str, dict[str, dict[str, float]]] = {}
     for fp in fps:
-        key = (fp.subsystem or "未分组", fp.l1_module or "未分类")
-        groups[key] = groups.get(key, 0.0) + float(fp.ufp or 0.0)
-    total_current = sum(groups.values())
+        sub = fp.subsystem or "未分组"
+        l1 = fp.l1_module or "未分类"
+        l2 = fp.l2_module or "未细分"
+        tree.setdefault(sub, {}).setdefault(l1, {})
+        tree[sub][l1][l2] = tree[sub][l1].get(l2, 0.0) + float(fp.ufp or 0.0)
+
+    total = sum(
+        u for subv in tree.values()
+        for l1v in subv.values() for u in l1v.values()
+    )
+
+    def _split(current: float, parent_alloc: float, parent_total: float) -> tuple[float, float]:
+        ratio = current / parent_total if parent_total > 0 else 0.0
+        return ratio, parent_alloc * ratio
+
     out: list[dict] = []
-    for (sub, mod), cur in sorted(groups.items()):
-        ratio = cur / total_current if total_current > 0 else 0.0
-        allocated = target_ufp * ratio
-        out.append({
+    for sub in sorted(tree.keys()):
+        sub_cur = sum(u for l1v in tree[sub].values() for u in l1v.values())
+        sub_ratio, sub_alloc = _split(sub_cur, target_ufp, total)
+        sub_node = {
             "subsystem": sub,
-            "l1_module": mod,
-            "current_ufp": round(cur, 2),
-            "allocated_ufp": round(allocated, 2),
-            "delta_ufp": round(allocated - cur, 2),
-            "ratio": round(ratio, 4),
-        })
+            "current_ufp": round(sub_cur, 2),
+            "allocated_ufp": round(sub_alloc, 2),
+            "delta_ufp": round(sub_alloc - sub_cur, 2),
+            "ratio": round(sub_ratio, 4),
+            "children": [],
+        }
+        for l1 in sorted(tree[sub].keys()):
+            l1_cur = sum(tree[sub][l1].values())
+            l1_ratio, l1_alloc = _split(l1_cur, sub_alloc, sub_cur)
+            l1_node = {
+                "l1_module": l1,
+                "current_ufp": round(l1_cur, 2),
+                "allocated_ufp": round(l1_alloc, 2),
+                "delta_ufp": round(l1_alloc - l1_cur, 2),
+                "ratio": round(l1_ratio, 4),
+                "children": [],
+            }
+            for l2 in sorted(tree[sub][l1].keys()):
+                l2_cur = tree[sub][l1][l2]
+                l2_ratio, l2_alloc = _split(l2_cur, l1_alloc, l1_cur)
+                l1_node["children"].append({
+                    "l2_module": l2,
+                    "current_ufp": round(l2_cur, 2),
+                    "allocated_ufp": round(l2_alloc, 2),
+                    "delta_ufp": round(l2_alloc - l2_cur, 2),
+                    "ratio": round(l2_ratio, 4),
+                })
+            sub_node["children"].append(l1_node)
+        out.append(sub_node)
     return out
+
+
+def _flatten_tree_leaves(tree: list[dict]) -> list[dict]:
+    """把三级树压成叶子列表（兼容旧前端 module_allocation 字段）。"""
+    leaves: list[dict] = []
+    for sub in tree:
+        for l1 in sub["children"]:
+            for l2 in l1["children"]:
+                leaves.append({
+                    "subsystem": sub["subsystem"],
+                    "l1_module": l1["l1_module"],
+                    "l2_module": l2["l2_module"],
+                    "current_ufp": l2["current_ufp"],
+                    "allocated_ufp": l2["allocated_ufp"],
+                    "delta_ufp": l2["delta_ufp"],
+                    "ratio": l2["ratio"],
+                })
+    return leaves
 
 
 def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
@@ -140,7 +196,10 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
     rec = out.get("recommended_band", "P50")
     target_ufp = out["scale_unadjusted_bands"][rec]
     out["target_ufp"] = round(target_ufp, 2)
-    out["module_allocation"] = _allocate_ufp_to_modules(db, project_id, target_ufp)
+    fps = fs.list_for_project(db, project_id)
+    tree = build_module_tree(fps, target_ufp)
+    out["module_allocation_tree"] = tree
+    out["module_allocation"] = _flatten_tree_leaves(tree)
     return out
 
 

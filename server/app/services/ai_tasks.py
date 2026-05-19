@@ -116,16 +116,23 @@ def update_task(
 # v2.5 — subprocess helpers
 # ---------------------------------------------------------------------------
 
-def spawn_claude_extract(
+def _spawn_claude_command(
     task_id: str,
     project_id: str,
     base_url: str,
     token: str,
+    command: str,
 ) -> int | None:
-    """v2.5 — 后台 spawn `claude --print` 跑 /cost <project_id>.
+    """共享 spawn 逻辑：后台 spawn `claude --print` 并通过 stdin 喂入 command。
 
-    Plugin /cost 命令通过 env vars (BASE/TOKEN/PROJECT_ID/TASK_ID) 6 次
-    PATCH /api/ai-tasks/{id} 上报进度。本函数不等待执行完毕，立即返回 PID。
+    Plugin 命令通过 env vars (BASE/TOKEN/PROJECT_ID/TASK_ID) PATCH /api/ai-tasks/{id}
+    上报进度。本函数不等待执行完毕，立即返回 PID。
+
+    Parameters
+    ----------
+    command:
+        完整插件命令（不含 project_id），例如 "/cost-estimation:cost"。
+        stdin 写入形如 "{command} {project_id}\\n"。
 
     Returns subprocess PID; None if claude CLI 不在 PATH 中。
     """
@@ -178,12 +185,12 @@ def spawn_claude_extract(
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
-    # 把 /cost-estimation:cost <project_id> 通过 stdin 喂给 claude。
-    # 注：必须用插件命名空间 (cost-estimation:cost)，否则 `/cost` 会被 claude
-    # 内置 cost 命令（显示会话成本）截获，导致 plugin 永远不执行。
+    # 把 "{command} {project_id}" 通过 stdin 喂给 claude。
+    # 注：必须用插件命名空间 (cost-estimation:*)，否则裸命令（如 `/cost`）会被
+    # claude 内置命令截获，导致 plugin 永远不执行。
     try:
         assert proc.stdin is not None
-        proc.stdin.write(f"/cost-estimation:cost {project_id}\n".encode())
+        proc.stdin.write(f"{command} {project_id}\n".encode())
         proc.stdin.close()
     except (BrokenPipeError, OSError):
         pass
@@ -194,6 +201,39 @@ def spawn_claude_extract(
         except OSError:
             pass
     return proc.pid
+
+
+def spawn_claude_extract(
+    task_id: str,
+    project_id: str,
+    base_url: str,
+    token: str,
+) -> int | None:
+    """v2.5 — 后台 spawn `claude --print` 跑 /cost-estimation:cost <project_id>.
+
+    Plugin /cost 命令通过 env vars (BASE/TOKEN/PROJECT_ID/TASK_ID) 6 次
+    PATCH /api/ai-tasks/{id} 上报进度。本函数不等待执行完毕，立即返回 PID。
+
+    Returns subprocess PID; None if claude CLI 不在 PATH 中。
+    """
+    return _spawn_claude_command(task_id, project_id, base_url, token,
+                                 "/cost-estimation:cost")
+
+
+def spawn_claude_reverse_fill(
+    task_id: str,
+    project_id: str,
+    base_url: str,
+    token: str,
+) -> int | None:
+    """v2.8 — 后台 spawn `claude --print` 跑 /cost-estimation:cost-fill <project_id>.
+
+    与 spawn_claude_extract 同构（env vars + stdin 喂命令），仅命令不同：
+    cost-fill 命令读反算模块树缺口、生成补全 FP 草稿写回 FP 表。
+    Returns subprocess PID; None if claude CLI 不在 PATH 中。
+    """
+    return _spawn_claude_command(task_id, project_id, base_url, token,
+                                 "/cost-estimation:cost-fill")
 
 
 def stop_claude_subprocess(pid: int) -> bool:

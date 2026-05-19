@@ -55,6 +55,31 @@ export interface ModuleUfpAllocation {
   ratio: number;
 }
 
+/** 反算三级模块树节点。subsystem/l1_module/l2_module 三层各一种形状。 */
+export interface ModuleTreeL2 {
+  l2_module: string;
+  current_ufp: number;
+  allocated_ufp: number;
+  delta_ufp: number;
+  ratio: number;
+}
+export interface ModuleTreeL1 {
+  l1_module: string;
+  current_ufp: number;
+  allocated_ufp: number;
+  delta_ufp: number;
+  ratio: number;
+  children: ModuleTreeL2[];
+}
+export interface ModuleTreeSubsystem {
+  subsystem: string;
+  current_ufp: number;
+  allocated_ufp: number;
+  delta_ufp: number;
+  ratio: number;
+  children: ModuleTreeL1[];
+}
+
 /**
  * Reverse 反算返回值（与 server `app/core/reverse.py:ReverseResult` 对齐）。
  *
@@ -74,6 +99,7 @@ export interface ReverseResult {
   recommended_band: Band;
   target_ufp: number;
   module_allocation: ModuleUfpAllocation[];
+  module_allocation_tree?: ModuleTreeSubsystem[];
 }
 
 /**

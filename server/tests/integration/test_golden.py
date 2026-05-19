@@ -67,7 +67,24 @@ def test_golden_appendix_d():
 
 
 def test_golden_appendix_d_factor_components_in_csbmk_202510():
-    """额外验证：用同样的因子组件查 CSBMK®-202510，能复现 1.18 ±0.005"""
+    """额外验证：用同样的因子组件查 CSBMK®-202510，能复现因子链乘积 ±0.005
+
+    B1 修正后各因子值（对齐 2025 PDF）：
+      business_importance.core = 1.10
+      security_level.L4        = 1.05
+      support.remote           = 0.90  (旧 0.89)
+      update_freq.quarterly    = 0.78  (旧 0.95)
+      response_time.24h        = 1.10
+      integrity_level.C/D      = 1.00
+      platform                 = 1.00  (ops 因子无此项，取 1.0)
+      team_exp.related         = 1.00
+      deployment.centralized   = 1.00
+      user_scale.>10k          = 1.12  (旧 1.10)
+      system_relevance.1-10    = 1.00  (键名旧为 "1-5"，值不变)
+
+    期望值 = 1.1 × 1.05 × 0.90 × 0.78 × 1.1 × 1.0 × 1.0 × 1.0 × 1.0 × 1.12 × 1.0
+           ≈ 0.9989
+    """
     repo_root = Path(__file__).parent.parent.parent
     csbmk_2510 = json.loads((repo_root / "app" / "data" / "csbmk_202510.json").read_text(encoding="utf-8"))
     f_ops = csbmk_2510["factors_ops"]
@@ -81,5 +98,5 @@ def test_golden_appendix_d_factor_components_in_csbmk_202510():
              f_ops["team_exp"]["related"] *
              f_ops["deployment"]["centralized"] *
              f_ops["user_scale"][">10k"] *
-             f_ops["system_relevance"]["1-5"])
-    assert abs(chain - 1.18) < 0.005, f"CSBMK-2510 factor chain = {chain}"
+             f_ops["system_relevance"]["1-10"])  # B1: 键名由 "1-5" 改为 "1-10"
+    assert abs(chain - 0.9989) < 0.005, f"CSBMK-2510 factor chain = {chain}"

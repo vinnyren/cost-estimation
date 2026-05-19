@@ -20,6 +20,8 @@ class ProjectCreate(BaseModel):
     alpha_dev: float = 1.0
     fp_method: Literal["nesma_estimated", "ifpug", "quick"] = "nesma_estimated"
     basis_data_ver: str
+    # v2.8 — 评估口径：development 开发项目 / enhancement 增强项目。
+    assessment_kind: Literal["development", "enhancement"] = "development"
     # v2.0 — per-project 调整因子选择（JSON 落盘 factors_dev_json / factors_ops_json）
     factors_dev: Optional[dict] = None
     factors_ops: Optional[dict] = None
@@ -67,6 +69,7 @@ class ProjectPatch(BaseModel):
     # 编辑设定可改评估方式与项目类型 —— 缺这两项时前端改「正向↔反向」会被静默丢弃。
     mode: Optional[Literal["forward", "reverse"]] = None
     project_type: Optional[Literal["dev_only", "ops_only", "dev_and_ops"]] = None
+    assessment_kind: Optional[Literal["development", "enhancement"]] = None
     target_cost: Optional[float] = None
     other_cost: Optional[float] = None
     include_ops: Optional[bool] = None
@@ -119,6 +122,7 @@ class ProjectBundleItem(BaseModel):
     alpha_dev: float = 1.0
     fp_method: Literal["nesma_estimated", "ifpug", "quick"] = "nesma_estimated"
     basis_data_ver: str
+    assessment_kind: Literal["development", "enhancement"] = "development"
     factors_dev: Optional[dict] = None
     factors_ops: Optional[dict] = None
     param_overrides: list[ParamOverrideItem] = Field(default_factory=list, max_length=500)

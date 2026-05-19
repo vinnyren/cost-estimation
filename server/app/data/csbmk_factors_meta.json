@@ -6,7 +6,6 @@
       "description": "项目所属软件应用领域 — 决定开发工作量基数。业务处理类基准 ×1.00，越偏向底层 / 控制类，系数越高。",
       "options": {
         "业务处理": {"label": "业务处理（OLTP）", "description": "在线事务处理类 — 典型企业管理 / 业务系统。基准 ×1.00。"},
-        "软件集成": {"label": "软件集成", "description": "以异构系统对接 / 接口开发为主。×1.20。"},
         "科技": {"label": "科技计算", "description": "数值计算 / 科研类系统。×1.20。"},
         "多媒体": {"label": "多媒体", "description": "音视频 / 图像 / 流媒体处理。×1.30。"},
         "智能信息": {"label": "智能信息（AI）", "description": "AI / ML / 智能分析类。×1.50。"},
@@ -40,11 +39,11 @@
       "description": "项目主要开发语言 / 平台。C/C++ 内存管理负担大，PowerBuilder/ASP 为遗留低代码平台。",
       "options": {
         "JAVA": {"label": "Java / Kotlin", "description": "JVM 生态 — 基准 ×1.00。"},
-        "C": {"label": "C", "description": "C 语言 — 内存管理负担大。×1.50。"},
+        "C": {"label": "C", "description": "C 语言 — 内存管理负担大。×1.20。"},
         "C++": {"label": "C++", "description": "C++ — 现代项目按 C++ 标准开发。×1.00。"},
         "C#": {"label": "C# / .NET", "description": "C# / .NET 生态。×1.00。"},
-        "PowerBuilder": {"label": "PowerBuilder", "description": "PowerBuilder — 遗留低代码平台。×0.60。"},
-        "ASP": {"label": "ASP / ASP.NET", "description": "ASP / ASP.NET — 遗留 Web 平台。×0.60。"}
+        "PowerBuilder": {"label": "PowerBuilder", "description": "PowerBuilder — 遗留低代码平台。×0.80。"},
+        "ASP": {"label": "ASP / ASP.NET", "description": "ASP / ASP.NET — 遗留 Web 平台。×0.80。"}
       }
     },
     "team_bg": {
@@ -62,7 +61,7 @@
       "label": "更新频率",
       "description": "运维期内系统更新发布的频率 — 频率越高运维工作量越大。",
       "options": {
-        "quarterly": {"label": "季度级", "description": "每季度一次更新（含小修补）。×0.95。"},
+        "quarterly": {"label": "季度级", "description": "每季度一次更新（含小修补）。×0.78。"},
         "monthly": {"label": "月度级", "description": "每月发布一次 — 行业基准。×1.00。"},
         "frequent": {"label": "高频", "description": "每周或更频繁发布。×1.12。"}
       }
@@ -71,9 +70,9 @@
       "label": "支持方式",
       "description": "运维支持的现场到位程度 — 驻场比远程贵。",
       "options": {
-        "remote": {"label": "远程支持", "description": "工单 + 远程接入 + 电话。×0.89。"},
+        "remote": {"label": "远程支持", "description": "工单 + 远程接入 + 电话。×0.90。"},
         "onsite": {"label": "驻场为主", "description": "部分时间驻场 + 远程结合。×1.00。"},
-        "pure_onsite": {"label": "纯驻场", "description": "全职驻场工程师。×1.08。"}
+        "pure_onsite": {"label": "纯驻场", "description": "全职驻场工程师。×1.20。"}
       }
     },
     "security_level": {
@@ -144,9 +143,9 @@
       "label": "用户规模",
       "description": "系统活跃用户量级。",
       "options": {
-        "<=1k": {"label": "≤ 1000 用户", "description": "小规模系统。×0.90。"},
+        "<=1k": {"label": "≤ 1000 用户", "description": "小规模系统。×0.93。"},
         "<=10k": {"label": "≤ 10000 用户", "description": "中规模系统。×1.00。"},
-        ">10k": {"label": "> 10000 用户", "description": "大规模系统。×1.10。"}
+        ">10k": {"label": "> 10000 用户", "description": "大规模系统。×1.12。"}
       }
     },
     "system_relevance": {
@@ -154,8 +153,8 @@
       "description": "与外部系统的对接数量 — 对接越多接口测试 / 故障排查越复杂。",
       "options": {
         "none": {"label": "无对接", "description": "孤立系统，无外部对接。×0.97。"},
-        "1-5": {"label": "1~5 个对接", "description": "少量对接系统。×1.00。"},
-        "6+": {"label": "6 个以上对接", "description": "大量对接 / 数据同步。×1.14。"}
+        "1-10": {"label": "1~10 个对接", "description": "少至中量对接系统。×1.00。"},
+        "10+": {"label": "10 个以上对接", "description": "大量对接 / 数据同步。×1.14。"}
       }
     }
   }

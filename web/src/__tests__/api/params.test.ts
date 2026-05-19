@@ -32,12 +32,11 @@ describe("paramsApi", () => {
     expect(result).toEqual({ cf: { x: 1 } });
   });
 
-  it("patchGlobal 调 PATCH /api/params/global 并透传 body", async () => {
-    const body = { hours_per_pm: 160 };
-    (api.patch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ ...body });
-    const result = await paramsApi.patchGlobal(body);
-    expect(api.patch).toHaveBeenCalledWith("/api/params/global", body);
-    expect(result).toMatchObject(body);
+  it("patchGlobal 调 PATCH /api/params/global 发送 {key, value}", async () => {
+    (api.patch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ updated: "hours_per_pm" });
+    const result = await paramsApi.patchGlobal("hours_per_pm", 160);
+    expect(api.patch).toHaveBeenCalledWith("/api/params/global", { key: "hours_per_pm", value: 160 });
+    expect(result).toMatchObject({ updated: "hours_per_pm" });
   });
 
   it("resetGlobal 调 POST /api/params/global/reset", async () => {
@@ -53,5 +52,24 @@ describe("paramsApi", () => {
     const result = await paramsApi.override("p-7", body);
     expect(api.patch).toHaveBeenCalledWith("/api/projects/p-7/params/override", body);
     expect(result).toMatchObject({ overrides: body });
+  });
+});
+
+describe("paramsApi.patchGlobal — 逐 leaf key", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("patchGlobal 发送 {key, value} 到 /api/params/global", async () => {
+    (api.patch as ReturnType<typeof vi.fn>).mockResolvedValue({ updated: "x" });
+    await paramsApi.patchGlobal("scale_change.modify", 0.85);
+    expect(api.patch).toHaveBeenCalledWith("/api/params/global", {
+      key: "scale_change.modify",
+      value: 0.85,
+    });
+  });
+
+  it("resetGlobal POST /api/params/global/reset", async () => {
+    (api.post as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    await paramsApi.resetGlobal();
+    expect(api.post).toHaveBeenCalledWith("/api/params/global/reset");
   });
 });

@@ -3,6 +3,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..db.models import FunctionPoint, FPSnapshot, Project, Result
 from ..schemas.functions import FunctionPointCreate, FunctionPointPatch
+from ..core.ifpug import classify_complexity, fp_value
 
 
 def _next_version(db: Session, project_id: str) -> int:
@@ -55,13 +56,33 @@ def list_snapshots(db: Session, project_id: str) -> list[dict]:
     ]
 
 
+def _apply_ifpug(data: dict) -> dict:
+    """提供了 IFPUG 复杂度查表所需输入时重算 complexity/ufp/us。
+
+    数据功能需 det+ret；事务功能需 det+ftr。信息不足时原样返回。
+    返回新 dict（不就地改入参）。
+    """
+    category = data.get("category")
+    det, ret, ftr = data.get("det"), data.get("ret"), data.get("ftr")
+    has_input = (
+        (category in ("ILF", "EIF") and det is not None and ret is not None)
+        or (category in ("EI", "EO", "EQ") and det is not None and ftr is not None)
+    )
+    if not has_input:
+        return data
+    complexity = classify_complexity(category, det, ret, ftr)
+    ufp = fp_value(category, complexity)
+    return {**data, "complexity": complexity, "ufp": ufp, "us": ufp}
+
+
 def create(db: Session, project_id: str, payload: FunctionPointCreate) -> FunctionPoint:
     if not db.query(Project).filter_by(id=project_id).first():
         raise ValueError("PROJECT_NOT_FOUND")
     version = _next_version(db, project_id)
+    data = _apply_ifpug(payload.model_dump())
     fp = FunctionPoint(id=f"fp-{uuid.uuid4().hex[:12]}",
                         project_id=project_id, version=version,
-                        **payload.model_dump())
+                        **data)
     db.add(fp); db.commit(); db.refresh(fp)
     _mark_results_stale(db, project_id)
     return fp
@@ -71,8 +92,17 @@ def patch(db: Session, project_id: str, fp_id: str, payload: FunctionPointPatch)
     fp = db.query(FunctionPoint).filter_by(id=fp_id, project_id=project_id).first()
     if not fp:
         return None
-    for k, v in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    # Merge existing column values with patch updates, then recompute IFPUG
+    # fields (complexity/ufp/us) when det/ret/ftr/category are sufficient.
+    merged = {c.name: getattr(fp, c.name) for c in fp.__table__.columns}
+    merged.update(updates)
+    merged = _apply_ifpug(merged)
+    for k, v in updates.items():
         setattr(fp, k, v)
+    for k in ("complexity", "ufp", "us"):
+        if merged.get(k) is not None:
+            setattr(fp, k, merged[k])
     db.commit(); db.refresh(fp)
     _mark_results_stale(db, project_id)
     return fp

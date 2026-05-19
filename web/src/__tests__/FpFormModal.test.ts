@@ -43,14 +43,16 @@ describe("FpFormModal", () => {
     (functionsApi.patch as ReturnType<typeof vi.fn>).mockResolvedValue(mockFp);
   });
 
-  it("新增模式：填写 name + 选 category/complexity → 提交 → create 被调用，payload 含 name/category/ufp", async () => {
+  it("新增模式：填写 name + 选 category + DET/RET → 提交 → create 被调用，payload 含 name/category/ufp", async () => {
     const w = mount(FpFormModal, {
       props: { open: true, projectId: "p-1", editing: null },
     });
 
     await w.find("#fp-name").setValue("新功能点");
     await w.find("#fp-category").setValue("ILF");
-    await w.find("#fp-complexity").setValue("average");
+    // ILF DET=25 (band 1), RET=3 (band 1) → COMPLEXITY_MATRIX[1][1] = average → UFP 10
+    await w.find("#fp-det").setValue("25");
+    await w.find("#fp-ret").setValue("3");
     await w.find("form").trigger("submit");
     await flushPromises();
 
@@ -63,16 +65,18 @@ describe("FpFormModal", () => {
     expect(payload.source).toBe("manual");
   });
 
-  it("UFP 自动计算：选 ILF + high → 显示 15", async () => {
+  it("UFP 自动计算：选 ILF + DET 60 + RET 6 → 复杂度 high → 显示 15", async () => {
     const w = mount(FpFormModal, {
       props: { open: true, projectId: "p-1", editing: null },
     });
 
     await w.find("#fp-category").setValue("ILF");
-    await w.find("#fp-complexity").setValue("high");
+    // ILF DET=60 (band 2), RET=6 (band 2) → COMPLEXITY_MATRIX[2][2] = high → UFP 15
+    await w.find("#fp-det").setValue("60");
+    await w.find("#fp-ret").setValue("6");
     await flushPromises();
 
-    const ufpDisplay = w.find(".ufp-value");
+    const ufpDisplay = w.find("[data-testid='fp-ufp-auto']");
     expect(ufpDisplay.exists()).toBe(true);
     expect(ufpDisplay.text()).toBe("15");
   });
@@ -115,14 +119,14 @@ describe("FpFormModal", () => {
     expect(payload.source).toBeUndefined();
   });
 
-  it("UFP 表默认值 EI + low = 3", async () => {
+  it("UFP 表默认值 EI + 无 DET/FTR → 复杂度 average → UFP 4", async () => {
     const w = mount(FpFormModal, {
       props: { open: true, projectId: "p-1", editing: null },
     });
 
-    // default: category=EI, complexity=low
-    const ufpDisplay = w.find(".ufp-value");
-    expect(ufpDisplay.text()).toBe("3");
+    // default: category=EI, det/ftr=null → complexity=average → UFP=4
+    const ufpDisplay = w.find("[data-testid='fp-ufp-auto']");
+    expect(ufpDisplay.text()).toBe("4");
   });
 
   it("不渲染口径选择器（运维不是独立的功能点清单）", async () => {

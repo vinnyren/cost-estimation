@@ -22,8 +22,8 @@ export const paramsApi = {
   effective: (projectId: string) =>
     api.get<EffectiveParams>(`/api/projects/${projectId}/params/effective`),
   global: () => api.get<EffectiveParams>("/api/params/global"),
-  patchGlobal: (body: Partial<EffectiveParams>) =>
-    api.patch<EffectiveParams>("/api/params/global", body),
+  patchGlobal: (key: string, value: unknown) =>
+    api.patch<{ updated: string }>("/api/params/global", { key, value }),
   resetGlobal: () => api.post<EffectiveParams>("/api/params/global/reset"),
   override: (projectId: string, body: Record<string, unknown>) =>
     api.patch<EffectiveParams>(`/api/projects/${projectId}/params/override`, body),

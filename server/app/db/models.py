@@ -40,6 +40,11 @@ class Project(Base):
     alpha_dev = Column(Float, default=1.0)
     fp_method = Column(String, default="nesma_estimated")
     basis_data_ver = Column(String, nullable=False)
+    # v2.8 — 评估口径：development 开发项目 / enhancement 增强项目。
+    # 独立于 project_type（dev_only/...），决定 forward 规模公式（DFP vs EFP）。
+    assessment_kind = Column(
+        String, nullable=False, server_default="development"
+    )
 
     # v2.0 — per-project 调整因子选择，calc.py 用它代替 default=1.0
     # JSON: dev = {"app_type": "OLTP", "integrity_level": "B", ...}
@@ -107,6 +112,10 @@ class FunctionPoint(Base):
     name = Column(String)
     category = Column(String, nullable=False)  # EI|EO|EQ|ILF|EIF
     complexity = Column(String, nullable=False)  # low|average|high
+    # v2.8 — IFPUG GB/T 42449 复杂度查表输入，均可空（老数据兼容）。
+    det = Column(Integer)  # 数据元素类型数 Data Element Types
+    ret = Column(Integer)  # 记录元素类型数 Record Element Types（数据功能用）
+    ftr = Column(Integer)  # 引用文件数 File Types Referenced（事务功能用）
     # fp_kind 区分开发 / 运维功能点 —— 反算分摊按口径拆分目标 US 时用它过滤。
     fp_kind = Column(String, nullable=False, server_default="dev")  # dev|ops
     ufp = Column(Float, nullable=False)

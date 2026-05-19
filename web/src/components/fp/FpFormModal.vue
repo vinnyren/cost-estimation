@@ -10,7 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ "update:open": [v: boolean]; saved: [] }>();
 
-// NESMA 标准表：category × complexity → UFP
+// IFPUG GB/T 42449 标准表：category × complexity → UFP
 const UFP_TABLE: Record<FpCategory, Record<FpComplexity, number>> = {
   EI:  { low: 3, average: 4, high: 6 },
   EO:  { low: 4, average: 5, high: 7 },
@@ -19,23 +19,76 @@ const UFP_TABLE: Record<FpCategory, Record<FpComplexity, number>> = {
   EIF: { low: 5, average: 7, high: 10 },
 };
 
-const CATEGORIES: FpCategory[] = ["EI", "EO", "EQ", "ILF", "EIF"];
-const COMPLEXITY_OPTIONS: { value: FpComplexity; label: string }[] = [
-  { value: "low", label: "低" },
-  { value: "average", label: "中" },
-  { value: "high", label: "高" },
+// IFPUG GB/T 42449 复杂度查表（与 server/app/core/ifpug.py 对齐）
+const COMPLEXITY_MATRIX: FpComplexity[][] = [
+  ["low", "low", "average"],
+  ["low", "average", "high"],
+  ["average", "high", "high"],
 ];
+
+function retBand(ret: number): number {
+  return ret <= 1 ? 0 : ret <= 5 ? 1 : 2;
+}
+function dataDetBand(det: number): number {
+  return det <= 19 ? 0 : det <= 50 ? 1 : 2;
+}
+function ftrBandEi(ftr: number): number {
+  return ftr <= 1 ? 0 : ftr === 2 ? 1 : 2;
+}
+function ftrBandEoEq(ftr: number): number {
+  return ftr <= 1 ? 0 : ftr <= 3 ? 1 : 2;
+}
+function eiDetBand(det: number): number {
+  return det <= 4 ? 0 : det <= 15 ? 1 : 2;
+}
+function eoEqDetBand(det: number): number {
+  return det <= 5 ? 0 : det <= 19 ? 1 : 2;
+}
+
+function classifyComplexity(
+  cat: FpCategory,
+  det: number | null,
+  ret: number | null,
+  ftr: number | null,
+): FpComplexity {
+  if (cat === "ILF" || cat === "EIF") {
+    if (det === null || ret === null) return "average";
+    return COMPLEXITY_MATRIX[retBand(ret)][dataDetBand(det)];
+  }
+  if (det === null || ftr === null) return "average";
+  if (cat === "EI") return COMPLEXITY_MATRIX[ftrBandEi(ftr)][eiDetBand(det)];
+  return COMPLEXITY_MATRIX[ftrBandEoEq(ftr)][eoEqDetBand(det)]; // EO | EQ
+}
+
+const CATEGORIES: FpCategory[] = ["EI", "EO", "EQ", "ILF", "EIF"];
+
 const name = ref("");
 const description = ref("");
 const subsystem = ref("");
 const l1_module = ref("");
 const l2_module = ref("");
 const category = ref<FpCategory>("EI");
-const complexity = ref<FpComplexity>("low");
+const det = ref<number | null>(null);
+const ret = ref<number | null>(null);
+const ftr = ref<number | null>(null);
 
 const submitting = ref(false);
 const errorMsg = ref("");
 const validationMsg = ref("");
+
+// Guard: prevents the category watch from clearing det/ret/ftr during prefillForm
+let suppressCategoryReset = false;
+
+watch(category, () => {
+  if (suppressCategoryReset) return;
+  det.value = null;
+  ret.value = null;
+  ftr.value = null;
+});
+
+const complexity = computed<FpComplexity>(() =>
+  classifyComplexity(category.value, det.value, ret.value, ftr.value),
+);
 
 const computedUfp = computed<number>(() => UFP_TABLE[category.value][complexity.value]);
 
@@ -46,21 +99,27 @@ function resetForm(): void {
   l1_module.value = "";
   l2_module.value = "";
   category.value = "EI";
-  complexity.value = "low";
+  det.value = null;
+  ret.value = null;
+  ftr.value = null;
   errorMsg.value = "";
   validationMsg.value = "";
 }
 
 function prefillForm(fp: FunctionPoint): void {
+  suppressCategoryReset = true;
   name.value = fp.name ?? "";
   description.value = fp.description ?? "";
   subsystem.value = fp.subsystem ?? "";
   l1_module.value = fp.l1_module ?? "";
   l2_module.value = fp.l2_module ?? "";
   category.value = fp.category;
-  complexity.value = fp.complexity;
+  det.value = fp.det ?? null;
+  ret.value = fp.ret ?? null;
+  ftr.value = fp.ftr ?? null;
   errorMsg.value = "";
   validationMsg.value = "";
+  suppressCategoryReset = false;
 }
 
 watch(
@@ -99,6 +158,9 @@ async function onSubmit(): Promise<void> {
     l2_module: l2_module.value.trim() || undefined,
     category: category.value,
     complexity: complexity.value,
+    det: det.value ?? undefined,
+    ret: ret.value ?? undefined,
+    ftr: ftr.value ?? undefined,
     ufp,
     us: ufp,
     ...(props.editing ? {} : { source: "manual" }),
@@ -200,20 +262,37 @@ async function onSubmit(): Promise<void> {
             </select>
           </div>
           <div class="form-group">
-            <label for="fp-complexity" class="form-label">复杂度</label>
-            <select id="fp-complexity" v-model="complexity" class="form-input form-select">
-              <option
-                v-for="opt in COMPLEXITY_OPTIONS"
-                :key="opt.value"
-                :value="opt.value"
-              >{{ opt.label }}</option>
-            </select>
+            <label for="fp-det" class="form-label">DET（数据元素数）</label>
+            <input id="fp-det" v-model.number="det" type="number" min="0"
+                   class="form-input" placeholder="字段数">
+          </div>
+          <div class="form-group" v-if="category === 'ILF' || category === 'EIF'">
+            <label for="fp-ret" class="form-label">RET（记录元素数）</label>
+            <input id="fp-ret" v-model.number="ret" type="number" min="0"
+                   class="form-input" placeholder="记录类型数">
+          </div>
+          <div class="form-group" v-else>
+            <label for="fp-ftr" class="form-label">FTR（引用文件数）</label>
+            <input id="fp-ftr" v-model.number="ftr" type="number" min="0"
+                   class="form-input" placeholder="引用文件数">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <span class="form-label">复杂度（IFPUG 自动）</span>
+            <div class="ufp-display">
+              <span data-testid="fp-complexity-auto" class="ufp-value">
+                {{ complexity === 'low' ? '低' : complexity === 'high' ? '高' : '中' }}
+              </span>
+              <span class="ufp-hint muted">按 GB/T 42449 查表</span>
+            </div>
           </div>
           <div class="form-group">
-            <label class="form-label">UFP（自动）</label>
+            <span class="form-label">UFP（自动）</span>
             <div class="ufp-display">
-              <span class="ufp-value">{{ computedUfp }}</span>
-              <span class="ufp-hint muted">按 NESMA 标准表自动计算</span>
+              <span data-testid="fp-ufp-auto" class="ufp-value">{{ computedUfp }}</span>
+              <span class="ufp-hint muted">按 IFPUG 标准表自动计算</span>
             </div>
           </div>
         </div>

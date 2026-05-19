@@ -64,15 +64,18 @@ async def test_reverse_allocates_ufp_to_modules(client_factory):
         assert r.status_code == 200
         data = r.json()["data"]
         assert "target_ufp" in data
+        # v2.8: 三级树 + 扁平兼容叶子列表
+        assert "module_allocation_tree" in data
         alloc = data["module_allocation"]
-        assert len(alloc) == 2  # 电子结算 + 智能终端
+        assert len(alloc) == 2  # 电子结算 + 智能终端（各一叶）
         by_mod = {m["l1_module"]: m for m in alloc}
-        # 电子结算现有 UFP 40，智能终端 10 → 占比 0.8 / 0.2
-        assert abs(by_mod["电子结算"]["ratio"] - 0.8) < 1e-6
-        assert abs(by_mod["智能终端"]["ratio"] - 0.2) < 1e-6
+        # 电子结算现有 UFP 40，智能终端 10 → 分摊占比 0.8 / 0.2（通过 allocated_ufp 验证）
+        target_ufp = data["target_ufp"]
+        assert abs(by_mod["电子结算"]["allocated_ufp"] / target_ufp - 0.8) < 1e-4
+        assert abs(by_mod["智能终端"]["allocated_ufp"] / target_ufp - 0.2) < 1e-4
         # 分摊后 UFP 合计 ≈ target_ufp
         total_alloc = sum(m["allocated_ufp"] for m in alloc)
-        assert abs(total_alloc - data["target_ufp"]) < 0.1
+        assert abs(total_alloc - target_ufp) < 0.1
         # delta = 分摊后 − 现有
         assert abs(by_mod["电子结算"]["delta_ufp"]
                    - (by_mod["电子结算"]["allocated_ufp"] - 40.0)) < 0.01

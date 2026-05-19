@@ -2,6 +2,7 @@ import { api, ApiError } from "./client";
 
 export type ProjectMode = "forward" | "reverse";
 export type ProjectType = "dev_only" | "ops_only" | "dev_and_ops";
+export type AssessmentKind = "development" | "enhancement";
 export type ProjectPhase =
   | "budget"
   | "bidding"
@@ -13,6 +14,7 @@ export interface Project {
   id: string;
   name: string;
   project_type: ProjectType;
+  assessment_kind: AssessmentKind;
   mode: ProjectMode;
   city: string;
   industry: string;
@@ -57,6 +59,7 @@ export interface ProjectQueryResult {
 export interface ProjectBundleItem {
   name: string;
   project_type: ProjectType;
+  assessment_kind?: AssessmentKind;
   phase: ProjectPhase;
   city: string;
   industry: string;
