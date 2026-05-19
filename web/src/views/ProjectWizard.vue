@@ -23,6 +23,7 @@ import { projectsApi } from "@/api/projects";
 import { factorMetaApi, type FactorMetaPayload } from "@/api/factorMeta";
 import type {
   Project,
+  AssessmentKind,
   ProjectMode,
   ProjectPhase,
   ProjectType,
@@ -130,6 +131,7 @@ interface FormState {
   industry: string;
   phase: ProjectPhase;
   project_type: ProjectType;
+  assessment_kind: AssessmentKind;
   target_total: number;
   alpha: number;
   client: string;
@@ -146,6 +148,7 @@ const form = reactive<FormState>({
   industry: "电子政务",
   phase: "bidding",
   project_type: "dev_only",
+  assessment_kind: "development",
   target_total: 0,
   alpha: 0.7,
   client: "",
@@ -236,6 +239,7 @@ onMounted(async () => {
         industry: proj.industry,
         phase: proj.phase,
         project_type: proj.project_type,
+        assessment_kind: proj.assessment_kind ?? "development",
         mode: proj.mode as ProjectMode,
         target_total: proj.target_cost ?? 0,
         client: proj.client ?? "",
@@ -284,6 +288,7 @@ async function submit(): Promise<void> {
       } = {
       name: form.name,
       project_type: form.project_type,
+      assessment_kind: form.assessment_kind,
       phase: form.phase,
       city: form.city,
       industry: form.industry,
@@ -421,6 +426,42 @@ async function submit(): Promise<void> {
             >
             <span>{{ PROJECT_TYPE_LABELS[t] }}</span>
           </label>
+        </div>
+        <div
+          class="field"
+          id="wizard-assessment-kind"
+          data-testid="wizard-assessment-kind"
+        >
+          <span class="field-label">评估口径（GB/T 42449）</span>
+          <div
+            class="radio-group"
+            role="radiogroup"
+            aria-labelledby="wizard-assessment-kind"
+          >
+            <label class="radio">
+              <input
+                type="radio"
+                name="assessment_kind"
+                value="development"
+                :checked="form.assessment_kind === 'development'"
+                @change="form.assessment_kind = 'development'"
+              >
+              <span>开发项目</span>
+            </label>
+            <label class="radio">
+              <input
+                type="radio"
+                name="assessment_kind"
+                value="enhancement"
+                :checked="form.assessment_kind === 'enhancement'"
+                @change="form.assessment_kind = 'enhancement'"
+              >
+              <span>增强项目</span>
+            </label>
+          </div>
+          <p class="hint" style="margin: 0">
+            开发项目按 DFP（新增+转换）计规模；增强项目按 EFP（新增+变更+转换+删除）计规模（GB/T 42449）
+          </p>
         </div>
         <label
           v-if="form.project_type !== 'ops_only'"
@@ -589,6 +630,9 @@ async function submit(): Promise<void> {
 
           <dt>类型</dt>
           <dd>{{ PROJECT_TYPE_LABELS[form.project_type] }}</dd>
+
+          <dt>评估口径</dt>
+          <dd>{{ form.assessment_kind === 'development' ? '开发项目（DFP）' : '增强项目（EFP）' }}</dd>
 
           <template v-if="form.project_type === 'dev_and_ops'">
             <dt>α</dt>

@@ -95,6 +95,7 @@ const forwardProject = {
   id: "p-1",
   name: "p",
   project_type: "dev_only" as const,
+  assessment_kind: "development" as const,
   mode: "forward" as const,
   city: "北京",
   industry: "电子政务",
