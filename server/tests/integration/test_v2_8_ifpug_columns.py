@@ -50,7 +50,11 @@ async def test_create_fp_with_ifpug_fields_persists(client_factory, db_session):
 @pytest.mark.asyncio
 async def test_create_fp_autocomputes_ufp_from_ifpug(client_factory, db_session):
     """提供 det/ret 时 create 按 IFPUG 重算 ufp/us，忽略请求里的手填值。"""
-    _seed(db_session, pid="p-ifpug-auto")
+    # v2.9: 必须显式指定 measurement_method="ifpug"，否则 server_default 为
+    # nesma_estimated，后者忽略 det/ret 使用 average 查表。
+    p = _seed(db_session, pid="p-ifpug-auto")
+    p.measurement_method = "ifpug"
+    db_session.commit()
     async with await client_factory() as client:
         r = await client.post(
             "/api/projects/p-ifpug-auto/functions",

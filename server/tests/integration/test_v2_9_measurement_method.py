@@ -84,3 +84,84 @@ def test_fp_patch_cosmic_fields():
     patch = FunctionPointPatch(cosmic_entry=1, cosmic_exit=2)
     assert patch.cosmic_entry == 1
     assert patch.cosmic_read is None
+
+
+# ---------------------------------------------------------------------------
+# Task A4: _apply_sizing — HTTP integration tests
+# ---------------------------------------------------------------------------
+import uuid
+from app.db.models import Project, FunctionPoint
+from app.services import functions as fn_svc
+
+
+def _seed_project(db, pid: str, measurement_method: str = "nesma_estimated"):
+    p = Project(
+        id=pid, name=f"test-{measurement_method}",
+        project_type="dev_only", phase="bidding",
+        city="北京", industry="电子政务",
+        mode="forward", basis_data_ver="SSM-BK-202509",
+        assessment_kind="development",
+        measurement_method=measurement_method,
+    )
+    db.add(p)
+    db.commit()
+    return p
+
+
+@pytest.mark.asyncio
+async def test_create_fp_under_cosmic_project_uses_cosmic_sizing(client_factory, db_session):
+    """COSMIC 项目：ufp/us = cosmic_entry+exit+read+write = 2+1+1+2 = 6。"""
+    _seed_project(db_session, "p-a4-cosmic", measurement_method="cosmic")
+    async with await client_factory() as client:
+        r = await client.post(
+            "/api/projects/p-a4-cosmic/functions",
+            headers={**H, "Content-Type": "application/json"},
+            json={
+                "name": "登录", "category": "EI", "complexity": "average",
+                "ufp": 0, "us": 0,
+                "cosmic_entry": 2, "cosmic_exit": 1,
+                "cosmic_read": 1, "cosmic_write": 2,
+            },
+        )
+        assert r.status_code == 201
+        data = r.json()["data"]
+        assert data["ufp"] == pytest.approx(6.0)
+        assert data["us"] == pytest.approx(6.0)
+
+
+@pytest.mark.asyncio
+async def test_create_fp_under_nesma_estimated_uses_average(client_factory, db_session):
+    """NESMA 估算级项目：ufp/us = EO average = 5，忽略 det/ftr 手填值。"""
+    _seed_project(db_session, "p-a4-nesma-est", measurement_method="nesma_estimated")
+    async with await client_factory() as client:
+        r = await client.post(
+            "/api/projects/p-a4-nesma-est/functions",
+            headers={**H, "Content-Type": "application/json"},
+            json={
+                "name": "查询报表", "category": "EO", "complexity": "low",
+                "ufp": 4, "us": 4,
+                "det": 999, "ftr": 999,
+            },
+        )
+        assert r.status_code == 201
+        data = r.json()["data"]
+        assert data["ufp"] == pytest.approx(5.0)  # EO average = 5
+
+
+@pytest.mark.asyncio
+async def test_create_fp_under_ifpug_unchanged(client_factory, db_session):
+    """IFPUG 项目：按 det/ret 查表，ILF det=10 ret=1 → low → 7。"""
+    _seed_project(db_session, "p-a4-ifpug", measurement_method="ifpug")
+    async with await client_factory() as client:
+        r = await client.post(
+            "/api/projects/p-a4-ifpug/functions",
+            headers={**H, "Content-Type": "application/json"},
+            json={
+                "name": "用户表", "category": "ILF", "complexity": "average",
+                "ufp": 10, "us": 10,
+                "det": 10, "ret": 1,
+            },
+        )
+        assert r.status_code == 201
+        data = r.json()["data"]
+        assert data["ufp"] == pytest.approx(7.0)  # ILF det=10 ret=1 → low → 7
