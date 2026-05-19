@@ -54,6 +54,23 @@
         "related": {"label": "相关行业", "description": "做过相邻行业 — 部分领域知识可复用。×1.00。"},
         "none": {"label": "无行业经验", "description": "团队首次接触本行业 — 需大量调研 / 培训。×1.20。"}
       }
+    },
+    "compliance": {
+      "label": "吻合度因子",
+      "description": "需求文档与功能点计数的吻合程度（GB/T 42449 / CSBMK 表 A.2）— 吻合度越高，调整系数越低。",
+      "options": {
+        "high": {"label": "高", "description": "需求与功能点计数高度吻合。×0.33。"},
+        "medium": {"label": "中", "description": "需求与功能点计数中等吻合。×0.67。"},
+        "low": {"label": "低", "description": "需求与功能点计数吻合度低。基准 ×1.00。"}
+      }
+    },
+    "confidentiality": {
+      "label": "涉密因子",
+      "description": "项目是否涉及国家秘密 / 涉密信息系统（CSBMK 表 A.19）。",
+      "options": {
+        "非涉密": {"label": "非涉密", "description": "不涉及涉密信息。基准 ×1.00。"},
+        "涉密": {"label": "涉密", "description": "涉密信息系统 — 额外保密管理与审查投入。×1.18。"}
+      }
     }
   },
   "factors_ops": {
@@ -155,6 +172,16 @@
         "none": {"label": "无对接", "description": "孤立系统，无外部对接。×0.97。"},
         "1-10": {"label": "1~10 个对接", "description": "少至中量对接系统。×1.00。"},
         "10+": {"label": "10 个以上对接", "description": "大量对接 / 数据同步。×1.14。"}
+      }
+    },
+    "software_type": {
+      "label": "软件类型因子",
+      "description": "运维对象的软件层次类型（CSBMK 表 A.8）— 越偏底层基础软件，运维系数越低。",
+      "options": {
+        "操作系统": {"label": "操作系统", "description": "操作系统类软件运维。×0.90。"},
+        "中间件": {"label": "中间件", "description": "中间件类软件运维。×0.96。"},
+        "数据库": {"label": "数据库", "description": "数据库类软件运维。基准 ×1.00。"},
+        "开发平台": {"label": "开发平台", "description": "开发平台 / 应用软件运维。×1.05。"}
       }
     }
   }

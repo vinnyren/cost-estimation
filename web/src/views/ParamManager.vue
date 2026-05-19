@@ -346,21 +346,21 @@ async function onFactorEdit(
           <button
             type="button"
             data-testid="draft-save"
-            class="btn-primary"
+            class="btn btn-primary btn-sm"
             :disabled="!isDirty || savingDraft"
             @click="saveDraft"
           >{{ savingDraft ? "保存中…" : "保存" }}</button>
           <button
             type="button"
             data-testid="draft-undo"
-            class="btn-secondary"
+            class="btn btn-sm"
             :disabled="!isDirty"
             @click="undoDraft"
           >撤销</button>
           <button
             type="button"
             data-testid="draft-reset"
-            class="btn-link"
+            class="btn btn-danger btn-sm"
             @click="resetToFactory"
           >还原出厂</button>
         </div>
@@ -854,20 +854,7 @@ async function onFactorEdit(
 }
 .draft-actions {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
-}
-.draft-actions .btn-link {
-  background: transparent;
-  border: none;
-  color: var(--color-danger, #b91c1c);
-  cursor: pointer;
-  padding: var(--space-1) var(--space-2);
-  text-decoration: underline;
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  transition: opacity var(--duration-fast) var(--ease-out);
-}
-.draft-actions .btn-link:hover {
-  opacity: 0.75;
 }
 </style>
