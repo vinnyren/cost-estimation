@@ -45,7 +45,7 @@ describe("FpFormModal", () => {
 
   it("新增模式：填写 name + 选 category + DET/RET → 提交 → create 被调用，payload 含 name/category/ufp", async () => {
     const w = mount(FpFormModal, {
-      props: { open: true, projectId: "p-1", editing: null },
+      props: { open: true, projectId: "p-1", editing: null, measurementMethod: "ifpug" },
     });
 
     await w.find("#fp-name").setValue("新功能点");
@@ -67,7 +67,7 @@ describe("FpFormModal", () => {
 
   it("UFP 自动计算：选 ILF + DET 60 + RET 6 → 复杂度 high → 显示 15", async () => {
     const w = mount(FpFormModal, {
-      props: { open: true, projectId: "p-1", editing: null },
+      props: { open: true, projectId: "p-1", editing: null, measurementMethod: "ifpug" },
     });
 
     await w.find("#fp-category").setValue("ILF");

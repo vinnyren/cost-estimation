@@ -11,7 +11,7 @@ describe("FpFormModal — IFPUG 复杂度联动", () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it("ILF + DET 60 + RET 6 → 复杂度 high、UFP 15", async () => {
-    const w = mount(FpFormModal, { props: { open: true, projectId: "p-1" } });
+    const w = mount(FpFormModal, { props: { open: true, projectId: "p-1", measurementMethod: "ifpug" } });
     await flushPromises();
     await w.find("#fp-category").setValue("ILF");
     await w.find("#fp-det").setValue("60");
@@ -23,7 +23,7 @@ describe("FpFormModal — IFPUG 复杂度联动", () => {
   });
 
   it("EI + DET 3 + FTR 1 → 复杂度 low、UFP 3", async () => {
-    const w = mount(FpFormModal, { props: { open: true, projectId: "p-1" } });
+    const w = mount(FpFormModal, { props: { open: true, projectId: "p-1", measurementMethod: "ifpug" } });
     await flushPromises();
     await w.find("#fp-category").setValue("EI");
     await w.find("#fp-det").setValue("3");
@@ -34,7 +34,7 @@ describe("FpFormModal — IFPUG 复杂度联动", () => {
   });
 
   it("ILF + DET 25 + RET 3 → average，提交 payload 含 det/ret", async () => {
-    const w = mount(FpFormModal, { props: { open: true, projectId: "p-1" } });
+    const w = mount(FpFormModal, { props: { open: true, projectId: "p-1", measurementMethod: "ifpug" } });
     await flushPromises();
     await w.find("#fp-name").setValue("查询客户");
     await w.find("#fp-category").setValue("ILF");

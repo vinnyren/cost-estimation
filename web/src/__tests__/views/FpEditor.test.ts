@@ -26,6 +26,16 @@ vi.mock("@/api/uploads", () => ({
   },
 }));
 
+vi.mock("@/api/projects", () => ({
+  projectsApi: {
+    get: vi.fn().mockResolvedValue({
+      id: "p-1",
+      name: "测试项目",
+      measurement_method: "nesma_estimated",
+    }),
+  },
+}));
+
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [

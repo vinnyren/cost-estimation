@@ -27,6 +27,7 @@ export interface Project {
   include_ops?: boolean;
   alpha_dev?: number;
   fp_method?: "nesma_estimated" | "ifpug" | "quick";
+  measurement_method?: "ifpug" | "nesma_detailed" | "nesma_estimated" | "nesma_indicative" | "cosmic";
   total_fp?: number;
   total_cost?: number;
   selected_band?: "P10" | "P50" | "P90";
