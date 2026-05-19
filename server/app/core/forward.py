@@ -25,6 +25,8 @@ class ForwardInput:
     other_cost: float = 0.0
     # v2.8 — development 开发项目 / enhancement 增强项目。
     assessment_kind: Literal["development", "enhancement"] = "development"
+    # v2.9：测量方法声明字符串，由 calc.py 按 measurement_method 注入。
+    size_declaration: str = "FP (IFPUG-GB/T 42449-2023)"
 
 
 @dataclass
@@ -83,7 +85,7 @@ def calculate_forward(ctx: EvaluationContext, inp: ForwardInput) -> ForwardResul
         "f_city": rate_dev,
         "ops_plus_other": cost_ops["P50"] + inp.other_cost,
         "total_p50": total["P50"],
-        "fp_count_declaration": f"{us:g} FP (IFPUG-GB/T 42449-2023)",
+        "fp_count_declaration": f"{us:g} {inp.size_declaration}",
     }
 
     # v2.2 composition: 4 段拆分（间接 = total - dev_labor - ops_labor - other，钳到 0+）

@@ -276,6 +276,8 @@ def effective_to_calc_dict(eff: dict) -> dict:
         "factors_ops": eff.get("factors_ops", {}),
         "hours_per_pm": eff.get("hours_per_pm", 174),
         "ops_cost_ratio": eff.get("ops_cost_ratio", {}),
+        # v2.9 B2/A5 — COSMIC CFP → FP 换算系数，默认 1.2
+        "cfp_to_fp": eff.get("cfp_to_fp", 1.2),
     }
 
 
