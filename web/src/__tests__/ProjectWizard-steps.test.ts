@@ -129,3 +129,66 @@ describe("ProjectWizard assessment_kind field", () => {
     );
   });
 });
+
+describe("ProjectWizard — measurement_method 字段 (v2.9)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  async function goToStep2() {
+    router.push("/projects/new");
+    await router.isReady();
+    const w = mountWizard();
+    await flushPromises();
+    await w.find('input[name="name"]').setValue("测试项目");
+    await w.find('[data-test="wizard-next"]').trigger("click");
+    await w.vm.$nextTick();
+    return w;
+  }
+
+  it("Step 2 渲染 5 个方法选项", async () => {
+    const w = await goToStep2();
+    const options = w.findAll("[data-testid='method-option']");
+    expect(options).toHaveLength(5);
+    const values = options.map((o) => o.attributes("value"));
+    expect(values).toContain("ifpug");
+    expect(values).toContain("nesma_indicative");
+    expect(values).toContain("nesma_estimated");
+    expect(values).toContain("nesma_detailed");
+    expect(values).toContain("cosmic");
+  });
+
+  it("默认选中 nesma_estimated", async () => {
+    const w = await goToStep2();
+    const selected = w.find("[data-testid='method-option'][value='nesma_estimated']");
+    expect((selected.element as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("提交 payload 包含 measurement_method", async () => {
+    const { projectsApi } = await import("@/api/projects");
+    const w = await goToStep2();
+
+    // Select cosmic method
+    const cosmicOption = w.find("[data-testid='method-option'][value='cosmic']");
+    await cosmicOption.trigger("change");
+    await w.vm.$nextTick();
+
+    // Advance through steps 3–6 to reach confirmation (step 7), then submit
+    for (let step = 2; step < 7; step++) {
+      const nextBtn = w.find('[data-test="wizard-next"]');
+      if (nextBtn.exists()) {
+        await nextBtn.trigger("click");
+        await w.vm.$nextTick();
+      }
+    }
+
+    // Now on step 7 — submit
+    await w.find(".btn.btn-primary").trigger("click");
+    await flushPromises();
+
+    expect(projectsApi.create).toHaveBeenCalledWith(
+      expect.objectContaining({ measurement_method: "cosmic" }),
+    );
+  });
+});

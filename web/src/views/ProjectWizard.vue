@@ -28,6 +28,8 @@ import type {
   ProjectPhase,
   ProjectType,
 } from "@/api/projects";
+
+type MeasurementMethod = "ifpug" | "nesma_indicative" | "nesma_estimated" | "nesma_detailed" | "cosmic";
 import AlphaSlider from "@/components/AlphaSlider.vue";
 import PhaseCfPreview from "@/components/PhaseCfPreview.vue";
 import FactorDropdown from "@/components/FactorDropdown.vue";
@@ -109,6 +111,14 @@ function chainMultiply(
   return f;
 }
 
+const METHOD_OPTIONS: { value: MeasurementMethod; label: string; hint: string }[] = [
+  { value: "nesma_estimated",  label: "NESMA 估算级",  hint: "按类别取平均复杂度（推荐初期估算）" },
+  { value: "nesma_detailed",   label: "NESMA 详细级",  hint: "按 DET/RET/FTR 精确查表（GB/T 42588）" },
+  { value: "nesma_indicative", label: "NESMA 预估级",  hint: "仅数 ILF/EIF 数量（最快速估算）" },
+  { value: "ifpug",            label: "IFPUG",         hint: "按 DET/RET/FTR 查表（GB/T 42449）" },
+  { value: "cosmic",           label: "COSMIC",        hint: "按数据移动计数（GB/T 42452）" },
+];
+
 const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
   dev_only: "仅开发",
   ops_only: "仅运维",
@@ -132,6 +142,7 @@ interface FormState {
   phase: ProjectPhase;
   project_type: ProjectType;
   assessment_kind: AssessmentKind;
+  measurement_method: MeasurementMethod;
   target_total: number;
   alpha: number;
   client: string;
@@ -149,6 +160,7 @@ const form = reactive<FormState>({
   phase: "bidding",
   project_type: "dev_only",
   assessment_kind: "development",
+  measurement_method: "nesma_estimated",
   target_total: 0,
   alpha: 0.7,
   client: "",
@@ -172,6 +184,9 @@ const STEP_LABELS = [
 
 const submitting = ref(false);
 const errorMsg = ref<string | null>(null);
+// For edit-mode: tracks the original measurement_method loaded from the server,
+// used to detect cross-input-model switches (COSMIC ↔ other methods).
+const originalMeasurementMethod = ref<MeasurementMethod | null>(null);
 
 const CITIES = [
   "北京", "天津", "上海", "重庆", "石家庄", "太原", "呼和浩特", "西安", "成都",
@@ -233,6 +248,8 @@ onMounted(async () => {
   if (props.projectId) {
     try {
       const proj = await projectsApi.get(props.projectId);
+      const loadedMethod: MeasurementMethod = (proj.measurement_method as MeasurementMethod) ?? "nesma_estimated";
+      originalMeasurementMethod.value = loadedMethod;
       Object.assign(form, {
         name: proj.name,
         city: proj.city,
@@ -240,6 +257,7 @@ onMounted(async () => {
         phase: proj.phase,
         project_type: proj.project_type,
         assessment_kind: proj.assessment_kind ?? "development",
+        measurement_method: loadedMethod,
         mode: proj.mode as ProjectMode,
         target_total: proj.target_cost ?? 0,
         client: proj.client ?? "",
@@ -274,6 +292,23 @@ function hasAnyFactor(obj: Record<string, string>): boolean {
 }
 
 async function submit(): Promise<void> {
+  // v2.9 — 编辑模式下检测 COSMIC ↔ 其他方法的跨输入模型切换，提示用户确认。
+  // FP 计数不从 wizard 层获取（FP 由 fp-editor 管理），因此只要从/到 cosmic
+  // 的方法切换就显示警告，不做 FP 数量的门控检查。
+  if (isEditMode.value && originalMeasurementMethod.value !== null) {
+    const orig = originalMeasurementMethod.value;
+    const next = form.measurement_method;
+    const crossModel =
+      (orig === "cosmic" && next !== "cosmic") ||
+      (orig !== "cosmic" && next === "cosmic");
+    if (crossModel && orig !== next) {
+      const confirmed = window.confirm(
+        "切换测量方法将导致录入模型不同（COSMIC ↔ 其他方法），已有 FP 数据将保留但不参与新方法的计算，请重新录入对应格式的功能点。确认切换？",
+      );
+      if (!confirmed) return;
+    }
+  }
+
   submitting.value = true;
   errorMsg.value = null;
   try {
@@ -289,6 +324,7 @@ async function submit(): Promise<void> {
       name: form.name,
       project_type: form.project_type,
       assessment_kind: form.assessment_kind,
+      measurement_method: form.measurement_method,
       phase: form.phase,
       city: form.city,
       industry: form.industry,
@@ -462,6 +498,38 @@ async function submit(): Promise<void> {
           <p class="hint" style="margin: 0">
             开发项目按 DFP（新增+转换）计规模；增强项目按 EFP（新增+变更+转换+删除）计规模（GB/T 42449）
           </p>
+        </div>
+        <div
+          class="field"
+          id="wizard-measurement-method"
+          data-testid="wizard-measurement-method"
+        >
+          <span class="field-label">功能规模测量方法</span>
+          <div
+            class="radio-group"
+            role="radiogroup"
+            aria-labelledby="wizard-measurement-method"
+          >
+            <label
+              v-for="opt in METHOD_OPTIONS"
+              :key="opt.value"
+              class="radio"
+            >
+              <input
+                type="radio"
+                name="measurement_method"
+                :value="opt.value"
+                :checked="form.measurement_method === opt.value"
+                :data-testid="'method-option'"
+                @change="form.measurement_method = opt.value"
+              >
+              <span>{{ opt.label }}</span>
+              <span
+                class="hint"
+                style="margin: 0; font-size: var(--font-size-xs)"
+              >{{ opt.hint }}</span>
+            </label>
+          </div>
         </div>
         <label
           v-if="form.project_type !== 'ops_only'"

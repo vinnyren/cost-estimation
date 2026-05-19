@@ -26,7 +26,6 @@ export interface Project {
   other_cost?: number;
   include_ops?: boolean;
   alpha_dev?: number;
-  fp_method?: "nesma_estimated" | "ifpug" | "quick";
   measurement_method?: "ifpug" | "nesma_detailed" | "nesma_estimated" | "nesma_indicative" | "cosmic";
   total_fp?: number;
   total_cost?: number;
@@ -72,7 +71,7 @@ export interface ProjectBundleItem {
   other_cost?: number;
   include_ops?: boolean;
   alpha_dev?: number;
-  fp_method?: "nesma_estimated" | "ifpug" | "quick";
+  measurement_method?: "ifpug" | "nesma_detailed" | "nesma_estimated" | "nesma_indicative" | "cosmic";
   basis_data_ver: string;
   factors_dev?: Record<string, unknown> | null;
   factors_ops?: Record<string, unknown> | null;
