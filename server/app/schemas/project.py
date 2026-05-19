@@ -22,6 +22,8 @@ class ProjectCreate(BaseModel):
     basis_data_ver: str
     # v2.8 — 评估口径：development 开发项目 / enhancement 增强项目。
     assessment_kind: Literal["development", "enhancement"] = "development"
+    # v2.9 — 用户在结果页选定的成本档位（P10/P50/P90）— 决定报告导出用哪一档。
+    selected_band: Literal["P10", "P50", "P90"] = "P50"
     # v2.0 — per-project 调整因子选择（JSON 落盘 factors_dev_json / factors_ops_json）
     factors_dev: Optional[dict] = None
     factors_ops: Optional[dict] = None
@@ -70,6 +72,7 @@ class ProjectPatch(BaseModel):
     mode: Optional[Literal["forward", "reverse"]] = None
     project_type: Optional[Literal["dev_only", "ops_only", "dev_and_ops"]] = None
     assessment_kind: Optional[Literal["development", "enhancement"]] = None
+    selected_band: Optional[Literal["P10", "P50", "P90"]] = None
     target_cost: Optional[float] = None
     other_cost: Optional[float] = None
     include_ops: Optional[bool] = None
@@ -123,6 +126,7 @@ class ProjectBundleItem(BaseModel):
     fp_method: Literal["nesma_estimated", "ifpug", "quick"] = "nesma_estimated"
     basis_data_ver: str
     assessment_kind: Literal["development", "enhancement"] = "development"
+    selected_band: Literal["P10", "P50", "P90"] = "P50"
     factors_dev: Optional[dict] = None
     factors_ops: Optional[dict] = None
     param_overrides: list[ParamOverrideItem] = Field(default_factory=list, max_length=500)

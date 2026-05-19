@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from typing import Literal, Optional
 from sqlalchemy.orm import Session
 
 from ..config import settings
@@ -96,7 +97,11 @@ def _forward_figures(db: Session, project_id: str, proj: Project) -> dict:
     }
 
 
-def generate_excel(db: Session, project_id: str) -> Path:
+def generate_excel(
+    db: Session,
+    project_id: str,
+    band: Optional[Literal["P10", "P50", "P90"]] = None,
+) -> Path:
     proj = db.query(Project).filter_by(id=project_id).first()
     if not proj:
         raise ValueError("PROJECT_NOT_FOUND")
@@ -104,6 +109,9 @@ def generate_excel(db: Session, project_id: str) -> Path:
     fps = db.query(FunctionPoint).filter_by(project_id=project_id).all()
     if not fps:
         raise ValueError("FP_EMPTY")
+
+    # 显式 band 参数优先；其次用项目持久化的选择；最后兜底 P50。
+    effective_band: str = band or getattr(proj, "selected_band", None) or "P50"
 
     is_reverse = proj.mode == "reverse"
     # 报告口径与结果页一致 —— 同样走 calc 服务（有效参数 + 项目因子）。
@@ -120,5 +128,6 @@ def generate_excel(db: Session, project_id: str) -> Path:
         figures=fig,
         is_reverse=is_reverse,
         target_cost_wan=(proj.target_cost or 0.0) if is_reverse else None,
+        selected_band=effective_band,
     )
     return out

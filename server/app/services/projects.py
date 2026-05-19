@@ -239,6 +239,7 @@ def export_projects(db: Session, ids: list[str]) -> dict:
             "fp_method": p.fp_method,
             "basis_data_ver": p.basis_data_ver,
             "assessment_kind": p.assessment_kind,
+            "selected_band": p.selected_band,
             "factors_dev": json.loads(p.factors_dev_json) if p.factors_dev_json else None,
             "factors_ops": json.loads(p.factors_ops_json) if p.factors_ops_json else None,
             "param_overrides": overrides,
@@ -279,6 +280,7 @@ def import_bundle(db: Session, bundle) -> tuple[int, list[str]]:
             fp_method=item.fp_method,
             basis_data_ver=item.basis_data_ver,
             assessment_kind=item.assessment_kind,
+            selected_band=item.selected_band,
             factors_dev_json=json.dumps(item.factors_dev) if item.factors_dev is not None else None,
             factors_ops_json=json.dumps(item.factors_ops) if item.factors_ops is not None else None,
         )

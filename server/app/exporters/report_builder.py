@@ -22,6 +22,12 @@ from .excel import _safe_text
 
 _BANDS = ("P10", "P50", "P90")
 _BAND_LABEL = {"P10": "下限值", "P50": "中值", "P90": "上限值"}
+# 报告结论档位的中文标注（评估结论行显示的档位名称）。
+_BAND_CONCLUSION_LABEL = {
+    "P10": "乐观（P10）",
+    "P50": "中值（P50）",
+    "P90": "保守（P90）",
+}
 
 _TITLE_FONT = Font(bold=True, size=16)
 _SECTION_FONT = Font(bold=True, size=11, color="FFFFFF")
@@ -51,15 +57,18 @@ def build_report(
     figures: dict,
     is_reverse: bool,
     target_cost_wan: float | None,
+    selected_band: str = "P50",
 ) -> Path:
     wb = Workbook()
     wb.remove(wb.active)
 
     _sheet_cover(wb, project, is_reverse, target_cost_wan)
-    _sheet_summary(wb, project, functions, figures, is_reverse, target_cost_wan)
-    _sheet_modules(wb, functions, figures)
+    _sheet_summary(wb, project, functions, figures, is_reverse, target_cost_wan,
+                   selected_band=selected_band)
+    _sheet_modules(wb, functions, figures, selected_band=selected_band)
     _sheet_fp_detail(wb, functions)
-    _sheet_narrative(wb, project, functions, figures, is_reverse, target_cost_wan)
+    _sheet_narrative(wb, project, functions, figures, is_reverse, target_cost_wan,
+                     selected_band=selected_band)
     _sheet_factors(wb, figures)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -120,7 +129,8 @@ def _sheet_cover(wb: Workbook, project: Any, is_reverse: bool,
 
 # ---------------------------------------------------------------- 评估结果汇总
 def _sheet_summary(wb: Workbook, project: Any, functions: list, fig: dict,
-                   is_reverse: bool, target_cost_wan: float | None) -> None:
+                   is_reverse: bool, target_cost_wan: float | None,
+                   selected_band: str = "P50") -> None:
     ws = wb.create_sheet("评估结果汇总")
     for col, w in zip("ABCDE", (16, 26, 12, 20, 16)):
         ws.column_dimensions[col].width = w
@@ -144,7 +154,9 @@ def _sheet_summary(wb: Workbook, project: Any, functions: list, fig: dict,
     eff = fig["effort_dev"]
     cost_dev = fig["cost_dev"]
     cost_ops = fig.get("cost_ops", {})
-    cost_total_p50 = fig["cost_total_p50_yuan"]
+    # 用选定档位的总造价作为评估结论主值。
+    cost_total_selected = fig["cost_total"][selected_band]
+    conclusion_label = _BAND_CONCLUSION_LABEL.get(selected_band, selected_band)
     # 基准生产率（不含调整因子）：AE = S × pdr × 因子 → pdr = AE /(S×因子)。
     # 反算每档 S 不同，按档取对应规模。
     s_bands = fig.get("scale_adjusted_bands", {b: s_adj for b in _BANDS})
@@ -195,22 +207,23 @@ def _sheet_summary(wb: Workbook, project: Any, functions: list, fig: dict,
     row("成本", "人力成本费率", "—", round(fig["rate_dev"], 2), "元/人月")
     for b in _BANDS:
         row("成本", "软件开发费用 P", _BAND_LABEL[b], _money(cost_dev[b]), "元")
-    ops_p50 = float(cost_ops.get("P50", 0.0) or 0.0)
-    if ops_p50 > 0:
-        row("成本", "运维费用", "中值", _money(ops_p50), "元")
+    ops_selected = float(cost_ops.get(selected_band, 0.0) or 0.0)
+    if ops_selected > 0:
+        row("成本", "运维费用", conclusion_label, _money(ops_selected), "元")
     row("成本", "其他费用 DNC", "—", _money(fig.get("other_cost", 0.0)), "元")
 
     section("四、评估结论")
-    row("结论", "评估总造价", "中值", _money(cost_total_p50), "元")
-    row("结论", "评估总造价", "中值", _wan(cost_total_p50), "万元")
-    unit_price = cost_total_p50 / ufp_total if ufp_total > 0 else 0.0
+    row("结论", "评估总造价", conclusion_label, _money(cost_total_selected), "元")
+    row("结论", "评估总造价", conclusion_label, _wan(cost_total_selected), "万元")
+    unit_price = cost_total_selected / ufp_total if ufp_total > 0 else 0.0
     row("结论", "功能点单价", "—", round(unit_price, 2), "元/功能点")
     if is_reverse and target_cost_wan is not None:
         row("结论", "目标造价（反算输入）", "—", round(target_cost_wan, 4), "万元")
 
 
 # ------------------------------------------ 模块功能点及费用分项统计表
-def _sheet_modules(wb: Workbook, functions: list, fig: dict) -> None:
+def _sheet_modules(wb: Workbook, functions: list, fig: dict,
+                   selected_band: str = "P50") -> None:
     ws = wb.create_sheet("模块功能点及费用分项统计表")
     for col, w in zip("ABCDEFG", (8, 16, 22, 16, 16, 18, 12)):
         ws.column_dimensions[col].width = w
@@ -238,8 +251,9 @@ def _sheet_modules(wb: Workbook, functions: list, fig: dict) -> None:
         g["us"] += float(fp.us or 0)
 
     total_us = sum(g["us"] for g in groups.values()) or 1.0
-    total_cost = fig["cost_total_p50_yuan"]
-    total_effort_day = fig["effort_dev"]["P50"] / 8.0
+    # 用选定档位的总造价和工作量做模块分摊。
+    total_cost = fig["cost_total"][selected_band]
+    total_effort_day = fig["effort_dev"][selected_band] / 8.0
 
     r = 4
     for idx, ((sub, mod), g) in enumerate(sorted(groups.items()), 1):
@@ -308,7 +322,8 @@ def _sheet_fp_detail(wb: Workbook, functions: list) -> None:
 
 # ---------------------------------------------------------------- 评估报告书
 def _sheet_narrative(wb: Workbook, project: Any, functions: list, fig: dict,
-                     is_reverse: bool, target_cost_wan: float | None) -> None:
+                     is_reverse: bool, target_cost_wan: float | None,
+                     selected_band: str = "P50") -> None:
     ws = wb.create_sheet("评估报告书")
     ws.column_dimensions["A"].width = 110
 
@@ -317,9 +332,11 @@ def _sheet_narrative(wb: Workbook, project: Any, functions: list, fig: dict,
     ws["A1"].alignment = _CENTER
 
     ufp_total = sum(float(fp.ufp or 0) for fp in functions)
-    p50 = fig["cost_total_p50_yuan"]
+    # 结论使用选定档位的造价；区间仍展示 P10~P90 全范围。
+    cost_selected = fig["cost_total"][selected_band]
     p10 = fig["cost_total"]["P10"]
     p90 = fig["cost_total"]["P90"]
+    band_cn = _BAND_CONCLUSION_LABEL.get(selected_band, selected_band)
     mode_label = "反算" if is_reverse else "正向"
 
     paras: list[tuple[str, str]] = [
@@ -336,18 +353,19 @@ def _sheet_narrative(wb: Workbook, project: Any, functions: list, fig: dict,
          "采用功能点方法测算软件规模：先统计未调整功能点数 UFP，乘以规模变更"
          f"因子 CF={round(fig['cf_used'], 3)} 得到调整后规模 S；再以行业基准生产率"
          "结合综合调整因子折算工作量，最后按人力成本费率换算为开发费用。"
-         "结果按 P10/P50/P90 三档给出，推荐采用 P50 中位档。"),
+         f"结果按 P10/P50/P90 三档给出，本报告采用 {band_cn} 档。"),
         ("四、评估过程",
          f"经测算，本项目未调整功能点数 UFP 为 {round(ufp_total, 2)} 功能点，"
          f"调整后规模 S 为 {round(fig['scale_adjusted'], 2)} 功能点；"
-         f"调整后工作量（中值）{round(fig['effort_dev']['P50'], 2)} 人时；"
+         f"调整后工作量（{band_cn}）{round(fig['effort_dev'][selected_band], 2)} 人时；"
          f"人力成本费率 {round(fig['rate_dev'], 2)} 元/人月。"
          + (f" 本项目为反算评估，目标造价 {target_cost_wan:g} 万元，"
             "据此反推可承载的功能点规模。" if is_reverse and target_cost_wan
             else "")),
         ("五、评估结论",
          f"本项目评估总造价区间为 {_money(p10):,.2f} 元 ~ {_money(p90):,.2f} 元，"
-         f"推荐采用中位值 P50：{_money(p50):,.2f} 元（约 {_wan(p50):g} 万元）。"),
+         f"本报告采用 {band_cn}：{_money(cost_selected):,.2f} 元"
+         f"（约 {_wan(cost_selected):g} 万元）。"),
         ("六、费用说明",
          "上述费用为软件开发费用测算结果，未包含直接非人力费用（DNC）、"
          "硬件采购、第三方软件授权等。运维费用如有需要按相应口径单独测算。"

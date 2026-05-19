@@ -1,3 +1,5 @@
+from typing import Literal, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -9,9 +11,13 @@ router = APIRouter(prefix="/api/reports")
 
 
 @router.get("/excel/{project_id}")
-def download_excel(project_id: str, db: Session = Depends(get_db)):
+def download_excel(
+    project_id: str,
+    band: Optional[Literal["P10", "P50", "P90"]] = None,
+    db: Session = Depends(get_db),
+):
     try:
-        out = svc.generate_excel(db, project_id)
+        out = svc.generate_excel(db, project_id, band=band)
     except ValueError as e:
         code = str(e).split(":")[0]
         if code == "PROJECT_NOT_FOUND":

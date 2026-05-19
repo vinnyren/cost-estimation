@@ -45,6 +45,8 @@ class Project(Base):
     assessment_kind = Column(
         String, nullable=False, server_default="development"
     )
+    # v2.9 — 用户在结果页选定的成本档位（P10/P50/P90）— 决定报告导出用哪一档。
+    selected_band = Column(String, nullable=False, server_default="P50")
 
     # v2.0 — per-project 调整因子选择，calc.py 用它代替 default=1.0
     # JSON: dev = {"app_type": "OLTP", "integrity_level": "B", ...}
