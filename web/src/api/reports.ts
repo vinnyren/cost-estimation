@@ -23,12 +23,15 @@ async function _extractBlobError(err: unknown): Promise<string> {
 
 export const reportsApi = {
   excelUrl: (projectId: string) => `/api/reports/excel/${projectId}`,
-  download: async (projectId: string, filename = "造价报告.xlsx"): Promise<void> => {
+  download: async (projectId: string, filename = "造价报告.xlsx", band?: "P10" | "P50" | "P90"): Promise<void> => {
     // Token is injected by the request interceptor in client.ts — no manual
     // header needed even for direct api.raw.* calls like this blob download.
+    const apiUrl = band
+      ? `/api/reports/excel/${projectId}?band=${band}`
+      : `/api/reports/excel/${projectId}`;
     let resp;
     try {
-      resp = await api.raw.get(`/api/reports/excel/${projectId}`, {
+      resp = await api.raw.get(apiUrl, {
         responseType: "blob",
       });
     } catch (err: unknown) {

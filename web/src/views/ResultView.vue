@@ -47,6 +47,9 @@ const error = ref<string | null>(null);
 const downloadError = ref<string | null>(null);
 const downloading = ref(false);
 
+/** Currently selected cost band — persisted to project.selected_band */
+const selectedBand = ref<"P10" | "P50" | "P90">("P50");
+
 const targetTotal = ref(0);
 const otherCost = ref(0);
 
@@ -97,6 +100,8 @@ async function loadAndCompute(): Promise<void> {
   error.value = null;
   try {
     project.value = await projectsApi.get(props.projectId);
+    // Restore persisted band selection; fall back to P50
+    selectedBand.value = project.value.selected_band ?? "P50";
     if (project.value.mode === "forward") {
       const r = await calcApi.forward({ project_id: props.projectId });
       forwardResult.value = r;
@@ -140,11 +145,26 @@ async function reverseCalc(): Promise<void> {
   }
 }
 
+async function selectBand(band: "P10" | "P50" | "P90"): Promise<void> {
+  selectedBand.value = band;
+  // Persist to project — failures are non-critical (local state still updates).
+  try {
+    await projectsApi.patch(props.projectId, { selected_band: band });
+  } catch (e: unknown) {
+    // eslint-disable-next-line no-console
+    console.warn("Failed to persist selected_band:", e);
+  }
+}
+
 async function download(): Promise<void> {
   downloading.value = true;
   downloadError.value = null;
   try {
-    await reportsApi.download(props.projectId, `${project.value?.name ?? "report"}.xlsx`);
+    await reportsApi.download(
+      props.projectId,
+      `${project.value?.name ?? "report"}.xlsx`,
+      selectedBand.value,
+    );
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "下载失败";
     // 反向项目无 FP 时后端会回 FP_EMPTY/400 — 给个能行动的提示
@@ -194,6 +214,12 @@ const PHASE_LABEL_MAP: Record<string, string> = {
   planning: "立项审批",
   change: "变更评估",
   settled: "结算审计",
+};
+
+const BAND_DETAIL_LABEL: Record<"P10" | "P50" | "P90", string> = {
+  P10: "P10 乐观档",
+  P50: "P50 推荐档",
+  P90: "P90 保守档",
 };
 
 const forwardTiers = computed(() => {
@@ -296,11 +322,15 @@ function fmtWan(n: number): string {
       v-else-if="project?.mode === 'forward' && hasForward"
       class="forward-result"
     >
-      <ResultTrio :tiers="forwardTiers" />
+      <ResultTrio
+        :tiers="forwardTiers"
+        :selected-band="selectedBand"
+        @select="selectBand"
+      />
 
       <div class="section">
         <div class="section-head">
-          <div class="section-title">计算路径详解 · P50 推荐档</div>
+          <div class="section-title">计算路径详解 · {{ BAND_DETAIL_LABEL[selectedBand] }}</div>
           <div class="section-sub">附录 D 算例 · 黄金测试基准</div>
         </div>
         <div
@@ -312,6 +342,9 @@ function fmtWan(n: number): string {
             :trace="forwardResult!.trace"
             :phase-label="PHASE_LABEL_MAP[project!.phase] || project!.phase"
             :city-label="project!.city"
+            :band="selectedBand"
+            :effort-dev-hours="forwardResult!.effort_dev_hours"
+            :cost-total-yuan="forwardResult!.cost_total_yuan"
           />
           <div
             v-else
@@ -332,7 +365,7 @@ function fmtWan(n: number): string {
             <span
               class="muted mono"
               style="font-size: 11px"
-            >P50 · 合计 {{ Math.round(forwardResult!.cost_total_yuan.P50).toLocaleString() }} 元</span>
+            >{{ selectedBand }} · 合计 {{ Math.round(forwardResult!.cost_total_yuan[selectedBand]).toLocaleString() }} 元</span>
           </div>
           <CostBar
             v-if="forwardResult!.composition"
@@ -346,6 +379,7 @@ function fmtWan(n: number): string {
           </div>
         </div>
         <ComplianceCard :p50-wan="fmtWan(forwardResult!.cost_total_yuan.P50)" />
+        <!-- ComplianceCard always cites P50 as the compliance baseline per standard wording -->
       </div>
     </div>
 

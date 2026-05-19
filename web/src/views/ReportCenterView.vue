@@ -11,7 +11,7 @@ onMounted(async () => {
 });
 
 async function downloadReport(p: Project) {
-  await reportsApi.download(p.id, `${p.name}.xlsx`);
+  await reportsApi.download(p.id, `${p.name}.xlsx`, p.selected_band ?? "P50");
 }
 </script>
 
@@ -31,7 +31,7 @@ async function downloadReport(p: Project) {
             <td><b>{{ p.name }}</b><div class="muted mono" style="font-size:11px">{{ p.id }}</div></td>
             <td>{{ p.city }} · {{ p.industry }}</td>
             <td class="muted mono" style="font-size:11px">{{ formatBeijing(p.updated_at) }}</td>
-            <td><button class="btn btn-sm" @click="downloadReport(p)">下载 P50 报告</button></td>
+            <td><button class="btn btn-sm" @click="downloadReport(p)">下载 {{ p.selected_band ?? "P50" }} 报告</button></td>
           </tr>
         </tbody>
       </table>

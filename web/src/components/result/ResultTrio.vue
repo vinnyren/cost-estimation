@@ -10,7 +10,25 @@ interface Tier {
   extras?: Array<[string, string]>;
 }
 
-defineProps<{ tiers: Tier[] }>();
+const props = defineProps<{
+  tiers: Tier[];
+  selectedBand?: "P10" | "P50" | "P90";
+}>();
+
+const emit = defineEmits<{
+  (e: "select", band: "P10" | "P50" | "P90"): void;
+}>();
+
+function selectBand(key: "P10" | "P50" | "P90") {
+  emit("select", key);
+}
+
+function onKeydown(event: KeyboardEvent, key: "P10" | "P50" | "P90") {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    selectBand(key);
+  }
+}
 
 function fmtMoney(n: number): string {
   return Math.round(n).toLocaleString("zh-CN");
@@ -26,12 +44,23 @@ function fmtWan(n: number): string {
       v-for="t in tiers"
       :key="t.key"
       class="result-card"
-      :class="{ recommended: t.recommended }"
+      :class="{
+        recommended: t.recommended,
+        selected: t.key === selectedBand,
+      }"
+      role="button"
+      tabindex="0"
+      :aria-pressed="t.key === selectedBand"
+      :data-testid="`tier-card-${t.key}`"
+      :data-selected="t.key === selectedBand ? 'true' : 'false'"
+      @click="selectBand(t.key)"
+      @keydown="onKeydown($event, t.key)"
     >
+      <div v-if="t.key === selectedBand" class="result-card-selected-mark" aria-hidden="true">✓</div>
       <div v-if="t.recommended" class="result-card-pill">推荐 · P50</div>
       <div class="result-card-tag">{{ t.key }}</div>
       <div class="result-card-name">{{ t.label }}</div>
-      <div class="result-card-amt" :class="{ dimmed: !t.recommended }">
+      <div class="result-card-amt" :class="{ dimmed: !t.recommended && t.key !== selectedBand }">
         <template v-if="t.unit === 'fp'">
           {{ t.fp?.toFixed(2) }}<span class="unit">FP</span>
         </template>
@@ -61,10 +90,44 @@ function fmtWan(n: number): string {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: box-shadow 120ms ease, border-color 120ms ease;
+  outline: none;
+}
+.result-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 15%, transparent);
+}
+.result-card:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 5px var(--accent);
 }
 .result-card.recommended {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.result-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent);
+  background: color-mix(in oklch, var(--accent) 6%, var(--surface));
+}
+.result-card.selected.recommended {
+  box-shadow: 0 0 0 4px var(--accent);
+}
+.result-card-selected-mark {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  width: 20px;
+  height: 20px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
 }
 .result-card-pill {
   position: absolute; top: -12px; left: 22px;

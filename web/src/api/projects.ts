@@ -29,6 +29,7 @@ export interface Project {
   fp_method?: "nesma_estimated" | "ifpug" | "quick";
   total_fp?: number;
   total_cost?: number;
+  selected_band?: "P10" | "P50" | "P90";
   created_at: string;
   updated_at: string;
 }

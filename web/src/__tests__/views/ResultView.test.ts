@@ -39,6 +39,7 @@ const allocFps: FunctionPoint[] = [
 vi.mock("@/api/projects", () => ({
   projectsApi: {
     get: vi.fn(),
+    patch: vi.fn().mockResolvedValue({}),
   },
 }));
 
@@ -213,7 +214,8 @@ describe("ResultView", () => {
     const dlBtn = w.findAll("button").find((b) => b.text().includes("下载 Excel"));
     await dlBtn!.trigger("click");
     await flushPromises();
-    expect(reportsApi.download).toHaveBeenCalledWith("p-1", "p.xlsx");
+    // Band defaults to P50 (project has no selected_band)
+    expect(reportsApi.download).toHaveBeenCalledWith("p-1", "p.xlsx", "P50");
   });
 
   it("点击「返回」→ 路由跳 fp-editor 并带 id", async () => {

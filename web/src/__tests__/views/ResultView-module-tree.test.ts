@@ -11,7 +11,7 @@ vi.mock("@/api/calc", () => ({
   calcApi: { forward: vi.fn(), reverse: vi.fn(), allocate: vi.fn() },
 }));
 vi.mock("@/api/projects", () => ({
-  projectsApi: { get: vi.fn() },
+  projectsApi: { get: vi.fn(), patch: vi.fn().mockResolvedValue({}) },
 }));
 vi.mock("@/api/aiTasks", () => ({
   aiTasksApi: {
