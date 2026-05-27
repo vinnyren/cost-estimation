@@ -289,8 +289,8 @@ async function onFactorEdit(
         </template>
       </h1>
       <div class="page-sub">
-        <template v-if="projectId">项目级覆盖优先于全局参数 · 当前数据基准 CSBMK®-202510</template>
-        <template v-else>全局参数库（影响所有项目） · 当前基准 CSBMK®-202510</template>
+        <template v-if="projectId">项目级覆盖优先于全局参数 · 当前数据基准 SSM-BK-202509</template>
+        <template v-else>全局参数库（影响所有项目） · 当前基准 SSM-BK-202509</template>
       </div>
     </header>
 
@@ -373,7 +373,7 @@ async function onFactorEdit(
       >
         <h2>城市费率（元/人月）</h2>
         <p class="hint">
-          基于 CSBMK®-202510，可单项覆盖。开发与运维各自独立费率。
+          基于 SSM-BK-202509，可单项覆盖。开发与运维各自独立费率。
         </p>
         <div class="city-rate-list">
           <div

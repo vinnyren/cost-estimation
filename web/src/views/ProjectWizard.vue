@@ -126,7 +126,7 @@ const PROJECT_TYPE_LABELS: Record<ProjectType, string> = {
 };
 const PROJECT_TYPES = ["dev_only", "ops_only", "dev_and_ops"] as const;
 
-const BASIS_DATA_VER = "CSBMK®-202510";
+const BASIS_DATA_VER = "SSM-BK-202509";
 
 const props = defineProps<{ projectId?: string }>();
 const isEditMode = computed(() => !!props.projectId);
