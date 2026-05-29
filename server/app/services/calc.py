@@ -213,6 +213,8 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
         ps.effective_to_calc_dict(eff),
         ProjectInputs(industry=proj.industry, city=proj.city, phase=proj.phase),
     )
+    method = getattr(proj, "measurement_method", "nesma_estimated") or "nesma_estimated"
+    is_cosmic = (method == "cosmic")
     dev_factor, ops_factor, warnings = _resolve_factors(proj, eff, payload)
     inp = ReverseInput(
         target_total=payload["target_total"],
@@ -224,6 +226,19 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
     r = calculate_reverse(ctx, inp)
     out = r.__dict__.copy()
     out["warning_messages"] = list(out.get("warning_messages") or []) + warnings
+    # v2.9 — COSMIC：reverse 按 FP/人月生产率反推的规模是 FP 当量口径，须 ×cfp_to_fp
+    # 还原为 CFP 当量，与 forward 的 CFP ÷ cfp_to_fp 对称，且与 CFP 口径的功能点表
+    # （fp.ufp 存 CFP）同口径分摊，避免 allocated(FP当量) − current(CFP) 的口径错配。
+    if is_cosmic:
+        cfp = ctx.cfp_to_fp
+        if not (cfp and cfp > 0):
+            raise ValueError("INVALID_CFP_TO_FP: COSMIC 换算系数 cfp_to_fp 必须 > 0")
+        out["scale_adjusted_bands"] = {
+            b: v * cfp for b, v in out["scale_adjusted_bands"].items()
+        }
+        out["scale_unadjusted_bands"] = {
+            b: v * cfp for b, v in out["scale_unadjusted_bands"].items()
+        }
     # 以「细化增加 UFP」为核心：反算总规模（推荐档未调整规模 = UFP 口径）
     # 按现有 FP 表各一级模块的 UFP 占比细化分摊到模块。
     rec = out.get("recommended_band", "P50")

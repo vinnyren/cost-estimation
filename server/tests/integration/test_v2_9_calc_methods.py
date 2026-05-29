@@ -94,6 +94,76 @@ class TestCosmicCfpConversion:
         assert result["scale_us"] == pytest.approx(5.0, rel=0.01)
 
 
+class TestCosmicReverseConversion:
+    """reverse 链路按 FP/人月生产率反推规模，对 COSMIC 项目须 ×cfp_to_fp
+    还原为 CFP 当量，与 forward 的 ÷cfp_to_fp 对称、与 CFP 口径的 FP 表同口径分摊。"""
+
+    def _cfp_to_fp(self, db, pid: str) -> float:
+        from app.services import params as ps
+        return ps.effective_to_calc_dict(ps.get_effective(db, pid))["cfp_to_fp"]
+
+    def test_cosmic_reverse_restores_cfp_equiv(self, db_session):
+        """同 target_total 下，cosmic 项目反算规模 = nesma 项目规模 × cfp_to_fp。"""
+        _seed_params(db_session)
+        _seed(db_session, "p-rev-cosmic", measurement_method="cosmic")
+        _seed(db_session, "p-rev-nesma", measurement_method="nesma_estimated")
+        payload = {"target_total": 500.0, "other_cost": 0.0}
+        r_cosmic = calc_svc.run_reverse(db_session, "p-rev-cosmic", dict(payload))
+        r_nesma = calc_svc.run_reverse(db_session, "p-rev-nesma", dict(payload))
+        cfp = self._cfp_to_fp(db_session, "p-rev-cosmic")
+        assert cfp > 1.0  # 默认 1.2，防止种子缺失退化为 1.0
+        for band in ("P10", "P50", "P90"):
+            assert r_cosmic["scale_unadjusted_bands"][band] == pytest.approx(
+                r_nesma["scale_unadjusted_bands"][band] * cfp, rel=0.01
+            )
+            assert r_cosmic["scale_adjusted_bands"][band] == pytest.approx(
+                r_nesma["scale_adjusted_bands"][band] * cfp, rel=0.01
+            )
+        assert r_cosmic["target_ufp"] == pytest.approx(
+            r_nesma["target_ufp"] * cfp, rel=0.01
+        )
+
+    def test_nesma_reverse_not_converted(self, db_session):
+        """nesma 项目 reverse 规模不受 cfp_to_fp 影响（回归保护）。"""
+        _seed_params(db_session)
+        _seed(db_session, "p-rev-nesma2", measurement_method="nesma_estimated")
+        r = calc_svc.run_reverse(
+            db_session, "p-rev-nesma2", {"target_total": 500.0, "other_cost": 0.0}
+        )
+        # nesma 的未调整规模 = 调整后规模 × cf（cf>1），与 cfp_to_fp 无关。
+        assert r["scale_unadjusted_bands"]["P50"] > 0
+        assert r["target_ufp"] == pytest.approx(
+            r["scale_unadjusted_bands"]["P50"], abs=0.01
+        )
+
+    def test_cosmic_reverse_module_allocation_same_unit(self, db_session):
+        """带 COSMIC FP 表时，分摊 current/allocated/delta 同为 CFP 口径：
+        各模块 allocated 之和应等于 CFP 当量的 target_ufp。"""
+        from app.db.models import FunctionPoint
+        _seed_params(db_session)
+        _seed(db_session, "p-rev-cosmic-mod", measurement_method="cosmic")
+        db_session.add(FunctionPoint(
+            id="fp-rev-c-1", project_id="p-rev-cosmic-mod", version=1,
+            category="EI", complexity="average", modify_type="add",
+            subsystem="核心", l1_module="调度", l2_module="进路",
+            ufp=8, us=8, cosmic_entry=2, cosmic_exit=3, cosmic_read=2, cosmic_write=1,
+        ))
+        db_session.add(FunctionPoint(
+            id="fp-rev-c-2", project_id="p-rev-cosmic-mod", version=1,
+            category="EO", complexity="average", modify_type="add",
+            subsystem="核心", l1_module="统计", l2_module="报表",
+            ufp=4, us=4, cosmic_entry=1, cosmic_exit=2, cosmic_read=1, cosmic_write=0,
+        ))
+        db_session.commit()
+        r = calc_svc.run_reverse(
+            db_session, "p-rev-cosmic-mod", {"target_total": 500.0, "other_cost": 0.0}
+        )
+        leaves = r["module_allocation"]
+        assert leaves, "应有模块分摊结果"
+        total_alloc = sum(leaf["allocated_ufp"] for leaf in leaves)
+        assert total_alloc == pytest.approx(r["target_ufp"], rel=0.01)
+
+
 def test_declaration_helper_covers_all_methods():
     from app.services.calc import _declaration_for
     for m in ("ifpug", "nesma_detailed", "nesma_estimated", "nesma_indicative", "cosmic"):
