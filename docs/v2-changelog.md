@@ -24,7 +24,7 @@
 | A1 | **`Project.measurement_method` 字段** —— 五取值：`ifpug` / `nesma_indicative` / `nesma_estimated` / `nesma_detailed` / `cosmic`；旧死字段 `fp_method` 被取代（`quick` → `nesma_estimated`） |
 | A2 | **策略包 `server/app/core/sizing/`** —— `base.SizeMethod` 协议 + `ifpug.py` / `nesma.py`（三级）/ `cosmic.py`；`get_method()` 注册表 |
 | A3 | **`function_points` 新增 COSMIC 列** —— `cosmic_entry/exit/read/write` 可空整数；后端 `_apply_sizing(method, data)` 取代 v2.8 的 `_apply_ifpug`，按方法重算行级 `ufp/us` |
-| A4 | **forward / reverse 按方法分派** —— `services/calc.py` 读 `project.measurement_method` 取策略；COSMIC 项目 forward 计算前将各 `FpItem.us ÷ cfp_to_fp` 换算为 FP 当量再走同一生产率/费率链；reverse 单一规模模型不依赖 FP 列表，COSMIC 换算不适用 |
+| A4 | **forward / reverse 按方法分派** —— `services/calc.py` 读 `project.measurement_method` 取策略；COSMIC 项目 forward 计算前将各 `FpItem.us ÷ cfp_to_fp` 换算为 FP 当量再走同一生产率/费率链；reverse 反推规模为 FP 当量，COSMIC 项目 `× cfp_to_fp` 还原为 CFP 当量（与 forward 对称），保证与 CFP 口径功能点表同口径分摊 |
 | A5/A6 | **Wizard / FpFormModal 方法选择 + 按方法切换录入区** —— 项目向导第 2 步加「功能规模测量方法」单选；FpFormModal 按方法 v-show 控制 DET/RET/FTR、复杂度提示或 4 类数据移动输入；COSMIC 录入实时汇总 CFP；跨录入模型切换（进/出 COSMIC）弹强警告并保留旧数据 |
 | A8 | **AI 提取按方法分支** —— `commands/cost.md` 先读 `measurement_method`，COSMIC 走「功能过程 + 4 类数据移动」prompt，其他走「5 类 + DET/RET/FTR」prompt，写入时带方法对应字段 |
 | A9 | **报告体现方法** —— `report_builder.py` 新增 `measurement_method` / `cfp_to_fp` 参数；评估报告书新增「三、评估方法」声明（写入方法标准全称）；COSMIC 项目额外追加 CFP→FP 当量换算备注 |
@@ -39,9 +39,15 @@
 
 ### 测试基线（v2.9）
 
-- Backend pytest: **360 / 360**（含 `test_v2_9_*` 系列新增测试：sizing 各策略 / forward COSMIC 换算 / 报告方法声明 / SSM-BK 数值校验）
+- Backend pytest: **363 / 363**（含 `test_v2_9_*` 系列新增测试：sizing 各策略 / forward + reverse COSMIC 换算 / 报告方法声明 / SSM-BK 数值校验）
 - Frontend vitest: **335 / 335**（含 `FpFormModal-methods.test` / `ProjectWizard-steps.test` 方法切换覆盖）
 - vue-tsc + vite build: clean
+
+### 发布收尾（ship）
+
+- **reverse 模式 COSMIC 口径修复** —— ship 前 pre-landing review 发现 reverse 反推规模未对 COSMIC 做 `cfp_to_fp` 换算，与 forward 不对称、与 CFP 口径功能点表分摊错配；已在 `run_reverse` 还原为 CFP 当量并补 3 个集成测试
+- **用户手册重生** —— `docs/user-guide.md` 重拍 22 张 v2.9 界面截图（项目工作台 / 7 步向导 / FP 编辑 / 参数管理 / 三档造价正反向 / 审计 / 报告中心）并按章节嵌入
+- **前端品牌文案同步** —— Sidebar / ParamManager / ProjectList / Wizard 仍残留的 `v2.6 · CSBMK®-202510` 统一为 `v2.9.0 · SSM-BK-202509`
 
 ### 升级（v2.6 → v2.9）
 
