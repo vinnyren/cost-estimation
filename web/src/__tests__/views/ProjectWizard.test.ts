@@ -906,7 +906,7 @@ describe("Wizard step 7 — 确认 + 提交 (T18)", () => {
     expect(summary.text()).toContain("开发 + 运维");
   });
 
-  it("payload 始终携带 basis_data_ver = CSBMK®-202510", async () => {
+  it("payload 始终携带 basis_data_ver = SSM-BK-202509", async () => {
     router.push("/projects/new");
     await router.isReady();
     const w = mountWizard();
@@ -921,6 +921,6 @@ describe("Wizard step 7 — 确认 + 提交 (T18)", () => {
 
     const payload = (projectsApi.create as unknown as ReturnType<typeof vi.fn>)
       .mock.calls[0][0];
-    expect(payload.basis_data_ver).toBe("CSBMK®-202510");
+    expect(payload.basis_data_ver).toBe("SSM-BK-202509");
   });
 });
