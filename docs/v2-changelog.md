@@ -58,6 +58,17 @@ cd server && .venv/bin/alembic upgrade head   # 6fd4cb76f438: measurement_method
 
 > 老项目首次进编辑或计算时 `measurement_method` 默认 `nesma_estimated`，行为与 v2.8 NESMA 估算一致；切到 IFPUG 详细 / COSMIC 需在「编辑设定」里改方法并按新录入模型补字段。
 
+### 安装与初始化修复（2026-05-31 patch）
+
+> 来源：用户反馈插件按 marketplace 布局安装后 `/setup` 路径检测落空、venv 用错 Python、且初始化装载的仍是旧基准 CSBMK®-202510。
+
+| # | 描述 |
+|---|---|
+| P1 | **`setup.md` / `cost.md` 路径检测对齐 marketplace 布局** —— 旧逻辑硬编码 `cache/cost-estimation`、`data/cost-estimation` 两条扁平路径，在 `cache/<marketplace>/cost-estimation/<version>` 布局下全部落空；改为优先用 `CLAUDE_PLUGIN_ROOT`，回退按版本号 `sort -V` 取最新，再回退旧扁平布局，末尾加 `server/` 存在性校验 |
+| P2 | **venv 自动选 ≥3.11 解释器** —— 旧 `setup.md` 直接 `python3 -m venv`，系统默认 `python3` 为 3.9 时 preflight 直接失败；改为按 `python3.13→3.12→3.11→python3` 探测取第一个 ≥3.11，缺失时提示 `brew install python@3.11` |
+| P3 | **失效运行态残留清理** —— `setup.md` 新增步骤：仅当 `.pid` 指向的进程已死时清理 `.pid/.token/.port`，活服务则保留并提示先 `/cost-stop`，避免误杀正在运行的后端 |
+| P4 | **初始化 seed 修正为 SSM-BK-202509** —— `setup.md` 步骤 5 此前硬编码 `--seed csbmk_202510.json`，覆盖了 `config.csbmk_seed_path` 已正确指向的 SSM 默认值；改为 `ssm_bk_202509.json`，与 v2.9 基准标准一致。`config.py` / `bootstrap` 默认本就正确，仅安装命令落后 |
+
 ---
 
 ## v2.8（2026-05-19）— 42449 算法 / 基准对齐 / 全局参数编辑 / 反算补全
