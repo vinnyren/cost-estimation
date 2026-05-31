@@ -5,8 +5,8 @@
     "email": "noreply@example.com"
   },
   "metadata": {
-    "description": "软件造价评估工具集（基于 GB/T 36964 / T/CCUA 005-2024 / CSBMK®-202510）",
-    "version": "2.5.0"
+    "description": "软件造价评估工具集（基于 GB/T 36964 / T/CCUA 005-2024 / SSM-BK-202509）",
+    "version": "2.9.0"
   },
   "plugins": [
     {
@@ -15,8 +15,8 @@
         "source": "url",
         "url": "https://github.com/vinnyren/cost-estimation.git"
       },
-      "description": "基于 GB/T 36964 / T/CCUA 005-2024 / CSBMK®-202510 的软件造价制作系统",
-      "version": "2.5.0",
+      "description": "基于 GB/T 36964 / T/CCUA 005-2024 / SSM-BK-202509 的软件造价制作系统",
+      "version": "2.9.0",
       "strict": true
     }
   ]

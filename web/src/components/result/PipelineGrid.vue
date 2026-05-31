@@ -79,7 +79,7 @@ const steps = computed(() => [
   { tag: "US", label: "未调整规模", val: props.trace.us.toFixed(2), unit: "FP", note: "Σ FP[i].us" },
   { tag: "×", label: "阶段调整因子 CF", val: props.trace.cf.toFixed(2), unit: "", note: props.phaseLabel },
   { tag: "S", label: "调整后规模", val: props.trace.s_adjusted.toFixed(2), unit: "FP", note: "US × CF", highlight: true },
-  { tag: "÷", label: `PDR ${activeBand.value}`, val: pdrForBand.value.toFixed(2), unit: "FP/PM", note: "CSBMK §4.1" },
+  { tag: "÷", label: `PDR ${activeBand.value}`, val: pdrForBand.value.toFixed(2), unit: "FP/PM", note: "SSM-BK §4.1" },
   { tag: "×", label: "开发因子乘积", val: props.trace.dev_factor.toFixed(2), unit: "", note: "5 项" },
   { tag: "EFF", label: "开发工作量", val: effPmForBand.value.toFixed(2), unit: "人月", note: `= ${effHoursForBand.value.toFixed(0)} 人时`, highlight: true },
   { tag: "×", label: `F_city (${props.cityLabel})`, val: props.trace.f_city.toLocaleString(), unit: "元/PM", note: "" },

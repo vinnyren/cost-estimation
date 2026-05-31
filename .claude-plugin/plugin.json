@@ -1,7 +1,7 @@
 {
   "name": "cost-estimation",
-  "description": "软件造价评估 · NESMA 估算 · 双向（FP↔成本）",
-  "version": "2.6.0",
+  "description": "软件造价评估 · 多标准功能规模测量（IFPUG/NESMA/COSMIC）· 双向（FP↔成本）",
+  "version": "2.9.0",
   "author": {
     "name": "Cost Estimation Team",
     "url": "https://github.com/vinnyren/cost-estimation"
