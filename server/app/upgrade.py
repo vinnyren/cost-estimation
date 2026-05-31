@@ -22,7 +22,9 @@ from pathlib import Path
 from sqlalchemy import inspect, text
 from sqlalchemy.dialects import sqlite as sqlite_dialect
 from sqlalchemy.engine import Engine
+from sqlalchemy.orm import sessionmaker
 
+from app.bootstrap import _flatten, reseed_if_outdated
 from app.db import models as _models  # noqa: F401  确保模型注册到 Base.metadata
 from app.db.session import Base
 
@@ -142,3 +144,56 @@ def reconcile_schema(engine: Engine) -> str:
         raise RuntimeError("alembic 无 head revision，请检查 alembic/versions 迁移脚本")
     _stamp(engine, head)
     return head
+
+
+def _export_modified(engine: Engine, out_path: Path, from_std: str, to_std: str, ts: str) -> int:
+    from app.db.models import ParamGlobal
+
+    Sess = sessionmaker(bind=engine)
+    with Sess() as s:
+        rows = s.query(ParamGlobal).filter_by(modified=True).all()
+        payload = {
+            "exported_at": ts,
+            "from_standard": from_std,
+            "to_standard": to_std,
+            "count": len(rows),
+            "modified_rows": [
+                {"key": r.key, "value": json.loads(r.value),
+                 "basis_version": r.basis_version}
+                for r in rows
+            ],
+        }
+        n = len(rows)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2),
+                        encoding="utf-8")
+    return n
+
+
+def reconcile_baseline(engine: Engine, seed_path: Path, ts: str, state: UpgradeState,
+                       export_dir: Path) -> dict:
+    """标准变更→导出 modified + 全量重置；不变→reseed 未改动行。绝不碰 params_override。"""
+    from app.db.models import ParamGlobal
+
+    Sess = sessionmaker(bind=engine)
+    if state.standard_changed:
+        from_std = sorted(state.basis_db)[0] if state.basis_db else "unknown"
+        export_path = export_dir / f"upgrade-modified-params-{ts}.json"
+        n_exported = _export_modified(engine, export_path, from_std,
+                                      state.basis_target, ts)
+        raw = json.loads(seed_path.read_text(encoding="utf-8"))
+        flat: dict = {}
+        _flatten("", raw, flat)
+        with Sess() as s:
+            s.query(ParamGlobal).delete()
+            for k, v in flat.items():
+                s.add(ParamGlobal(
+                    key=k, value=json.dumps(v, ensure_ascii=False),
+                    basis_version=state.basis_target, modified=False))
+            s.commit()
+        return {"path": "reset", "exported": n_exported,
+                "export_file": str(export_path), "seeded": len(flat)}
+
+    with Sess() as s:
+        n = reseed_if_outdated(s, seed_path=seed_path)
+    return {"path": "reseed", "reseeded": n}

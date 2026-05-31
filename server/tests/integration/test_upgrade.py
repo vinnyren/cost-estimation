@@ -8,6 +8,18 @@ from app.db.session import Base
 from app.db import models as _models  # noqa: F401  注册模型
 
 
+def _seed_db_with_standard(eng, version: str):
+    """直接灌几行 params_global，模拟某标准的库。"""
+    Base.metadata.create_all(eng)
+    with eng.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO params_global (key, value, basis_version, modified) VALUES "
+            "('cf.budget', '1.39', :v, 1), "
+            "('city_rate.北京.dev', '32198', :v, 1), "
+            "('hours_per_pm', '174', :v, 0)"
+        ), {"v": version})
+
+
 def _engine(db_path: Path):
     return create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
 
@@ -107,3 +119,80 @@ def test_reconcile_schema_backfills_server_default_on_existing_rows(tmp_path: Pa
         val = conn.execute(text("SELECT selected_band FROM projects WHERE id='p1'")).scalar()
     assert val == "P50", f"expected 'P50' but got {val!r}"  # 被 server_default 回填，而非 NULL
     assert "selected_band" in {c["name"] for c in inspect(eng).get_columns("projects")}
+
+
+def test_baseline_standard_changed_full_reset_and_export(tmp_path: Path):
+    from app.upgrade import detect_state, reconcile_baseline
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    _seed_db_with_standard(eng, "CSBMK®-202510")
+    seed = _seed_json(tmp_path, version="SSM-BK-TEST")
+    export_dir = tmp_path / "exports"
+
+    state = detect_state(eng, seed)
+    assert state.standard_changed is True
+    res = reconcile_baseline(eng, seed, "20260531T193000", state, export_dir)
+
+    assert res["path"] == "reset"
+    with eng.connect() as conn:
+        versions = {r[0] for r in conn.execute(text(
+            "SELECT DISTINCT basis_version FROM params_global")).all()}
+        budget = conn.execute(text(
+            "SELECT value FROM params_global WHERE key='cf.budget'")).scalar()
+    assert versions == {"SSM-BK-TEST"}
+    assert json.loads(budget) == 1.7   # 旧 1.39 已被新标准覆盖
+    exported = json.loads((export_dir / "upgrade-modified-params-20260531T193000.json")
+                          .read_text(encoding="utf-8"))
+    assert exported["from_standard"] == "CSBMK®-202510"
+    assert exported["to_standard"] == "SSM-BK-TEST"
+    assert exported["count"] == 2     # 两行 modified=True
+    keys = {r["key"] for r in exported["modified_rows"]}
+    assert keys == {"cf.budget", "city_rate.北京.dev"}
+
+
+def test_baseline_standard_unchanged_reseed_unmodified(tmp_path: Path):
+    from app.upgrade import detect_state, reconcile_baseline
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    _seed_db_with_standard(eng, "SSM-BK-TEST")   # 与 seed 同标准
+    seed = _seed_json(tmp_path, version="SSM-BK-TEST")
+    export_dir = tmp_path / "exports"
+
+    state = detect_state(eng, seed)
+    assert state.standard_changed is False
+    res = reconcile_baseline(eng, seed, "20260531T193000", state, export_dir)
+
+    assert res["path"] == "reseed"
+    with eng.connect() as conn:
+        budget = conn.execute(text(
+            "SELECT value FROM params_global WHERE key='cf.budget'")).scalar()
+    assert json.loads(budget) == 1.39   # modified=True 行保留原值
+    assert not (export_dir / "upgrade-modified-params-20260531T193000.json").exists()
+
+
+def test_param_override_untouched(tmp_path: Path):
+    from app.upgrade import detect_state, reconcile_baseline
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    _seed_db_with_standard(eng, "CSBMK®-202510")
+    # 测试 engine 未启用 FK（无 session.py 的 pragma 监听器），故无需真实 project 行
+    with eng.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO params_override (project_id, key, value) "
+            "VALUES ('p1', 'cf.budget', '2.0')"))
+    seed = _seed_json(tmp_path, version="SSM-BK-TEST")
+
+    state = detect_state(eng, seed)
+    reconcile_baseline(eng, seed, "20260531T193000", state, tmp_path / "exports")
+
+    with eng.connect() as conn:
+        ov = conn.execute(text(
+            "SELECT value FROM params_override WHERE project_id='p1' AND key='cf.budget'"
+        )).scalar()
+    assert json.loads(ov) == 2.0   # 按项目覆盖原样幸存
