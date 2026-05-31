@@ -1,0 +1,87 @@
+"""插件升级编排：把既有数据目录安全推进到当前代码版本。
+
+用法：
+  python -m app.upgrade --db <db> --seed <seed.json> --ts <timestamp> [--yes]
+
+职责：备份 → schema 漂移修复(create_all + 可空加列 + stamp head) → 基准重灯
+(标准变更→导出+全量重置；不变→reseed 未改动行)。
+
+铁律：不触碰 params_override（按项目定制）；备份先于一切变更；失败立即停、
+不自动回滚，打印恢复命令。
+
+约束：本模块假设迁移为【加性 schema 变更】（新表 / 可空新列 / 索引）。若未来出现
+非加性 DDL（删列/改类型/加约束）或需复杂数据回填的迁移，必须在此为对应 revision
+加显式 handler——reconcile_schema 遇非空无默认缺列会主动抛错提示。
+"""
+from __future__ import annotations
+
+import json
+import shutil
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import click
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.dialects import sqlite as sqlite_dialect
+from sqlalchemy.orm import sessionmaker
+
+from app.bootstrap import _flatten, reseed_if_outdated
+from app.db import models as _models  # noqa: F401  确保模型注册到 Base.metadata
+from app.db.session import Base
+
+
+@dataclass
+class UpgradeState:
+    stamp_rev: str | None
+    schema_at_head: bool
+    missing_tables: list[str] = field(default_factory=list)
+    missing_cols: list[tuple[str, str]] = field(default_factory=list)  # (table, column)
+    basis_db: set[str] = field(default_factory=set)
+    basis_target: str = ""
+    standard_changed: bool = False
+
+
+def _actual_columns(engine) -> dict[str, set[str]]:
+    insp = inspect(engine)
+    return {t: {c["name"] for c in insp.get_columns(t)} for t in insp.get_table_names()}
+
+
+def detect_state(engine, seed_path: Path) -> UpgradeState:
+    actual = _actual_columns(engine)
+    missing_tables: list[str] = []
+    missing_cols: list[tuple[str, str]] = []
+    for t in Base.metadata.sorted_tables:
+        if t.name not in actual:
+            missing_tables.append(t.name)
+            continue
+        for col in t.columns:
+            if col.name not in actual[t.name]:
+                missing_cols.append((t.name, col.name))
+
+    stamp_rev = None
+    if "alembic_version" in actual:
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT version_num FROM alembic_version")).first()
+            stamp_rev = row[0] if row else None
+
+    seed = json.loads(seed_path.read_text(encoding="utf-8"))
+    basis_target = seed.get("version", "CSBMK®-unknown")
+    basis_db: set[str] = set()
+    if "params_global" in actual:
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT DISTINCT basis_version FROM params_global "
+                "WHERE basis_version != 'user'"
+            )).all()
+            basis_db = {r[0] for r in rows}
+
+    return UpgradeState(
+        stamp_rev=stamp_rev,
+        schema_at_head=(not missing_tables and not missing_cols),
+        missing_tables=missing_tables,
+        missing_cols=missing_cols,
+        basis_db=basis_db,
+        basis_target=basis_target,
+        standard_changed=bool(basis_db) and basis_target not in basis_db,
+    )
