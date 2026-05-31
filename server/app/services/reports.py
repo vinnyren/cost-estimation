@@ -8,6 +8,7 @@ from ..core.forward import BANDS
 from ..db.models import Project, FunctionPoint
 from ..exporters.report_builder import build_report
 from . import calc as calc_svc
+from . import params as params_svc
 
 
 # 目标造价以「万元」录入/存储，计算层以「元」运算 —— 边界处换算。
@@ -92,6 +93,8 @@ def _forward_figures(db: Session, project_id: str, proj: Project) -> dict:
         "rate_dev": trace.get("f_city", 0.0),
         "hours_per_pm": trace.get("pm", 174.0),
         "other_cost": fwd.get("cost_other_yuan", 0.0),
+        # v2.9 A9: pass trace so report_builder can read fp_count_declaration
+        "trace": trace,
     }
 
 
@@ -119,6 +122,11 @@ def generate_excel(
     out = _exports_dir(project_id) / (
         f"评估报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
 
+    # v2.9 A9: resolve measurement_method and cfp_to_fp for report declaration
+    measurement_method = getattr(proj, "measurement_method", "nesma_estimated") or "nesma_estimated"
+    eff = params_svc.get_effective(db, project_id)
+    cfp_to_fp = float(eff.get("cfp_to_fp", 1.2))
+
     build_report(
         out,
         project=proj,
@@ -127,5 +135,7 @@ def generate_excel(
         is_reverse=is_reverse,
         target_cost_wan=(proj.target_cost or 0.0) if is_reverse else None,
         selected_band=effective_band,
+        measurement_method=measurement_method,
+        cfp_to_fp=cfp_to_fp,
     )
     return out

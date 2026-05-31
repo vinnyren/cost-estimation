@@ -14,6 +14,7 @@
 import { onMounted, onBeforeUnmount, ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { functionsApi, type FunctionPoint, type FpSnapshotMeta } from "@/api/functions";
+import { projectsApi, type Project } from "@/api/projects";
 import { uploadsApi } from "@/api/uploads";
 import { formatBeijing } from "@/lib/datetime";
 import { useResultsStore } from "@/stores/results";
@@ -46,6 +47,7 @@ const uploadSection = ref<{ reload: () => Promise<void> } | null>(null);
 // 同时每 30s 轮询一次 FP 列表，发现 claude_draft 行数增加就停止并提示审核。
 const fpFormOpen = ref(false);
 const editingFp = ref<FunctionPoint | null>(null);
+const project = ref<Project | null>(null);
 
 // 上传成功后的引导文案 —— 优先引导用户用「AI 任务面板」一键发起提取。
 const UPLOADED_HINT =
@@ -84,6 +86,8 @@ function onModuleSelect(payload: ModuleSel): void {
 }
 
 onMounted(async () => {
+  // Fetch project metadata (for measurement_method) in parallel with FP list
+  void projectsApi.get(props.projectId).then((p) => { project.value = p; }).catch(() => {});
   await load();
 });
 
@@ -533,6 +537,7 @@ async function onFpSaved(): Promise<void> {
       v-model:open="fpFormOpen"
       :project-id="projectId"
       :editing="editingFp"
+      :measurement-method="project?.measurement_method ?? 'nesma_estimated'"
       @saved="onFpSaved"
     />
   </section>

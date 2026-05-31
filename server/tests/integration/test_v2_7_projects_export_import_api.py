@@ -136,7 +136,7 @@ async def test_import_normalizes_claude_draft_source_to_ai_extracted(client_fact
                 "other_cost": 0,
                 "include_ops": False,
                 "alpha_dev": 1.0,
-                "fp_method": "nesma_estimated",
+                "measurement_method": "nesma_estimated",
                 "factors_dev": None,
                 "factors_ops": None,
                 "param_overrides": [],

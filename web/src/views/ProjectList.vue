@@ -220,7 +220,7 @@ async function onImportFile(ev: Event): Promise<void> {
       <div>
         <h1 class="page-title">项目工作台</h1>
         <div class="page-sub">
-          软件造价咨询项目 · GB/T 36964-2018 + CSBMK®-202510
+          软件造价咨询项目 · GB/T 36964-2018 + SSM-BK-202509
         </div>
       </div>
       <div class="page-spacer" />

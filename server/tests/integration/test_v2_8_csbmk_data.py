@@ -76,8 +76,8 @@ def test_confidentiality_factor_present():
 def test_defect_density_table_present():
     dd = _seed()["display"]["defect_density"]
     assert "P50" in dd
-    # 表 4.4 缺陷密度已核对值
-    assert dd["P50"] == 0.23
+    # SSM-BK-202509 表 3-5 缺陷密度已核对值（P50 由 0.23 更新为 0.12）
+    assert dd["P50"] == 0.12
 
 
 def test_phase_effort_distribution_present():
@@ -90,8 +90,8 @@ def test_phase_effort_distribution_present():
 def test_fp_unit_price_present():
     up = _seed()["display"]["fp_unit_price"]
     assert isinstance(up, dict) and len(up) >= 1
-    # 第 4.6 节 功能点单价已核对值（北京开发）
-    assert up["北京_开发"] == 1243.52
+    # SSM-BK-202509 第 3.14 节 功能点单价已核对值（北京开发，由 1243.52 更新为 1336.00）
+    assert up["北京_开发"] == 1336.00
 
 
 def test_ops_cost_ratio_all_bands():

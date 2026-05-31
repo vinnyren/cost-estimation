@@ -54,7 +54,7 @@ function go(item: NavItem) {
       <div class="sidebar-brand-mark">F</div>
       <div class="sidebar-brand-text">
         <div class="sidebar-brand-title">FP-Studio</div>
-        <div class="sidebar-brand-sub mono">v2.6 · CSBMK 202510</div>
+        <div class="sidebar-brand-sub mono">v2.9.0 · SSM-BK-202509</div>
       </div>
     </div>
 
@@ -88,7 +88,7 @@ function go(item: NavItem) {
     </nav>
 
     <div class="sidebar-foot">
-      <div class="sidebar-help mono">CSBMK®-202510</div>
+      <div class="sidebar-help mono">SSM-BK-202509</div>
     </div>
   </aside>
 </template>

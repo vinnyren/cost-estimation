@@ -163,7 +163,33 @@ curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
   > /dev/null || true
 ```
 
-### Step 3：按 NESMA 5 类别生成 FP 列表
+### Step 2.5：读取项目的度量方法
+
+在执行提取前，先读取项目的 `measurement_method`，以便后续按方法分支：
+
+```bash
+MEASUREMENT_METHOD=$(curl -s -H "X-Auth-Token: $TOKEN" \
+  "$BASE/api/projects/$PROJECT_ID" \
+  | jq -r '.data.measurement_method // .measurement_method // "nesma_estimated"')
+echo "measurement_method: $MEASUREMENT_METHOD"
+```
+
+> 说明：jq 路径兼容两种 API 响应格式——`{ "data": { "measurement_method": "..." } }` 和 `{ "measurement_method": "..." }`；两者都不存在时 fallback 为 `"nesma_estimated"`。
+
+---
+
+### Step 3：按度量方法分支提取功能点
+
+**根据 `$MEASUREMENT_METHOD` 决定走哪个提取路径：**
+
+- 若 `$MEASUREMENT_METHOD` 为 `"cosmic"`，执行 **Step 3-COSMIC**（功能过程 + 数据移动），跳过 Step 3-IFPUG/NESMA。
+- 否则（`ifpug`、`nesma_estimated`、`nesma_detailed`、`nesma_indicative` 以及任何其他值），执行 **Step 3-IFPUG/NESMA**，跳过 Step 3-COSMIC。
+
+---
+
+### Step 3-IFPUG/NESMA：按 NESMA 5 类别生成 FP 列表
+
+> **仅当 `$MEASUREMENT_METHOD` != `"cosmic"` 时执行此段，COSMIC 跳过。**
 
 按 SKILL.md "AI 功能点提取 — Step 2/3" 的 prompt 把文本里描述的功能逐条归类。
 
@@ -233,7 +259,89 @@ curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
   > /dev/null || true
 ```
 
+---
+
+### Step 3-COSMIC：按功能过程 + 数据移动提取（GB/T 42452 COSMIC）
+
+> **仅当 `$MEASUREMENT_METHOD` == `"cosmic"` 时执行此段，IFPUG/NESMA 跳过。**
+
+根据已拼接的项目文档文本，按 COSMIC（ISO/IEC 19761，国标 GB/T 42452）方法提取功能点：
+
+#### 3-COSMIC.0 必须提取三级模块层级（与 IFPUG/NESMA 要求相同，强制）
+
+每一条功能过程 **必须**带上 `subsystem`（子系统）、`l1_module`（一级模块）、`l2_module`（二级模块）。规则与 Step 3.0 相同：结构化表格直接读列，使用手册从标题层级推断，向下填充合并单元格，`subsystem` 和 `l1_module` 不可为空。
+
+#### 3-COSMIC.1 识别功能过程（Functional Process）
+
+COSMIC 的基本度量单位是**功能过程**：由软件用户触发的、处理一个独立数据移动集合的最小功能单元。对每个功能过程，识别：
+
+- `name`：功能过程名称（即该功能的操作名，如"提交订单"、"查询账户余额"）
+- `description`：功能过程的业务描述
+- `subsystem` / `l1_module` / `l2_module`：三级模块层级（见 3-COSMIC.0）
+
+#### 3-COSMIC.2 统计数据移动（Data Movement）
+
+对每个功能过程，统计 4 类数据移动数量（均为整数 ≥ 0）：
+
+| 字段 | 数据移动类型 | 方向 | 说明 |
+|---|---|---|---|
+| `cosmic_entry` | Entry（入口 E） | 用户 → 被测软件 | 用户发送数据给软件（如表单提交、参数输入） |
+| `cosmic_exit` | Exit（出口 X） | 被测软件 → 用户 | 软件向用户返回数据（如查询结果、报表导出） |
+| `cosmic_read` | Read（读 R） | 持久存储 → 软件 | 软件从存储读取数据（如数据库查询） |
+| `cosmic_write` | Write（写 W） | 软件 → 持久存储 | 软件向存储写入数据（如插入、更新、删除记录） |
+
+- 信息明确时据实统计；信息不足时，按如下默认值填写：`cosmic_entry=1, cosmic_exit=1, cosmic_read=1, cosmic_write=1`。
+- 后端将根据 `cosmic_entry + cosmic_exit + cosmic_read + cosmic_write` 自动计算 CFP（Cosmic Function Points），并回填 `ufp` / `us`，因此这两个字段在提取阶段填 `0`。
+
+#### 3-COSMIC.3 其他字段约定
+
+- `category`：填占位值 `"EI"`（COSMIC 不使用 IFPUG 类别，但后端 schema 必填此字段）
+- `complexity`：填占位值 `"average"`（COSMIC 不按复杂度分级，但后端 schema 必填此字段）
+- `fp_kind`：填 `"dev"`（开发功能点，与 IFPUG/NESMA 一致）
+- `ufp`：填 `0`（后端 `_apply_sizing` 将根据 cosmic_* 字段重算后回填）
+- `us`：填 `0`（同上）
+- `source`：必须是 `"claude_draft"`
+
+**COSMIC 提取示例**（说明 JSON 格式，非真实数据）：
+
+一个"查询账户余额"功能过程，用户发起查询请求（1 个 Entry），系统返回余额数据（1 个 Exit），后端从数据库读取账户记录（1 个 Read），无写操作（0 个 Write）：
+
+```json
+{
+  "subsystem": "电子结算",
+  "l1_module": "账户管理",
+  "l2_module": "余额查询",
+  "name": "查询账户余额",
+  "category": "EI",
+  "complexity": "average",
+  "ufp": 0,
+  "us": 0,
+  "cosmic_entry": 1,
+  "cosmic_exit": 1,
+  "cosmic_read": 1,
+  "cosmic_write": 0,
+  "fp_kind": "dev",
+  "source": "claude_draft",
+  "description": "用户输入账户ID，系统返回该账户的当前余额和最近交易记录"
+}
+```
+
+**T3 — 功能过程提取完成（COSMIC）**
+
+```bash
+curl -fsS -X PATCH "$BASE/api/ai-tasks/$TASK_ID" \
+  -H "X-Auth-Token: $TOKEN" -H "content-type: application/json" \
+  -d '{"progress_pct":55,"stage_log_append":"✓ COSMIC 功能过程 + 数据移动提取"}' \
+  > /dev/null || true
+```
+
+---
+
 ### Step 4：批量写入
+
+**根据 `$MEASUREMENT_METHOD` 决定发送哪种格式的 items：**
+
+#### Step 4-IFPUG/NESMA（当 `$MEASUREMENT_METHOD` != `"cosmic"`）
 
 ```http
 POST /api/projects/{project_id}/functions/bulk
@@ -259,13 +367,56 @@ X-Auth-Token: $TOKEN
 }
 ```
 
-**关键约束**：
+**IFPUG/NESMA 关键约束**：
 
 - `subsystem` + `l1_module` **必填**（见 3.0），`l2_module` 尽量填、实在无层级才留空
 - `source` 必须是 `"claude_draft"`（前端会高亮提示用户审核）
 - `ufp` 与 `us` 必须等于上表对应单元格的 NESMA 默认值（不要自创）
 - `replace=false` 走追加模式，不覆盖用户已手填的 FP
 - 一次性提交完整 FP 清单（覆盖文档里全部业务流程），避免多次半成品调用
+
+#### Step 4-COSMIC（当 `$MEASUREMENT_METHOD` == `"cosmic"`）
+
+```http
+POST /api/projects/{project_id}/functions/bulk
+Content-Type: application/json
+X-Auth-Token: $TOKEN
+
+{
+  "items": [
+    {
+      "subsystem": "电子结算",
+      "l1_module": "账户管理",
+      "l2_module": "余额查询",
+      "name": "查询账户余额",
+      "category": "EI",
+      "complexity": "average",
+      "ufp": 0,
+      "us": 0,
+      "cosmic_entry": 1,
+      "cosmic_exit": 1,
+      "cosmic_read": 1,
+      "cosmic_write": 0,
+      "fp_kind": "dev",
+      "source": "claude_draft",
+      "description": "用户输入账户ID，系统返回该账户的当前余额和最近交易记录"
+    }
+  ],
+  "replace": false
+}
+```
+
+**COSMIC 关键约束**：
+
+- `subsystem` + `l1_module` **必填**，`l2_module` 尽量填
+- `category` 必须填 `"EI"`（占位，schema 必填字段，COSMIC 不使用 IFPUG 类别）
+- `complexity` 必须填 `"average"`（占位，schema 必填字段，COSMIC 不按此分级）
+- `ufp` 和 `us` 必须填 `0`（后端 `_apply_sizing` 根据 `cosmic_*` 字段自动计算回填）
+- `cosmic_entry`、`cosmic_exit`、`cosmic_read`、`cosmic_write` 必须全部提供（整数 ≥ 0）
+- `fp_kind` 必须填 `"dev"`
+- `source` 必须是 `"claude_draft"`
+- `replace=false` 走追加模式，不覆盖用户已手填的 FP
+- 一次性提交完整功能过程清单，避免多次半成品调用
 
 **T4 — FP 表写入完成**
 

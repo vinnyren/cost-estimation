@@ -11,6 +11,88 @@
 
 ---
 
+## v2.9（2026-05-20）— 多标准功能规模测量 + SSM-BK-202509
+
+> 来源：用户提出在评估中支持三种国标功能规模测量方法（IFPUG / NESMA / COSMIC），并基于一份新的行业基准报告重建基准数据。
+> 三份标准（GB/T 42449 / 42452 / 42588）均为功能规模测量标准，**成本流水线不变**，变的是"怎么数规模"。
+> **零 breaking change**：旧 `fp_method` 字段迁移到 `measurement_method`；老项目默认 `nesma_estimated`；alembic migration `6fd4cb76f438` 新增 `measurement_method` + COSMIC 四列均为可空，老库自动 fallback。
+
+### 多标准（Part A）
+
+| # | 描述 |
+|---|---|
+| A1 | **`Project.measurement_method` 字段** —— 五取值：`ifpug` / `nesma_indicative` / `nesma_estimated` / `nesma_detailed` / `cosmic`；旧死字段 `fp_method` 被取代（`quick` → `nesma_estimated`） |
+| A2 | **策略包 `server/app/core/sizing/`** —— `base.SizeMethod` 协议 + `ifpug.py` / `nesma.py`（三级）/ `cosmic.py`；`get_method()` 注册表 |
+| A3 | **`function_points` 新增 COSMIC 列** —— `cosmic_entry/exit/read/write` 可空整数；后端 `_apply_sizing(method, data)` 取代 v2.8 的 `_apply_ifpug`，按方法重算行级 `ufp/us` |
+| A4 | **forward / reverse 按方法分派** —— `services/calc.py` 读 `project.measurement_method` 取策略；COSMIC 项目 forward 计算前将各 `FpItem.us ÷ cfp_to_fp` 换算为 FP 当量再走同一生产率/费率链；reverse 反推规模为 FP 当量，COSMIC 项目 `× cfp_to_fp` 还原为 CFP 当量（与 forward 对称），保证与 CFP 口径功能点表同口径分摊 |
+| A5/A6 | **Wizard / FpFormModal 方法选择 + 按方法切换录入区** —— 项目向导第 2 步加「功能规模测量方法」单选；FpFormModal 按方法 v-show 控制 DET/RET/FTR、复杂度提示或 4 类数据移动输入；COSMIC 录入实时汇总 CFP；跨录入模型切换（进/出 COSMIC）弹强警告并保留旧数据 |
+| A8 | **AI 提取按方法分支** —— `commands/cost.md` 先读 `measurement_method`，COSMIC 走「功能过程 + 4 类数据移动」prompt，其他走「5 类 + DET/RET/FTR」prompt，写入时带方法对应字段 |
+| A9 | **报告体现方法** —— `report_builder.py` 新增 `measurement_method` / `cfp_to_fp` 参数；评估报告书新增「三、评估方法」声明（写入方法标准全称）；COSMIC 项目额外追加 CFP→FP 当量换算备注 |
+
+### 基准数据（Part B）
+
+| # | 描述 |
+|---|---|
+| B1 | **SSM-BK-202509 重建基准数据** —— 新 `server/app/data/ssm_bk_202509.json`，覆盖全行业及 8 个分行业 P10–P90 生产率、维护型 / AI+开发生产率、缺陷密度、交付质量、工作量分布、功能点单价（1336 元）及 CF 表；`config.csbmk_seed_path` 切到新文件，`csbmk_202510.json` 保留不删 |
+| B2 | **`cfp_to_fp` 换算系数** —— 全局参数新增 `cfp_to_fp`（默认 1.2，对应 1 NESMA-FP ≈ 1.2 CFP），COSMIC 项目走 `FP 当量 = CFP ÷ cfp_to_fp` 后接 FP/人月生产率，避免手工臆造 CFP 专属生产率表 |
+| B3 | **README 标准更正** —— GB/T 42452 旧误标为「软件开发成本度量规范应用指南」，更正为「COSMIC 功能规模测量方法」；标准合规章节补 42449 / 42588；顶部基准从 CSBMK®-202510 同步为 SSM-BK-202509 |
+
+### 测试基线（v2.9）
+
+- Backend pytest: **363 / 363**（含 `test_v2_9_*` 系列新增测试：sizing 各策略 / forward + reverse COSMIC 换算 / 报告方法声明 / SSM-BK 数值校验）
+- Frontend vitest: **335 / 335**（含 `FpFormModal-methods.test` / `ProjectWizard-steps.test` 方法切换覆盖）
+- vue-tsc + vite build: clean
+
+### 发布收尾（ship）
+
+- **reverse 模式 COSMIC 口径修复** —— ship 前 pre-landing review 发现 reverse 反推规模未对 COSMIC 做 `cfp_to_fp` 换算，与 forward 不对称、与 CFP 口径功能点表分摊错配；已在 `run_reverse` 还原为 CFP 当量并补 3 个集成测试
+- **用户手册重生** —— `docs/user-guide.md` 重拍 22 张 v2.9 界面截图（项目工作台 / 7 步向导 / FP 编辑 / 参数管理 / 三档造价正反向 / 审计 / 报告中心）并按章节嵌入
+- **前端品牌文案同步** —— Sidebar / ParamManager / ProjectList / Wizard 仍残留的 `v2.6 · CSBMK®-202510` 统一为 `v2.9.0 · SSM-BK-202509`
+
+### 升级（v2.6 → v2.9）
+
+```bash
+git pull
+cd server && .venv/bin/alembic upgrade head   # 6fd4cb76f438: measurement_method + cosmic 列
+```
+
+> 老项目首次进编辑或计算时 `measurement_method` 默认 `nesma_estimated`，行为与 v2.8 NESMA 估算一致；切到 IFPUG 详细 / COSMIC 需在「编辑设定」里改方法并按新录入模型补字段。
+
+---
+
+## v2.8（2026-05-19）— 42449 算法 / 基准对齐 / 全局参数编辑 / 反算补全
+
+> Phase A / B / C / D 四块同期完成。pytest 289 / vitest 308 / vue-tsc / build 全绿。
+
+| 阶段 | 描述 |
+|---|---|
+| A · IFPUG 算法 | `core/ifpug.py` 复杂度查表（DET/RET/FTR → 复杂度 → UFP），FP 表加 `det/ret/ftr` 列，`Project.assessment_kind`（development / enhancement）覆盖 DFP / EFP 口径；FpFormModal IFPUG 联动；Wizard 第 2 步加「评估口径」单选 |
+| B · 基准数据对齐 2025 PDF | `csbmk_202510.json` 6 处数值修正（修改类型 / 平台 / 支持 / 用户规模等）；补因子表 / 展示数据 / 附录 C；`ParamGlobal.reseed_if_outdated()` 旧库刷新到新 seed（用户改过的项保留） |
+| C · 全局参数草稿编辑 | ParamManager 全局模式三按钮：**保存 / 撤销 / 还原出厂**；草稿在缓冲区累积不即时落库；顶部状态条「● 有未保存的修改 / 参数已是最新保存状态」 |
+| D · 反算补全 | reverse 项目结果页新增三级模块树（build_module_tree 逐层分摊）；「按反算补全 FP」按钮触发 `reverse_fill` AI 任务，按反算分摊量级回写 FP 表 |
+| 选档 | 结果页三档卡片可点选 P10/P50/P90 → 持久化到 `Project.selected_band`；Excel 报告按选档导出 |
+
+### 升级（v2.7 → v2.8）
+
+```bash
+git pull
+cd server && .venv/bin/alembic upgrade head   # IFPUG/assessment_kind/selected_band 列
+```
+
+---
+
+## v2.7（2026-05-18）— 预留入口补全
+
+> 补全 v2.6 遗留的三个 stub 入口。pytest 233 / vitest 296 / vue-tsc 0 / build OK。
+
+| 入口 | 描述 |
+|---|---|
+| 全局审计聚合 | `GET /api/audit` 跨项目时间线 + AuditView global 分支 + 项目徽章；侧边栏「审计日志」从规划中状态变为实装 |
+| 批量导出 / 导入 | `POST /api/projects/export` / `import` JSON bundle；ProjectList 复选框选择 + 批量导出 / 导入按钮启用；导入带规模上限校验，旧 bundle 兼容 |
+| 采纳 FP | AiTaskPanel 完成后新增「采纳 FP」按钮 → `POST /api/projects/{id}/functions/accept-drafts`，把 `claude_draft` 升级为 `ai_extracted` 并自动留快照 |
+
+---
+
 ## v2.6（2026-05-18）— 反算重做与报告升级
 
 > 来源：v2.5 release 后用户反馈，聚焦反算模型一致性、行业评估报告格式与大文件上传。**零 breaking change，无新表，无需 alembic migration。**

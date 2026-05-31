@@ -39,9 +39,9 @@ async def test_effective_returns_flat_keys_with_overrides_empty(client_factory):
         assert "city_rate" in data
         assert "factors_dev" in data
         assert "factors_ops" in data
-        assert data["cf"]["bidding"] == 1.21
-        assert data["productivity_dev"]["电子政务"]["P50"] == 6.41
-        assert data["city_rate"]["北京"]["dev"] == 32198
+        assert data["cf"]["bidding"] == 1.25
+        assert data["productivity_dev"]["电子政务"]["P50"] == 8.02
+        assert data["city_rate"]["北京"]["dev"] == 33400
         assert data["overrides"] == {}
 
 
@@ -83,7 +83,7 @@ async def test_override_supports_productivity_flat_path(client_factory):
         body = r.json()["data"]
         assert body["productivity_dev"]["电子政务"]["P50"] == 9.99
         # 其它 band 不被波及
-        assert body["productivity_dev"]["电子政务"]["P10"] == 2.04
+        assert body["productivity_dev"]["电子政务"]["P10"] == 2.26
 
 
 async def test_override_clear_via_null(client_factory):
@@ -103,7 +103,7 @@ async def test_override_clear_via_null(client_factory):
         assert r.status_code == 200
         body = r.json()["data"]
         assert "city_rate.北京.dev" not in body["overrides"]
-        assert body["city_rate"]["北京"]["dev"] == 32198  # 回到 global 值
+        assert body["city_rate"]["北京"]["dev"] == 33400  # 回到 global 值
 
 
 async def test_global_reset_clears_modified_and_reseeds(client_factory):
@@ -121,7 +121,7 @@ async def test_global_reset_clears_modified_and_reseeds(client_factory):
         assert r.status_code == 200, r.text
 
         g2 = await client.get("/api/params/global", headers=H)
-        assert g2.json()["data"]["city_rate"]["北京"]["dev"] == 32198  # 回 seed
+        assert g2.json()["data"]["city_rate"]["北京"]["dev"] == 33400  # 回 seed
 
 
 async def test_calc_forward_uses_overrides(client_factory):
@@ -148,7 +148,7 @@ async def test_calc_forward_uses_overrides(client_factory):
         await client.patch(
             f"/api/projects/{pid}/params/override",
             headers={**H, "Content-Type": "application/json"},
-            json={"city_rate.北京.dev": 64396},
+            json={"city_rate.北京.dev": 66800},
         )
         r2 = await client.post(
             "/api/calc/forward",

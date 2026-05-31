@@ -22,6 +22,14 @@ from .excel import _safe_text
 
 _BANDS = ("P10", "P50", "P90")
 _BAND_LABEL = {"P10": "下限值", "P50": "中值", "P90": "上限值"}
+
+_DECLARATION_LABEL = {
+    "ifpug":            "IFPUG（GB/T 42449-2023）",
+    "nesma_detailed":   "NESMA 详细级（GB/T 42588-2023）",
+    "nesma_estimated":  "NESMA 估算级（GB/T 42588-2023）",
+    "nesma_indicative": "NESMA 预估级（GB/T 42588-2023）",
+    "cosmic":           "COSMIC（GB/T 42452-2023）",
+}
 # 报告结论档位的中文标注（评估结论行显示的档位名称）。
 _BAND_CONCLUSION_LABEL = {
     "P10": "乐观（P10）",
@@ -58,6 +66,8 @@ def build_report(
     is_reverse: bool,
     target_cost_wan: float | None,
     selected_band: str = "P50",
+    measurement_method: str = "nesma_estimated",
+    cfp_to_fp: float = 1.2,
 ) -> Path:
     wb = Workbook()
     wb.remove(wb.active)
@@ -68,7 +78,9 @@ def build_report(
     _sheet_modules(wb, functions, figures, selected_band=selected_band)
     _sheet_fp_detail(wb, functions)
     _sheet_narrative(wb, project, functions, figures, is_reverse, target_cost_wan,
-                     selected_band=selected_band)
+                     selected_band=selected_band,
+                     measurement_method=measurement_method,
+                     cfp_to_fp=cfp_to_fp)
     _sheet_factors(wb, figures)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -323,7 +335,9 @@ def _sheet_fp_detail(wb: Workbook, functions: list) -> None:
 # ---------------------------------------------------------------- 评估报告书
 def _sheet_narrative(wb: Workbook, project: Any, functions: list, fig: dict,
                      is_reverse: bool, target_cost_wan: float | None,
-                     selected_band: str = "P50") -> None:
+                     selected_band: str = "P50",
+                     measurement_method: str = "nesma_estimated",
+                     cfp_to_fp: float = 1.2) -> None:
     ws = wb.create_sheet("评估报告书")
     ws.column_dimensions["A"].width = 110
 
@@ -339,6 +353,28 @@ def _sheet_narrative(wb: Workbook, project: Any, functions: list, fig: dict,
     band_cn = _BAND_CONCLUSION_LABEL.get(selected_band, selected_band)
     mode_label = "反算" if is_reverse else "正向"
 
+    # 评估方法声明
+    method_label = _DECLARATION_LABEL.get(measurement_method, measurement_method)
+    # fp_count_declaration 来自 run_forward trace（如有）
+    fp_decl = (fig.get("trace") or {}).get("fp_count_declaration", "")
+    method_section_body = (
+        f"本项目功能规模测量方法：{method_label}。"
+        + (f"规模声明：{fp_decl}。" if fp_decl else "")
+        + "采用功能点方法测算软件规模：先统计未调整功能点数 UFP，乘以规模变更"
+        f"因子 CF={round(fig['cf_used'], 3)} 得到调整后规模 S；再以行业基准生产率"
+        "结合综合调整因子折算工作量，最后按人力成本费率换算为开发费用。"
+        f"结果按 P10/P50/P90 三档给出，本报告采用 {band_cn} 档。"
+    )
+
+    # COSMIC 换算备注（仅 COSMIC 项目追加）
+    cosmic_note = ""
+    if measurement_method == "cosmic":
+        cosmic_note = (
+            f"注：本项目采用 COSMIC 功能规模测量方法，规模单位为 CFP。"
+            f"评估结果经 CFP→FP 当量换算（系数 {cfp_to_fp}），"
+            f"因无直接 COSMIC 生产率基准，换算后的 FP 当量走与 IFPUG/NESMA 相同的 FP/人月生产率。"
+        )
+
     paras: list[tuple[str, str]] = [
         ("一、项目概述",
          f"本次评估对象为「{project.name}」（项目编号 {project.id}）。"
@@ -347,13 +383,9 @@ def _sheet_narrative(wb: Workbook, project: Any, functions: list, fig: dict,
          f"评估阶段为「{project.phase}」，评估方式为{mode_label}。"),
         ("二、评估依据",
          "1.《软件研发成本度量规范》（GB/T 36964-2018）；"
-         "2. NESMA 功能点估算方法；"
+         f"2. {_DECLARATION_LABEL.get(measurement_method, '功能规模测量方法')}；"
          f"3. CSBMK 行业基准数据（版本 {project.basis_data_ver}）。"),
-        ("三、评估方法",
-         "采用功能点方法测算软件规模：先统计未调整功能点数 UFP，乘以规模变更"
-         f"因子 CF={round(fig['cf_used'], 3)} 得到调整后规模 S；再以行业基准生产率"
-         "结合综合调整因子折算工作量，最后按人力成本费率换算为开发费用。"
-         f"结果按 P10/P50/P90 三档给出，本报告采用 {band_cn} 档。"),
+        ("三、评估方法", method_section_body),
         ("四、评估过程",
          f"经测算，本项目未调整功能点数 UFP 为 {round(ufp_total, 2)} 功能点，"
          f"调整后规模 S 为 {round(fig['scale_adjusted'], 2)} 功能点；"
@@ -361,7 +393,8 @@ def _sheet_narrative(wb: Workbook, project: Any, functions: list, fig: dict,
          f"人力成本费率 {round(fig['rate_dev'], 2)} 元/人月。"
          + (f" 本项目为反算评估，目标造价 {target_cost_wan:g} 万元，"
             "据此反推可承载的功能点规模。" if is_reverse and target_cost_wan
-            else "")),
+            else "")
+         + (f" {cosmic_note}" if cosmic_note else "")),
         ("五、评估结论",
          f"本项目评估总造价区间为 {_money(p10):,.2f} 元 ~ {_money(p90):,.2f} 元，"
          f"本报告采用 {band_cn}：{_money(cost_selected):,.2f} 元"

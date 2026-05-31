@@ -86,7 +86,7 @@ def create_app() -> FastAPI:
         else {}
     )
     app = FastAPI(
-        title="软件造价制作系统", version="1.0.0", lifespan=_lifespan,
+        title="软件造价制作系统", version="2.9.0", lifespan=_lifespan,
         **docs_kwargs,  # type: ignore[arg-type]
     )
 

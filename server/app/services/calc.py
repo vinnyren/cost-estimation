@@ -9,8 +9,23 @@ from . import params as ps
 from . import functions as fs
 
 
+_METHOD_DECLARATION = {
+    "ifpug":            "FP (IFPUG-GB/T 42449-2023)",
+    "nesma_detailed":   "FP (NESMA-GB/T 42588-2023, 详细级)",
+    "nesma_estimated":  "FP (NESMA-GB/T 42588-2023, 估算级)",
+    "nesma_indicative": "FP (NESMA-GB/T 42588-2023, 预估级)",
+    "cosmic":           "FP 当量 (COSMIC-GB/T 42452-2023, 经 CFP 换算)",
+}
+
+
+def _declaration_for(measurement_method: str) -> str:
+    """返回 measurement_method 对应的规模声明字符串。"""
+    return _METHOD_DECLARATION.get(measurement_method, "FP (IFPUG-GB/T 42449-2023)")
+
+
 def _resolve_items(
-    db: Session, project_id: str, payload: dict, mode: str = "forward"
+    db: Session, project_id: str, payload: dict, mode: str = "forward",
+    cfp_to_fp: float = 1.2, is_cosmic: bool = False,
 ) -> list[FpItem]:
     """Get FpItem list from payload, or fall back to DB functions for the project.
 
@@ -22,16 +37,28 @@ def _resolve_items(
     forward 模式下若既无 payload.items 也无 DB function points，抛
     NO_FUNCTION_POINTS（返回 422 给前端，避免静默 scale_us=0 的"看似坏了"体验）。
     reverse 模式不需要 items（仅用 target_total），所以不强制。
+
+    v2.9 — COSMIC 项目：CFP ÷ cfp_to_fp 换算为 FP 等量后再进成本管道。
     """
     raw_items = payload.get("items")
     if raw_items:
-        return [FpItem(us=i["us"], modify_type=i.get("modify_type", "add")) for i in raw_items]
-    db_items = fs.list_for_project(db, project_id)
-    if not db_items and mode == "forward":
-        raise ValueError(
-            "NO_FUNCTION_POINTS: 项目暂无功能点，请先在 FP 编辑屏添加或上传文档让 AI 提取"
-        )
-    return [FpItem(us=fp.us, modify_type=fp.modify_type or "add") for fp in db_items]
+        items = [FpItem(us=i["us"], modify_type=i.get("modify_type", "add")) for i in raw_items]
+    else:
+        db_items = fs.list_for_project(db, project_id)
+        if not db_items and mode == "forward":
+            raise ValueError(
+                "NO_FUNCTION_POINTS: 项目暂无功能点，请先在 FP 编辑屏添加或上传文档让 AI 提取"
+            )
+        items = [FpItem(us=fp.us, modify_type=fp.modify_type or "add") for fp in db_items]
+
+    # COSMIC CFP → FP 等量换算（仅 forward，仅 COSMIC 方法）
+    if is_cosmic:
+        if not (cfp_to_fp and cfp_to_fp > 0):
+            raise ValueError("INVALID_CFP_TO_FP: COSMIC 换算系数 cfp_to_fp 必须 > 0")
+        items = [FpItem(us=item.us / cfp_to_fp, modify_type=item.modify_type)
+                 for item in items]
+
+    return items
 
 
 def _resolve_factors(
@@ -71,15 +98,21 @@ def run_forward(db: Session, project_id: str, payload: dict) -> dict:
         ps.effective_to_calc_dict(eff),
         ProjectInputs(industry=proj.industry, city=proj.city, phase=proj.phase),
     )
+    method = getattr(proj, "measurement_method", "nesma_estimated") or "nesma_estimated"
+    is_cosmic = (method == "cosmic")
     dev_factor, ops_factor, warnings = _resolve_factors(proj, eff, payload)
     inp = ForwardInput(
-        items=_resolve_items(db, project_id, payload, mode="forward"),
+        items=_resolve_items(
+            db, project_id, payload, mode="forward",
+            cfp_to_fp=ctx.cfp_to_fp, is_cosmic=is_cosmic,
+        ),
         dev_factor=dev_factor,
         ops_factor=ops_factor,
         include_dev=payload.get("include_dev", True),
         include_ops=payload.get("include_ops", proj.include_ops or False),
         other_cost=payload.get("other_cost", proj.other_cost or 0.0),
         assessment_kind=getattr(proj, "assessment_kind", None) or "development",
+        size_declaration=_declaration_for(method),
     )
     r = calculate_forward(ctx, inp)
     out = r.__dict__.copy()
@@ -180,6 +213,8 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
         ps.effective_to_calc_dict(eff),
         ProjectInputs(industry=proj.industry, city=proj.city, phase=proj.phase),
     )
+    method = getattr(proj, "measurement_method", "nesma_estimated") or "nesma_estimated"
+    is_cosmic = (method == "cosmic")
     dev_factor, ops_factor, warnings = _resolve_factors(proj, eff, payload)
     inp = ReverseInput(
         target_total=payload["target_total"],
@@ -191,6 +226,19 @@ def run_reverse(db: Session, project_id: str, payload: dict) -> dict:
     r = calculate_reverse(ctx, inp)
     out = r.__dict__.copy()
     out["warning_messages"] = list(out.get("warning_messages") or []) + warnings
+    # v2.9 — COSMIC：reverse 按 FP/人月生产率反推的规模是 FP 当量口径，须 ×cfp_to_fp
+    # 还原为 CFP 当量，与 forward 的 CFP ÷ cfp_to_fp 对称，且与 CFP 口径的功能点表
+    # （fp.ufp 存 CFP）同口径分摊，避免 allocated(FP当量) − current(CFP) 的口径错配。
+    if is_cosmic:
+        cfp = ctx.cfp_to_fp
+        if not (cfp and cfp > 0):
+            raise ValueError("INVALID_CFP_TO_FP: COSMIC 换算系数 cfp_to_fp 必须 > 0")
+        out["scale_adjusted_bands"] = {
+            b: v * cfp for b, v in out["scale_adjusted_bands"].items()
+        }
+        out["scale_unadjusted_bands"] = {
+            b: v * cfp for b, v in out["scale_unadjusted_bands"].items()
+        }
     # 以「细化增加 UFP」为核心：反算总规模（推荐档未调整规模 = UFP 口径）
     # 按现有 FP 表各一级模块的 UFP 占比细化分摊到模块。
     rec = out.get("recommended_band", "P50")

@@ -23,7 +23,7 @@ vi.mock("@/api/projects", () => ({
       factors_dev: { app_type: "业务处理" },
       factors_ops: {},
       basis_data_ver: "CSBMK-202510",
-      fp_method: "nesma_estimated",
+      measurement_method: "nesma_estimated",
       created_at: "2026-05-12T00:00:00Z",
       updated_at: "2026-05-12T00:00:00Z",
     }),

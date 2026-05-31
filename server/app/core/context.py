@@ -36,3 +36,11 @@ class EvaluationContext:
     @property
     def hours_per_pm(self) -> float:
         return self.raw.get("hours_per_pm", 174)
+
+    @property
+    def cfp_to_fp(self) -> float:
+        """COSMIC CFP → FP 当量换算系数。默认 1.2（1 NESMA-FP ≈ 1.2 CFP）。
+
+        可在全局参数页（ParamManager）草稿编辑覆盖。
+        """
+        return float(self.raw.get("cfp_to_fp", 1.2))

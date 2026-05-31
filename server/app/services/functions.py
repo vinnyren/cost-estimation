@@ -3,7 +3,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..db.models import FunctionPoint, FPSnapshot, Project, Result
 from ..schemas.functions import FunctionPointCreate, FunctionPointPatch
-from ..core.ifpug import classify_complexity, fp_value
+from ..core.ifpug import classify_complexity
+from ..core.sizing import get_method
 
 
 def _next_version(db: Session, project_id: str) -> int:
@@ -56,30 +57,49 @@ def list_snapshots(db: Session, project_id: str) -> list[dict]:
     ]
 
 
-def _apply_ifpug(data: dict) -> dict:
-    """提供了 IFPUG 复杂度查表所需输入时重算 complexity/ufp/us。
+def _apply_sizing(method: str, data: dict) -> dict:
+    """按项目 measurement_method 重算 ufp / us，并（部分方法）重算 complexity。
 
-    数据功能需 det+ret；事务功能需 det+ftr。信息不足时原样返回。
-    返回新 dict（不就地改入参）。
+    返回新 dict，不就地修改 data（不可变原则）。
     """
-    category = data.get("category")
-    det, ret, ftr = data.get("det"), data.get("ret"), data.get("ftr")
-    has_input = (
-        (category in ("ILF", "EIF") and det is not None and ret is not None)
-        or (category in ("EI", "EO", "EQ") and det is not None and ftr is not None)
-    )
-    if not has_input:
-        return data
-    complexity = classify_complexity(category, det, ret, ftr)
-    ufp = fp_value(category, complexity)
-    return {**data, "complexity": complexity, "ufp": ufp, "us": ufp}
+    try:
+        method_obj = get_method(method)
+    except ValueError:
+        return data  # 未知方法：退化到原样返回
+
+    size = method_obj.compute_entry_size(data)
+
+    if method_obj.input_model == "ifpug_style":
+        if method in ("ifpug", "nesma_detailed"):
+            cat = data.get("category")
+            det, ret, ftr = data.get("det"), data.get("ret"), data.get("ftr")
+            has_input = (
+                (cat in ("ILF", "EIF") and det is not None and ret is not None)
+                or (cat in ("EI", "EO", "EQ") and det is not None and ftr is not None)
+            )
+            if has_input:
+                complexity = classify_complexity(cat, det, ret, ftr)
+            else:
+                # 无足够 DET/RET/FTR 时：保留 data 中已有的 complexity（如
+                # PATCH 时显式传入的值），无则退回 "average"。
+                complexity = data.get("complexity") or "average"
+        elif method == "nesma_estimated":
+            complexity = "average"
+        else:  # nesma_indicative：保留原 complexity
+            complexity = data.get("complexity", "average")
+        return {**data, "complexity": complexity, "ufp": size, "us": size}
+
+    # cosmic：不动 complexity；写入 ufp/us（CFP 值）
+    return {**data, "ufp": size, "us": size}
 
 
 def create(db: Session, project_id: str, payload: FunctionPointCreate) -> FunctionPoint:
-    if not db.query(Project).filter_by(id=project_id).first():
+    proj = db.query(Project).filter_by(id=project_id).first()
+    if not proj:
         raise ValueError("PROJECT_NOT_FOUND")
     version = _next_version(db, project_id)
-    data = _apply_ifpug(payload.model_dump())
+    method = getattr(proj, "measurement_method", "nesma_estimated") or "nesma_estimated"
+    data = _apply_sizing(method, payload.model_dump())
     fp = FunctionPoint(id=f"fp-{uuid.uuid4().hex[:12]}",
                         project_id=project_id, version=version,
                         **data)
@@ -93,11 +113,15 @@ def patch(db: Session, project_id: str, fp_id: str, payload: FunctionPointPatch)
     if not fp:
         return None
     updates = payload.model_dump(exclude_unset=True)
-    # Merge existing column values with patch updates, then recompute IFPUG
-    # fields (complexity/ufp/us) when det/ret/ftr/category are sufficient.
+    # Merge existing column values with patch updates, then recompute sizing
+    # fields (complexity/ufp/us) per the project's measurement method.
     merged = {c.name: getattr(fp, c.name) for c in fp.__table__.columns}
     merged.update(updates)
-    merged = _apply_ifpug(merged)
+    proj_obj = db.query(Project).filter_by(id=project_id).first()
+    if proj_obj is None:
+        return None
+    method = getattr(proj_obj, "measurement_method", "nesma_estimated") or "nesma_estimated"
+    merged = _apply_sizing(method, merged)
     for k, v in updates.items():
         setattr(fp, k, v)
     for k in ("complexity", "ufp", "us"):

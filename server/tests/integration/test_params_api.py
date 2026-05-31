@@ -6,9 +6,9 @@ async def test_global_params_after_seed(client_factory):
         r = await client.get("/api/params/global", headers=H)
         assert r.status_code == 200
         data = r.json()["data"]
-        assert data["city_rate"]["北京"]["dev"] == 32198
-        assert data["productivity"]["dev"]["电子政务"]["P50"] == 6.41
-        assert data["cf"]["bidding"] == 1.21
+        assert data["city_rate"]["北京"]["dev"] == 33400
+        assert data["productivity"]["dev"]["电子政务"]["P50"] == 8.02
+        assert data["cf"]["bidding"] == 1.25
 
 
 async def test_patch_global_param(client_factory):

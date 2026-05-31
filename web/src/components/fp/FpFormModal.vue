@@ -6,6 +6,7 @@ const props = defineProps<{
   open: boolean;
   projectId: string;
   editing?: FunctionPoint | null;
+  measurementMethod?: string;
 }>();
 
 const emit = defineEmits<{ "update:open": [v: boolean]; saved: [] }>();
@@ -60,8 +61,24 @@ function classifyComplexity(
   return COMPLEXITY_MATRIX[ftrBandEoEq(ftr)][eoEqDetBand(det)]; // EO | EQ
 }
 
-const CATEGORIES: FpCategory[] = ["EI", "EO", "EQ", "ILF", "EIF"];
+const ALL_CATEGORIES: FpCategory[] = ["EI", "EO", "EQ", "ILF", "EIF"];
+const INDICATIVE_CATEGORIES: FpCategory[] = ["ILF", "EIF"];
 
+// --- measurement method derived flags ---
+// Default undefined measurementMethod to "nesma_estimated" per spec.
+const effectiveMethod = computed(() => props.measurementMethod ?? "nesma_estimated");
+const isIfpugStyle = computed(() =>
+  effectiveMethod.value === "ifpug" || effectiveMethod.value === "nesma_detailed",
+);
+const isNesmaEstimated = computed(() => effectiveMethod.value === "nesma_estimated");
+const isNesmaIndicative = computed(() => effectiveMethod.value === "nesma_indicative");
+const isCosmic = computed(() => effectiveMethod.value === "cosmic");
+
+const effectiveCategories = computed<FpCategory[]>(() =>
+  isNesmaIndicative.value ? INDICATIVE_CATEGORIES : ALL_CATEGORIES,
+);
+
+// --- form refs ---
 const name = ref("");
 const description = ref("");
 const subsystem = ref("");
@@ -71,6 +88,12 @@ const category = ref<FpCategory>("EI");
 const det = ref<number | null>(null);
 const ret = ref<number | null>(null);
 const ftr = ref<number | null>(null);
+
+// COSMIC data movement counts
+const cosmicEntry = ref<number | null>(null);
+const cosmicExit = ref<number | null>(null);
+const cosmicRead = ref<number | null>(null);
+const cosmicWrite = ref<number | null>(null);
 
 const submitting = ref(false);
 const errorMsg = ref("");
@@ -86,11 +109,38 @@ watch(category, () => {
   ftr.value = null;
 });
 
-const complexity = computed<FpComplexity>(() =>
-  classifyComplexity(category.value, det.value, ret.value, ftr.value),
-);
+// When method switches to nesma_indicative and current category is not ILF/EIF, reset to ILF
+watch(isNesmaIndicative, (v) => {
+  if (v && !INDICATIVE_CATEGORIES.includes(category.value)) {
+    category.value = "ILF";
+  }
+});
+
+const complexity = computed<FpComplexity>(() => {
+  if (isNesmaEstimated.value) return "average";
+  return classifyComplexity(category.value, det.value, ret.value, ftr.value);
+});
 
 const computedUfp = computed<number>(() => UFP_TABLE[category.value][complexity.value]);
+
+const cosmicCfpTotal = computed<number>(() =>
+  (cosmicEntry.value ?? 0) +
+  (cosmicExit.value ?? 0) +
+  (cosmicRead.value ?? 0) +
+  (cosmicWrite.value ?? 0),
+);
+
+// Fix 2: method-aware complexity label/hint for the v-else (ifpug-style) block
+const complexityMeta = computed<{ label: string; hint: string }>(() => {
+  if (effectiveMethod.value === "nesma_detailed") {
+    return { label: "复杂度（NESMA 详细级 自动）", hint: "按 GB/T 42588 查表" };
+  }
+  if (effectiveMethod.value === "nesma_indicative") {
+    return { label: "复杂度（NESMA 预估级）", hint: "预估级仅按 ILF/EIF 计数" };
+  }
+  // ifpug (and any unexpected method that falls into v-else)
+  return { label: "复杂度（IFPUG 自动）", hint: "按 GB/T 42449 查表" };
+});
 
 function resetForm(): void {
   name.value = "";
@@ -98,10 +148,14 @@ function resetForm(): void {
   subsystem.value = "";
   l1_module.value = "";
   l2_module.value = "";
-  category.value = "EI";
+  category.value = isNesmaIndicative.value ? "ILF" : "EI";
   det.value = null;
   ret.value = null;
   ftr.value = null;
+  cosmicEntry.value = null;
+  cosmicExit.value = null;
+  cosmicRead.value = null;
+  cosmicWrite.value = null;
   errorMsg.value = "";
   validationMsg.value = "";
 }
@@ -117,6 +171,17 @@ function prefillForm(fp: FunctionPoint): void {
   det.value = fp.det ?? null;
   ret.value = fp.ret ?? null;
   ftr.value = fp.ftr ?? null;
+  // COSMIC fields — stored in extended props (may not exist on older FPs)
+  const fpAny = fp as FunctionPoint & {
+    cosmic_entry?: number | null;
+    cosmic_exit?: number | null;
+    cosmic_read?: number | null;
+    cosmic_write?: number | null;
+  };
+  cosmicEntry.value = fpAny.cosmic_entry ?? null;
+  cosmicExit.value = fpAny.cosmic_exit ?? null;
+  cosmicRead.value = fpAny.cosmic_read ?? null;
+  cosmicWrite.value = fpAny.cosmic_write ?? null;
   errorMsg.value = "";
   validationMsg.value = "";
   suppressCategoryReset = false;
@@ -149,29 +214,66 @@ async function onSubmit(): Promise<void> {
     return;
   }
 
-  const ufp = computedUfp.value;
-  const payload: Partial<FunctionPoint> = {
-    name: name.value.trim(),
-    description: description.value.trim() || undefined,
-    subsystem: subsystem.value.trim() || undefined,
-    l1_module: l1_module.value.trim() || undefined,
-    l2_module: l2_module.value.trim() || undefined,
-    category: category.value,
-    complexity: complexity.value,
-    det: det.value ?? undefined,
-    ret: ret.value ?? undefined,
-    ftr: ftr.value ?? undefined,
-    ufp,
-    us: ufp,
-    ...(props.editing ? {} : { source: "manual" }),
-  };
+  let payload: Record<string, unknown>;
+
+  if (isCosmic.value) {
+    const cfp = cosmicCfpTotal.value;
+    payload = {
+      name: name.value.trim(),
+      description: description.value.trim() || undefined,
+      subsystem: subsystem.value.trim() || undefined,
+      l1_module: l1_module.value.trim() || undefined,
+      l2_module: l2_module.value.trim() || undefined,
+      category: category.value,
+      complexity: "average" as const, // COSMIC has no complexity concept; schema requires a value
+      cosmic_entry: cosmicEntry.value ?? 0,
+      cosmic_exit: cosmicExit.value ?? 0,
+      cosmic_read: cosmicRead.value ?? 0,
+      cosmic_write: cosmicWrite.value ?? 0,
+      ufp: cfp,
+      us: cfp,
+      ...(props.editing ? {} : { source: "manual" }),
+    };
+  } else if (isNesmaEstimated.value || isNesmaIndicative.value) {
+    const ufp = computedUfp.value;
+    payload = {
+      name: name.value.trim(),
+      description: description.value.trim() || undefined,
+      subsystem: subsystem.value.trim() || undefined,
+      l1_module: l1_module.value.trim() || undefined,
+      l2_module: l2_module.value.trim() || undefined,
+      category: category.value,
+      complexity: complexity.value,
+      ufp,
+      us: ufp,
+      ...(props.editing ? {} : { source: "manual" }),
+    };
+  } else {
+    // ifpug / nesma_detailed
+    const ufp = computedUfp.value;
+    payload = {
+      name: name.value.trim(),
+      description: description.value.trim() || undefined,
+      subsystem: subsystem.value.trim() || undefined,
+      l1_module: l1_module.value.trim() || undefined,
+      l2_module: l2_module.value.trim() || undefined,
+      category: category.value,
+      complexity: complexity.value,
+      det: det.value ?? undefined,
+      ret: ret.value ?? undefined,
+      ftr: ftr.value ?? undefined,
+      ufp,
+      us: ufp,
+      ...(props.editing ? {} : { source: "manual" }),
+    };
+  }
 
   submitting.value = true;
   try {
     if (props.editing) {
-      await functionsApi.patch(props.projectId, props.editing.id, payload);
+      await functionsApi.patch(props.projectId, props.editing.id, payload as Partial<FunctionPoint>);
     } else {
-      await functionsApi.create(props.projectId, payload);
+      await functionsApi.create(props.projectId, payload as Partial<FunctionPoint>);
     }
     emit("saved");
     close();
@@ -203,6 +305,7 @@ async function onSubmit(): Promise<void> {
             class="form-input"
             placeholder="请输入功能点名称"
             autocomplete="off"
+            data-testid="input-name"
           >
           <p v-if="validationMsg" class="form-error">{{ validationMsg }}</p>
         </div>
@@ -254,38 +357,152 @@ async function onSubmit(): Promise<void> {
           </div>
         </div>
 
+        <!-- category: filtered by method for nesma_indicative -->
         <div class="form-row">
           <div class="form-group">
             <label for="fp-category" class="form-label">类别</label>
             <select id="fp-category" v-model="category" class="form-input form-select">
-              <option v-for="cat in CATEGORIES" :key="cat" :value="cat">{{ cat }}</option>
+              <option
+                v-for="cat in effectiveCategories"
+                :key="cat"
+                :value="cat"
+                data-testid="category-option"
+              >{{ cat }}</option>
             </select>
           </div>
+
+          <!-- IFPUG / nesma_detailed: DET + RET/FTR -->
+          <template v-if="isIfpugStyle">
+            <div class="form-group">
+              <label for="fp-det" class="form-label">DET（数据元素数）</label>
+              <input
+                id="fp-det"
+                v-model.number="det"
+                type="number"
+                min="0"
+                class="form-input"
+                placeholder="字段数"
+                data-testid="input-det"
+              >
+            </div>
+            <!-- RET visible for data functions (ILF/EIF); FTR visible for transaction functions -->
+            <div class="form-group" v-show="category === 'ILF' || category === 'EIF'">
+              <label for="fp-ret" class="form-label">RET（记录元素数）</label>
+              <input
+                id="fp-ret"
+                v-model.number="ret"
+                type="number"
+                min="0"
+                class="form-input"
+                placeholder="记录类型数"
+                data-testid="input-ret"
+              >
+            </div>
+            <div class="form-group" v-show="category !== 'ILF' && category !== 'EIF'">
+              <label for="fp-ftr" class="form-label">FTR（引用文件数）</label>
+              <input
+                id="fp-ftr"
+                v-model.number="ftr"
+                type="number"
+                min="0"
+                class="form-input"
+                placeholder="引用文件数"
+                data-testid="input-ftr"
+              >
+            </div>
+          </template>
+        </div>
+
+        <!-- COSMIC: 4 data movement inputs -->
+        <template v-if="isCosmic">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fp-cosmic-entry" class="form-label">入口（Entry）</label>
+              <input
+                id="fp-cosmic-entry"
+                v-model.number="cosmicEntry"
+                type="number"
+                min="0"
+                class="form-input"
+                placeholder="入口移动数"
+                data-testid="input-cosmic-entry"
+              >
+            </div>
+            <div class="form-group">
+              <label for="fp-cosmic-exit" class="form-label">出口（Exit）</label>
+              <input
+                id="fp-cosmic-exit"
+                v-model.number="cosmicExit"
+                type="number"
+                min="0"
+                class="form-input"
+                placeholder="出口移动数"
+                data-testid="input-cosmic-exit"
+              >
+            </div>
+            <div class="form-group">
+              <label for="fp-cosmic-read" class="form-label">读（Read）</label>
+              <input
+                id="fp-cosmic-read"
+                v-model.number="cosmicRead"
+                type="number"
+                min="0"
+                class="form-input"
+                placeholder="读移动数"
+                data-testid="input-cosmic-read"
+              >
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fp-cosmic-write" class="form-label">写（Write）</label>
+              <input
+                id="fp-cosmic-write"
+                v-model.number="cosmicWrite"
+                type="number"
+                min="0"
+                class="form-input"
+                placeholder="写移动数"
+                data-testid="input-cosmic-write"
+              >
+            </div>
+            <div class="form-group">
+              <span class="form-label">CFP（自动汇总）</span>
+              <div class="ufp-display">
+                <span data-testid="cfp-total" class="ufp-value">{{ cosmicCfpTotal }}</span>
+                <span class="ufp-hint muted">入口 + 出口 + 读 + 写</span>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- nesma_estimated: complexity fixed to average (中) -->
+        <div v-else-if="isNesmaEstimated" class="form-row">
           <div class="form-group">
-            <label for="fp-det" class="form-label">DET（数据元素数）</label>
-            <input id="fp-det" v-model.number="det" type="number" min="0"
-                   class="form-input" placeholder="字段数">
+            <span class="form-label">复杂度（估算级固定）</span>
+            <div class="ufp-display">
+              <span data-testid="fp-complexity-estimated" class="ufp-value">中</span>
+              <span class="ufp-hint muted">NESMA 估算级固定为中等复杂度</span>
+            </div>
           </div>
-          <div class="form-group" v-if="category === 'ILF' || category === 'EIF'">
-            <label for="fp-ret" class="form-label">RET（记录元素数）</label>
-            <input id="fp-ret" v-model.number="ret" type="number" min="0"
-                   class="form-input" placeholder="记录类型数">
-          </div>
-          <div class="form-group" v-else>
-            <label for="fp-ftr" class="form-label">FTR（引用文件数）</label>
-            <input id="fp-ftr" v-model.number="ftr" type="number" min="0"
-                   class="form-input" placeholder="引用文件数">
+          <div class="form-group">
+            <span class="form-label">UFP（自动）</span>
+            <div class="ufp-display">
+              <span data-testid="fp-ufp-auto" class="ufp-value">{{ computedUfp }}</span>
+              <span class="ufp-hint muted">按类别 × 中等复杂度查表</span>
+            </div>
           </div>
         </div>
 
-        <div class="form-row">
+        <!-- ifpug / nesma_detailed / nesma_indicative: complexity auto display -->
+        <div v-else class="form-row">
           <div class="form-group">
-            <span class="form-label">复杂度（IFPUG 自动）</span>
+            <span class="form-label">{{ complexityMeta.label }}</span>
             <div class="ufp-display">
               <span data-testid="fp-complexity-auto" class="ufp-value">
                 {{ complexity === 'low' ? '低' : complexity === 'high' ? '高' : '中' }}
               </span>
-              <span class="ufp-hint muted">按 GB/T 42449 查表</span>
+              <span class="ufp-hint muted">{{ complexityMeta.hint }}</span>
             </div>
           </div>
           <div class="form-group">

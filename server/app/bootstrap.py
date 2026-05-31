@@ -2,7 +2,7 @@
 
 用法：
   python -m app.bootstrap --db ~/.claude/projects/cost-estimation/db/cost.sqlite \\
-                          --seed app/data/csbmk_202510.json
+                          --seed app/data/ssm_bk_202509.json
 
 幂等保证：
   - 如目标 DB 已含 params_global 行，则跳过 seed 装载，不破坏用户数据。

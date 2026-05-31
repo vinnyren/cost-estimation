@@ -63,7 +63,15 @@ async def test_bulk_accepts_ai_extracted_source(client_factory):
 
 async def test_patch_fp_marks_results_stale(client_factory):
     async with await client_factory() as c:
-        pid = await _make_project(c)
+        # v2.9: use ifpug project so that explicit complexity/ufp patch is
+        # honoured (nesma_estimated would override complexity to "average").
+        r0 = await c.post("/api/projects", headers=H, json={
+            "name": "T-ifpug", "project_type": "dev_only", "phase": "bidding",
+            "city": "北京", "industry": "电子政务", "mode": "forward",
+            "basis_data_ver": "CSBMK®-202510",
+            "measurement_method": "ifpug",
+        })
+        pid = r0.json()["data"]["id"]
         r = await c.post(f"/api/projects/{pid}/functions",
                           headers={**H, "Content-Type": "application/json"},
                           json=SAMPLE_FP)
