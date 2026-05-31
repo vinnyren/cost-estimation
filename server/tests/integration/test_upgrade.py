@@ -2,8 +2,6 @@
 import json
 from pathlib import Path
 
-import pytest
-from click.testing import CliRunner
 from sqlalchemy import create_engine, text
 
 from app.db.session import Base

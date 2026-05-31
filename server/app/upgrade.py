@@ -16,22 +16,17 @@
 from __future__ import annotations
 
 import json
-import shutil
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import click
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.dialects import sqlite as sqlite_dialect
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import inspect, text
+from sqlalchemy.engine import Engine
 
-from app.bootstrap import _flatten, reseed_if_outdated
 from app.db import models as _models  # noqa: F401  确保模型注册到 Base.metadata
 from app.db.session import Base
 
 
-@dataclass
+@dataclass(frozen=True)
 class UpgradeState:
     stamp_rev: str | None
     schema_at_head: bool
@@ -42,12 +37,12 @@ class UpgradeState:
     standard_changed: bool = False
 
 
-def _actual_columns(engine) -> dict[str, set[str]]:
+def _actual_columns(engine: Engine) -> dict[str, set[str]]:
     insp = inspect(engine)
     return {t: {c["name"] for c in insp.get_columns(t)} for t in insp.get_table_names()}
 
 
-def detect_state(engine, seed_path: Path) -> UpgradeState:
+def detect_state(engine: Engine, seed_path: Path) -> UpgradeState:
     actual = _actual_columns(engine)
     missing_tables: list[str] = []
     missing_cols: list[tuple[str, str]] = []
@@ -83,5 +78,6 @@ def detect_state(engine, seed_path: Path) -> UpgradeState:
         missing_cols=missing_cols,
         basis_db=basis_db,
         basis_target=basis_target,
+        # basis_db 为空(全新/仅 user 行) → standard_changed=False，视作首装而非漂移
         standard_changed=bool(basis_db) and basis_target not in basis_db,
     )
