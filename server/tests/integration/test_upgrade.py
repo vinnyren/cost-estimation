@@ -246,6 +246,7 @@ def test_cli_end_to_end_then_idempotent(tmp_path: Path):
     # 再跑：标准已是 SSM-BK-TEST → reseed 路径，no-op，不丢数据
     r2 = runner.invoke(cli, ["--db", str(db), "--seed", str(seed), "--ts", "T2"])
     assert r2.exit_code == 0, r2.output
+    assert (db.parent / "cost.sqlite.pre-upgrade-T2.bak").exists()
     eng = _engine(db)
     with eng.connect() as conn:
         n2 = conn.execute(text("SELECT count(*) FROM params_global")).scalar()
@@ -261,3 +262,27 @@ def test_cli_refuses_when_db_missing(tmp_path: Path):
                             "--seed", str(seed), "--ts", "T1"])
     assert r.exit_code == 2
     assert "请先 /setup" in r.output
+
+
+def test_cli_reports_recovery_command_on_failure(tmp_path: Path, monkeypatch):
+    import app.upgrade as up
+    from app.upgrade import cli
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    _seed_db_with_standard(eng, "CSBMK®-202510")
+    eng.dispose()
+    seed = _seed_json(tmp_path, version="SSM-BK-TEST")
+
+    def _boom(engine):
+        raise RuntimeError("schema 炸了")
+    monkeypatch.setattr(up, "reconcile_schema", _boom)
+
+    runner = CliRunner()
+    r = runner.invoke(cli, ["--db", str(db), "--seed", str(seed), "--ts", "TF"])
+    assert r.exit_code == 1
+    assert "升级失败" in r.output
+    assert "恢复命令: cp" in r.output
+    # 备份已先于失败生成
+    assert (db.parent / "cost.sqlite.pre-upgrade-TF.bak").exists()

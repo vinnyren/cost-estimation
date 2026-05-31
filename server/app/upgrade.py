@@ -1,7 +1,7 @@
 """插件升级编排：把既有数据目录安全推进到当前代码版本。
 
 用法：
-  python -m app.upgrade --db <db> --seed <seed.json> --ts <timestamp> [--yes]
+  python -m app.upgrade --db <db> --seed <seed.json> --ts <timestamp>
 
 职责：备份 → schema 漂移修复(create_all + 可空加列 + stamp head) → 基准重灯
 (标准变更→导出+全量重置；不变→reseed 未改动行)。
@@ -219,8 +219,7 @@ def backup_db(db_path: Path, ts: str) -> Path:
 @click.option("--seed", "seed_path", required=True, type=click.Path(path_type=Path),
               help="基准 seed JSON 路径")
 @click.option("--ts", required=True, help="时间戳(命令层注入, 用于备份/导出命名)")
-@click.option("--yes", is_flag=True, default=False, help="非交互模式")
-def cli(db_path: Path, seed_path: Path, ts: str, yes: bool) -> None:
+def cli(db_path: Path, seed_path: Path, ts: str) -> None:
     """把既有 DB 升级到当前代码版本（备份 + schema 修复 + 基准重灯）。"""
     if not db_path.exists():
         click.echo(f"✗ 数据库不存在: {db_path}（升级≠首装，请先 /setup）", err=True)
@@ -229,8 +228,14 @@ def cli(db_path: Path, seed_path: Path, ts: str, yes: bool) -> None:
         click.echo(f"✗ seed 文件不存在: {seed_path}", err=True)
         sys.exit(2)
 
-    engine = create_engine(f"sqlite:///{db_path}",
-                           connect_args={"check_same_thread": False})
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False, "timeout": 30},
+    )
+    with engine.begin() as conn:
+        conn.execute(text("PRAGMA journal_mode = WAL"))
+        conn.execute(text("PRAGMA busy_timeout = 5000"))
+        conn.execute(text("PRAGMA foreign_keys = ON"))
     state = detect_state(engine, seed_path)
     head = _alembic_head()
     click.echo(f"升级计划: schema stamp {state.stamp_rev} → {head} "
@@ -245,6 +250,7 @@ def cli(db_path: Path, seed_path: Path, ts: str, yes: bool) -> None:
         click.echo(f"✓ 备份: {bak}")
         reconcile_schema(engine)
         click.echo(f"✓ schema 已对齐 head={head}")
+        # 约定: db_path = <data_dir>/db/<name>.sqlite → exports 落在 <data_dir>/exports/
         export_dir = db_path.parent.parent / "exports"
         res = reconcile_baseline(engine, seed_path, ts, state, export_dir)
         if res["path"] == "reset":
