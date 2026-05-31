@@ -196,3 +196,18 @@ def test_param_override_untouched(tmp_path: Path):
             "SELECT value FROM params_override WHERE project_id='p1' AND key='cf.budget'"
         )).scalar()
     assert json.loads(ov) == 2.0   # 按项目覆盖原样幸存
+
+
+def test_backup_db_created(tmp_path: Path):
+    from app.upgrade import backup_db
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    Base.metadata.create_all(eng)
+    eng.dispose()
+
+    bak = backup_db(db, "20260531T193000")
+    assert bak.exists()
+    assert bak.name == "cost.sqlite.pre-upgrade-20260531T193000.bak"
+    assert bak.stat().st_size > 0

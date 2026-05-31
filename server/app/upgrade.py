@@ -16,10 +16,11 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from sqlalchemy import inspect, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.dialects import sqlite as sqlite_dialect
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -197,3 +198,14 @@ def reconcile_baseline(engine: Engine, seed_path: Path, ts: str, state: UpgradeS
     with Sess() as s:
         n = reseed_if_outdated(s, seed_path=seed_path)
     return {"path": "reseed", "reseeded": n}
+
+
+def backup_db(db_path: Path, ts: str) -> Path:
+    """WAL checkpoint 落盘后复制为时间戳备份。返回备份路径。"""
+    eng = create_engine(f"sqlite:///{db_path}")
+    with eng.begin() as conn:
+        conn.execute(text("PRAGMA wal_checkpoint(TRUNCATE)"))
+    eng.dispose()
+    bak = db_path.with_name(f"{db_path.name}.pre-upgrade-{ts}.bak")
+    shutil.copy2(db_path, bak)
+    return bak
