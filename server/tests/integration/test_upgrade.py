@@ -82,3 +82,28 @@ def test_reconcile_schema_adds_missing_nullable_column(tmp_path: Path):
 
     cols = {c["name"] for c in inspect(eng).get_columns("projects")}
     assert "selected_band" in cols
+
+
+def test_reconcile_schema_backfills_server_default_on_existing_rows(tmp_path: Path):
+    """老库有数据行且缺 server_default NOT NULL 列 → 加列后老行被填默认值(非 NULL)。"""
+    from app.upgrade import reconcile_schema
+    from sqlalchemy import inspect
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    Base.metadata.create_all(eng)
+    with eng.begin() as conn:
+        conn.execute(text("ALTER TABLE projects DROP COLUMN selected_band"))
+        # projects 有多列 NOT NULL 无默认值，INSERT 需全部提供
+        conn.execute(text(
+            "INSERT INTO projects (id, name, project_type, phase, city, industry, mode, basis_data_ver)"
+            " VALUES ('p1', 'demo', 'web', 'plan', 'bj', 'finance', 'normal', 'SSM-BK-TEST')"
+        ))
+
+    reconcile_schema(eng)
+
+    with eng.connect() as conn:
+        val = conn.execute(text("SELECT selected_band FROM projects WHERE id='p1'")).scalar()
+    assert val == "P50", f"expected 'P50' but got {val!r}"  # 被 server_default 回填，而非 NULL
+    assert "selected_band" in {c["name"] for c in inspect(eng).get_columns("projects")}

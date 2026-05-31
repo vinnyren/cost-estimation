@@ -84,7 +84,7 @@ def detect_state(engine: Engine, seed_path: Path) -> UpgradeState:
     )
 
 
-def _alembic_head() -> str:
+def _alembic_head() -> str | None:
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
@@ -104,16 +104,23 @@ def _stamp(engine: Engine, rev: str) -> None:
 
 
 def _add_column(engine: Engine, table: str, col) -> None:
-    """对已存在表加一列。仅可空/带默认的列可安全 ADD COLUMN(SQLite)。"""
+    """对已存在表加一列。仅可空/带默认的列可安全 ADD COLUMN(SQLite)。
+
+    用 CreateColumn 渲染完整列 DDL（含 DEFAULT/NOT NULL），使带 server_default 的
+    NOT NULL 列能被 SQLite 用默认值回填现有行；ORM python-side(default=) 标量默认值
+    在 ADD COLUMN 后另行 UPDATE 回填。
+    """
     if not col.nullable and col.default is None and col.server_default is None:
         raise RuntimeError(
             f"无法自动加非空无默认列 {table}.{col.name}：该迁移非加性，"
             f"请在 upgrade.py 为对应 revision 加显式 handler"
         )
-    coltype = col.type.compile(dialect=sqlite_dialect.dialect())
+    from sqlalchemy.schema import CreateColumn
+
+    col_spec = CreateColumn(col).compile(dialect=sqlite_dialect.dialect()).string
     with engine.begin() as conn:
-        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col.name} {coltype}"))
-        # 回填默认值，避免老行留 NULL 破坏计算
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_spec}"))
+        # ORM python-side 标量默认值(server_default=None 时)：回填老行 NULL
         if col.default is not None and getattr(col.default, "is_scalar", False):
             conn.execute(
                 text(f"UPDATE {table} SET {col.name} = :d WHERE {col.name} IS NULL"),
@@ -131,5 +138,7 @@ def reconcile_schema(engine: Engine) -> str:
             if col.name not in acols:
                 _add_column(engine, t.name, col)
     head = _alembic_head()
+    if head is None:
+        raise RuntimeError("alembic 无 head revision，请检查 alembic/versions 迁移脚本")
     _stamp(engine, head)
     return head
