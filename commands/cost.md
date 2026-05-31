@@ -16,10 +16,16 @@ allowed-tools: Bash, Read
 
 > 用户没传 project_id 时走这条分支。下方步骤 1-6 是启动流程；执行完毕后给出 URL 并退出，不进入分支 B。
 
-1. 定义路径：
+1. 定义路径（兼容 marketplace 与旧扁平布局）：
    ```bash
-   PLUGIN_DIR="$HOME/.claude/plugins/cache/cost-estimation"
-   [ -d "$PLUGIN_DIR" ] || PLUGIN_DIR="$HOME/.claude/plugins/data/cost-estimation"
+   PLUGIN_DIR="${CLAUDE_PLUGIN_ROOT:-}"
+   if [ -z "$PLUGIN_DIR" ] || [ ! -d "$PLUGIN_DIR/server" ]; then
+     PLUGIN_DIR=$(ls -d "$HOME"/.claude/plugins/cache/*/cost-estimation/*/ 2>/dev/null | sort -V | tail -1)
+     PLUGIN_DIR="${PLUGIN_DIR%/}"
+   fi
+   [ -d "$PLUGIN_DIR/server" ] || PLUGIN_DIR="$HOME/.claude/plugins/cache/cost-estimation"
+   [ -d "$PLUGIN_DIR/server" ] || PLUGIN_DIR="$HOME/.claude/plugins/data/cost-estimation"
+   [ -d "$PLUGIN_DIR/server" ] || { echo "✗ 未找到插件安装目录，请先运行 /cost-estimation:setup"; exit 1; }
    DATA_DIR="$HOME/.claude/projects/cost-estimation"
    mkdir -p "$DATA_DIR"
    ```
