@@ -17,9 +17,11 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import click
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.dialects import sqlite as sqlite_dialect
 from sqlalchemy.engine import Engine
@@ -209,3 +211,54 @@ def backup_db(db_path: Path, ts: str) -> Path:
     bak = db_path.with_name(f"{db_path.name}.pre-upgrade-{ts}.bak")
     shutil.copy2(db_path, bak)
     return bak
+
+
+@click.command()
+@click.option("--db", "db_path", required=True, type=click.Path(path_type=Path),
+              help="SQLite 数据库路径")
+@click.option("--seed", "seed_path", required=True, type=click.Path(path_type=Path),
+              help="基准 seed JSON 路径")
+@click.option("--ts", required=True, help="时间戳(命令层注入, 用于备份/导出命名)")
+@click.option("--yes", is_flag=True, default=False, help="非交互模式")
+def cli(db_path: Path, seed_path: Path, ts: str, yes: bool) -> None:
+    """把既有 DB 升级到当前代码版本（备份 + schema 修复 + 基准重灯）。"""
+    if not db_path.exists():
+        click.echo(f"✗ 数据库不存在: {db_path}（升级≠首装，请先 /setup）", err=True)
+        sys.exit(2)
+    if not seed_path.exists():
+        click.echo(f"✗ seed 文件不存在: {seed_path}", err=True)
+        sys.exit(2)
+
+    engine = create_engine(f"sqlite:///{db_path}",
+                           connect_args={"check_same_thread": False})
+    state = detect_state(engine, seed_path)
+    head = _alembic_head()
+    click.echo(f"升级计划: schema stamp {state.stamp_rev} → {head} "
+               f"(已到位={state.schema_at_head}, 缺表={len(state.missing_tables)}, "
+               f"缺列={len(state.missing_cols)})")
+    click.echo(f"          基准 {sorted(state.basis_db) or '空'} → {state.basis_target} "
+               f"(标准变更={state.standard_changed})")
+
+    bak = None
+    try:
+        bak = backup_db(db_path, ts)
+        click.echo(f"✓ 备份: {bak}")
+        reconcile_schema(engine)
+        click.echo(f"✓ schema 已对齐 head={head}")
+        export_dir = db_path.parent.parent / "exports"
+        res = reconcile_baseline(engine, seed_path, ts, state, export_dir)
+        if res["path"] == "reset":
+            click.echo(f"✓ 基准全量重置 → {res['seeded']} 行；"
+                       f"导出旧改动 {res['exported']} 条 → {res['export_file']}")
+        else:
+            click.echo(f"✓ 基准 reseed 未改动行 {res['reseeded']} 条（标准未变）")
+        click.echo("✓ 升级完成。运行 /cost 启动。")
+    except Exception as e:  # noqa: BLE001
+        click.echo(f"✗ 升级失败: {e}", err=True)
+        if bak:
+            click.echo(f"  恢复命令: cp {bak} {db_path}", err=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    cli()

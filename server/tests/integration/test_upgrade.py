@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 
+from click.testing import CliRunner
 from sqlalchemy import create_engine, text
 
 from app.db.session import Base
@@ -211,3 +212,52 @@ def test_backup_db_created(tmp_path: Path):
     assert bak.exists()
     assert bak.name == "cost.sqlite.pre-upgrade-20260531T193000.bak"
     assert bak.stat().st_size > 0
+
+
+def test_cli_end_to_end_then_idempotent(tmp_path: Path):
+    """端到端：漂移+旧标准库 → 一次升级到位；再跑一次为 no-op、不丢数据。"""
+    from app.upgrade import cli, _alembic_head
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    _seed_db_with_standard(eng, "CSBMK®-202510")
+    with eng.begin() as conn:   # 落后的 stamp
+        conn.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"))
+        conn.execute(text("INSERT INTO alembic_version VALUES ('4b7939b0712d')"))
+    eng.dispose()
+    seed = _seed_json(tmp_path, version="SSM-BK-TEST")
+
+    runner = CliRunner()
+    r1 = runner.invoke(cli, ["--db", str(db), "--seed", str(seed), "--ts", "T1"])
+    assert r1.exit_code == 0, r1.output
+    assert "升级完成" in r1.output
+
+    eng = _engine(db)
+    with eng.connect() as conn:
+        stamp = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+        versions = {r[0] for r in conn.execute(text(
+            "SELECT DISTINCT basis_version FROM params_global")).all()}
+        n1 = conn.execute(text("SELECT count(*) FROM params_global")).scalar()
+    assert stamp == _alembic_head()
+    assert versions == {"SSM-BK-TEST"}
+    eng.dispose()
+
+    # 再跑：标准已是 SSM-BK-TEST → reseed 路径，no-op，不丢数据
+    r2 = runner.invoke(cli, ["--db", str(db), "--seed", str(seed), "--ts", "T2"])
+    assert r2.exit_code == 0, r2.output
+    eng = _engine(db)
+    with eng.connect() as conn:
+        n2 = conn.execute(text("SELECT count(*) FROM params_global")).scalar()
+    assert n2 == n1
+
+
+def test_cli_refuses_when_db_missing(tmp_path: Path):
+    from app.upgrade import cli
+
+    seed = _seed_json(tmp_path)
+    runner = CliRunner()
+    r = runner.invoke(cli, ["--db", str(tmp_path / "nope.sqlite"),
+                            "--seed", str(seed), "--ts", "T1"])
+    assert r.exit_code == 2
+    assert "请先 /setup" in r.output
