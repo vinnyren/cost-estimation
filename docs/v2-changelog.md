@@ -69,6 +69,12 @@ cd server && .venv/bin/alembic upgrade head   # 6fd4cb76f438: measurement_method
 | P3 | **失效运行态残留清理** —— `setup.md` 新增步骤：仅当 `.pid` 指向的进程已死时清理 `.pid/.token/.port`，活服务则保留并提示先 `/cost-stop`，避免误杀正在运行的后端 |
 | P4 | **初始化 seed 修正为 SSM-BK-202509** —— `setup.md` 步骤 5 此前硬编码 `--seed csbmk_202510.json`，覆盖了 `config.csbmk_seed_path` 已正确指向的 SSM 默认值；改为 `ssm_bk_202509.json`，与 v2.9 基准标准一致。`config.py` / `bootstrap` 默认本就正确，仅安装命令落后 |
 
+### 升级命令（2026-05-31 patch）
+
+| # | 描述 |
+|---|---|
+| P5 | **新增 `/cost-upgrade`** —— 既有安装的升级路径：备份 DB（WAL 落盘 + 时间戳副本）→ 内省驱动的 alembic 漂移修复（schema 到位则 `stamp head`，缺可空列则加列回填，避开重放迁移链崩溃）→ 基准重灯（标准变更如 CSBMK→SSM 则导出 modified 行 + 全量重置 + 清死键；标准不变则 reseed 未改动行）→ 刷新 venv 依赖 + 前端。逻辑在可测的 `server/app/upgrade.py`（11 项集成测试），命令文件保持薄壳。铁律：`params_override` 永不触碰、备份先于变更、失败不自动回滚而给恢复命令 |
+
 ---
 
 ## v2.8（2026-05-19）— 42449 算法 / 基准对齐 / 全局参数编辑 / 反算补全

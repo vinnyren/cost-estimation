@@ -20,6 +20,14 @@
 
 启动后在浏览器创建项目、上传文档；回到终端运行 `/cost-estimation:cost <project_id>` 让 AI 提取功能点。逐页操作见 [docs/user-guide.md](docs/user-guide.md)。
 
+| 命令 | 说明 |
+|---|---|
+| `/cost-estimation:setup` | 首次安装：建后端 venv + 装依赖 + 初始化数据库与基准数据 |
+| `/cost-estimation:cost` | 启动后端服务并打开浏览器；带 `<project_id>` 时对该项目执行 AI 功能点提取 |
+| `/cost-estimation:cost-allocate` | AI 模块分摊：将反算 P50 规模按模块切分并写回 FP 表 |
+| `/cost-estimation:cost-stop` | 停止后端服务并清理 pid/token 文件 |
+| `/cost-estimation:cost-upgrade` | 升级既有安装：备份 + alembic 迁移 + 基准重灯 + 刷新依赖/前端 |
+
 ---
 
 ## 两种工作模式
@@ -81,7 +89,7 @@
 ```
 .
 ├── .claude-plugin/         # Plugin 元信息（marketplace.json + plugin.json）
-├── commands/               # slash 命令（setup / cost / cost-allocate / cost-stop）
+├── commands/               # slash 命令（setup / cost / cost-allocate / cost-stop / cost-upgrade）
 ├── reference/              # NESMA 规则 + CSBMK 说明
 ├── server/                 # FastAPI 后端 + 计算引擎
 │   ├── app/
