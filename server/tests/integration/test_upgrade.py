@@ -264,6 +264,52 @@ def test_cli_refuses_when_db_missing(tmp_path: Path):
     assert "请先 /setup" in r.output
 
 
+def test_add_column_rejects_func_now_notnull(tmp_path: Path):
+    """_add_column 应拒绝 func.now() 非空列（非常量 server_default），不应让 SQLite 抛晦涩错误。"""
+    import pytest
+    from sqlalchemy import Column, DateTime, Integer, MetaData, Table
+    from sqlalchemy.sql import func
+
+    from app.upgrade import _add_column
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    md = MetaData()
+    Table("t_demo", md, Column("id", Integer, primary_key=True))
+    md.create_all(eng)
+
+    # 构造 func.now() 非空列，模拟未来对已存在表新增此类列
+    bad_col = Column("created_at", DateTime, server_default=func.now(), nullable=False)
+    bad_col.name = "created_at"
+
+    with pytest.raises(RuntimeError, match="非加性"):
+        _add_column(eng, "t_demo", bad_col)
+
+
+def test_reconcile_schema_recreates_dropped_table(tmp_path: Path):
+    """reconcile_schema 应重建被物理删除的表（missing_tables 路径）。
+
+    选 param_snapshots：无其他表以其为外键目标，DROP 无阻碍；
+    且它含 func.now() NOT NULL 列，额外验证建表（非 ADD COLUMN）路径不受守卫影响。
+    """
+    from sqlalchemy import inspect
+
+    from app.upgrade import reconcile_schema
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    Base.metadata.create_all(eng)
+    with eng.begin() as conn:
+        conn.execute(text("DROP TABLE param_snapshots"))
+    assert "param_snapshots" not in inspect(eng).get_table_names()
+
+    reconcile_schema(eng)
+
+    assert "param_snapshots" in inspect(eng).get_table_names()
+
+
 def test_cli_reports_recovery_command_on_failure(tmp_path: Path, monkeypatch):
     import app.upgrade as up
     from app.upgrade import cli

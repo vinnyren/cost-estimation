@@ -109,15 +109,25 @@ def _stamp(engine: Engine, rev: str) -> None:
 
 
 def _add_column(engine: Engine, table: str, col) -> None:
-    """对已存在表加一列。仅可空/带默认的列可安全 ADD COLUMN(SQLite)。
+    """对已存在表加一列。仅可空、或带 python-side 标量默认值、或带字面量
+    server_default 的列可安全 ADD COLUMN(SQLite)。
 
-    用 CreateColumn 渲染完整列 DDL（含 DEFAULT/NOT NULL），使带 server_default 的
-    NOT NULL 列能被 SQLite 用默认值回填现有行；ORM python-side(default=) 标量默认值
+    非空且无字面量默认值的列（含 func.now() 等非常量 server_default）无法被
+    SQLite 安全 ADD COLUMN——视作非加性迁移，主动抛错要求加显式 handler，
+    避免抛出晦涩的 SQLite "non-constant default" 错误。
+
+    用 CreateColumn 渲染完整列 DDL（含 DEFAULT/NOT NULL），使带字面量 server_default
+    的 NOT NULL 列能被 SQLite 用默认值回填现有行；ORM python-side(default=) 标量默认值
     在 ADD COLUMN 后另行 UPDATE 回填。
     """
-    if not col.nullable and col.default is None and col.server_default is None:
+    server_default_literal = (
+        col.server_default is not None
+        and isinstance(getattr(col.server_default, "arg", None), str)
+    )
+    if not col.nullable and col.default is None and not server_default_literal:
         raise RuntimeError(
-            f"无法自动加非空无默认列 {table}.{col.name}：该迁移非加性，"
+            f"无法自动加列 {table}.{col.name}（非空且无字面量默认值，"
+            f"可能是 func.now() 等非常量 server_default）：该迁移非加性，"
             f"请在 upgrade.py 为对应 revision 加显式 handler"
         )
     from sqlalchemy.schema import CreateColumn
