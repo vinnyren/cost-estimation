@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from sqlalchemy import inspect, text
+from sqlalchemy.dialects import sqlite as sqlite_dialect
 from sqlalchemy.engine import Engine
 
 from app.db import models as _models  # noqa: F401  确保模型注册到 Base.metadata
@@ -81,3 +82,54 @@ def detect_state(engine: Engine, seed_path: Path) -> UpgradeState:
         # basis_db 为空(全新/仅 user 行) → standard_changed=False，视作首装而非漂移
         standard_changed=bool(basis_db) and basis_target not in basis_db,
     )
+
+
+def _alembic_head() -> str:
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    ini = Path(__file__).resolve().parents[1] / "alembic.ini"
+    return ScriptDirectory.from_config(Config(str(ini))).get_current_head()
+
+
+def _stamp(engine: Engine, rev: str) -> None:
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS alembic_version "
+            "(version_num VARCHAR(32) NOT NULL)"
+        ))
+        conn.execute(text("DELETE FROM alembic_version"))
+        conn.execute(text("INSERT INTO alembic_version (version_num) VALUES (:v)"),
+                     {"v": rev})
+
+
+def _add_column(engine: Engine, table: str, col) -> None:
+    """对已存在表加一列。仅可空/带默认的列可安全 ADD COLUMN(SQLite)。"""
+    if not col.nullable and col.default is None and col.server_default is None:
+        raise RuntimeError(
+            f"无法自动加非空无默认列 {table}.{col.name}：该迁移非加性，"
+            f"请在 upgrade.py 为对应 revision 加显式 handler"
+        )
+    coltype = col.type.compile(dialect=sqlite_dialect.dialect())
+    with engine.begin() as conn:
+        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col.name} {coltype}"))
+        # 回填默认值，避免老行留 NULL 破坏计算
+        if col.default is not None and getattr(col.default, "is_scalar", False):
+            conn.execute(
+                text(f"UPDATE {table} SET {col.name} = :d WHERE {col.name} IS NULL"),
+                {"d": col.default.arg},
+            )
+
+
+def reconcile_schema(engine: Engine) -> str:
+    """create_all 补缺失表 + 对已存在表补可空缺列 + stamp head。返回 head 修订号。"""
+    Base.metadata.create_all(engine)            # 幂等补齐缺失【表】
+    actual = _actual_columns(engine)
+    for t in Base.metadata.sorted_tables:
+        acols = actual.get(t.name, set())
+        for col in t.columns:
+            if col.name not in acols:
+                _add_column(engine, t.name, col)
+    head = _alembic_head()
+    _stamp(engine, head)
+    return head

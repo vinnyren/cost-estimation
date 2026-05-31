@@ -39,3 +39,46 @@ def test_detect_diverged_stamp(tmp_path: Path):
     assert state.schema_at_head is True
     assert state.stamp_rev == "4b7939b0712d"
     assert state.missing_cols == []
+
+
+def test_reconcile_schema_stamps_when_current(tmp_path: Path):
+    """漂移 DB（schema 到位、stamp 落后）→ stamp head，无 DDL 报错，列完好。"""
+    from app.upgrade import reconcile_schema, _alembic_head
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    Base.metadata.create_all(eng)
+    with eng.begin() as conn:
+        conn.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"))
+        conn.execute(text("INSERT INTO alembic_version VALUES ('4b7939b0712d')"))
+
+    head = reconcile_schema(eng)
+
+    with eng.connect() as conn:
+        stamp = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
+    assert stamp == head == _alembic_head()
+    # projects 表关键列仍在
+    from sqlalchemy import inspect
+    cols = {c["name"] for c in inspect(eng).get_columns("projects")}
+    assert "measurement_method" in cols
+
+
+def test_reconcile_schema_adds_missing_nullable_column(tmp_path: Path):
+    """老库缺一可空列 → 加列 + 回填默认 + stamp head。"""
+    from app.upgrade import reconcile_schema
+    from sqlalchemy import inspect
+
+    db = tmp_path / "db" / "cost.sqlite"
+    db.parent.mkdir(parents=True)
+    eng = _engine(db)
+    Base.metadata.create_all(eng)
+    # 制造"缺列"：物理删除 projects.selected_band（SQLite 3.35+ 支持 DROP COLUMN）
+    with eng.begin() as conn:
+        conn.execute(text("ALTER TABLE projects DROP COLUMN selected_band"))
+    assert "selected_band" not in {c["name"] for c in inspect(eng).get_columns("projects")}
+
+    reconcile_schema(eng)
+
+    cols = {c["name"] for c in inspect(eng).get_columns("projects")}
+    assert "selected_band" in cols
