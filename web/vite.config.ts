@@ -3,15 +3,20 @@ import vue from "@vitejs/plugin-vue";
 import path from "node:path";
 import { readFileSync } from "node:fs";
 
-const pkg = JSON.parse(
-  readFileSync(path.resolve(__dirname, "package.json"), "utf-8"),
+// 版本号单一来源：从插件根 .claude-plugin/plugin.json 读取（权威源），
+// 而非 package.json，使前端显示版本恒等于产品版本。
+const pluginManifest = JSON.parse(
+  readFileSync(
+    path.resolve(__dirname, "../.claude-plugin/plugin.json"),
+    "utf-8",
+  ),
 ) as { version: string };
 
 export default defineConfig({
   plugins: [vue()],
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
   define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_VERSION__: JSON.stringify(pluginManifest.version),
   },
   server: {
     host: "127.0.0.1",

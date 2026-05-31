@@ -13,6 +13,9 @@ interface NavItem {
 const route = useRoute();
 const router = useRouter();
 
+// 版本号单一来源：构建期由 vite 从 .claude-plugin/plugin.json 注入。
+const appVersion = __APP_VERSION__;
+
 const MAIN_NAV: NavItem[] = [
   { key: "projects", label: "项目工作台", icon: "folder", to: "/" },
   { key: "params-global", label: "全局参数库", icon: "settings", to: "/params/global" },
@@ -54,7 +57,7 @@ function go(item: NavItem) {
       <div class="sidebar-brand-mark">F</div>
       <div class="sidebar-brand-text">
         <div class="sidebar-brand-title">FP-Studio</div>
-        <div class="sidebar-brand-sub mono">v2.9.0 · SSM-BK-202509</div>
+        <div class="sidebar-brand-sub mono">v{{ appVersion }} · SSM-BK-202509</div>
       </div>
     </div>
 

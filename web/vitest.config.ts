@@ -1,10 +1,23 @@
 import { defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import path from "node:path";
+import { readFileSync } from "node:fs";
+
+// 版本号单一来源：与 vite.config.ts 一致，从 .claude-plugin/plugin.json 注入
+// __APP_VERSION__，使挂载组件的单测能解析该构建期全局常量。
+const pluginManifest = JSON.parse(
+  readFileSync(
+    path.resolve(__dirname, "../.claude-plugin/plugin.json"),
+    "utf-8",
+  ),
+) as { version: string };
 
 export default defineConfig({
   plugins: [vue()],
   resolve: { alias: { "@": path.resolve(__dirname, "src") } },
+  define: {
+    __APP_VERSION__: JSON.stringify(pluginManifest.version),
+  },
   test: {
     environment: "happy-dom",
     globals: true,
