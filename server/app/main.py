@@ -18,6 +18,7 @@ from .api.snapshots import router as snapshots_router
 from .api.audit import router as audit_router, global_router as audit_global_router
 from .api.ai_tasks import router as ai_tasks_router
 from .config import Settings, settings
+from .version import get_version
 from .deps import auth_middleware, origin_middleware
 from .middleware.audit import AuditMiddleware
 
@@ -86,7 +87,7 @@ def create_app() -> FastAPI:
         else {}
     )
     app = FastAPI(
-        title="软件造价制作系统", version="2.9.0", lifespan=_lifespan,
+        title="软件造价制作系统", version=get_version(), lifespan=_lifespan,
         **docs_kwargs,  # type: ignore[arg-type]
     )
 

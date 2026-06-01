@@ -4,34 +4,19 @@
 配置 API 路由白名单即可直连。同样原因，全局 X-Auth-Token 中间件对该
 路径放行。
 
-version 字段优先从已安装包元数据读取（pip install -e 之后），失败时
-回退到读取仓库根 pyproject.toml；最终兜底 "unknown"，避免 release 时
-漏改 hard-coded 字符串。
+version 字段从版本单一来源 `app.version.get_version()` 读取（权威源
+`.claude-plugin/plugin.json`），避免与硬编码字符串漂移。
 """
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
-
 from fastapi import APIRouter
+
+from app.version import get_version
 
 router = APIRouter()
 
 
 def _read_version() -> str:
-    """读 pyproject 版本，避免 release 时漏改 hard-coded 字符串。"""
-    try:
-        return _pkg_version("cost-estimation")
-    except PackageNotFoundError:
-        # 包未 pip install -e 时（直接 uvicorn .venv 运行）— 读 pyproject 文件
-        try:
-            import tomllib
-            from pathlib import Path
-            here = Path(__file__).resolve()
-            pyproject = here.parents[2] / "pyproject.toml"
-            if pyproject.exists():
-                with pyproject.open("rb") as f:
-                    return tomllib.load(f)["project"]["version"]
-        except Exception:
-            pass
-        return "unknown"
+    """委托给版本单一来源；保留此名以兼容既有调用方/测试。"""
+    return get_version()
 
 
 @router.get("/health")
